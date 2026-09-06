@@ -1,0 +1,61 @@
+name: Build without warnings
+
+on:
+  push:
+    branches:
+      - main
+      - 'sub/**'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.x
+
+      - name: Check solution includes every project
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+
+          solution = Path("PiggyFarm.slnx")
+          root = ET.parse(solution).getroot()
+          listed = {
+              Path(project.attrib.get("Path") or project.findtext("Path", "")).as_posix()
+              for project in root.iter("Project")
+              if project.attrib.get("Path") or project.findtext("Path")
+          }
+          projects = {
+              path.as_posix()
+              for path in Path(".").rglob("*.csproj")
+              if "obj" not in path.parts and ".git" not in path.parts
+          }
+
+          missing = sorted(projects - listed)
+          stale = sorted(listed - projects)
+          if missing or stale:
+              if missing:
+                  print("Projects missing from the solution:")
+                  print("\n".join(f"  {path}" for path in missing))
+              if stale:
+                  print("Solution entries with no project file:")
+                  print("\n".join(f"  {path}" for path in stale))
+              raise SystemExit(1)
+          PY
+
+      - name: Restore solution
+        run: dotnet restore PiggyFarm.slnx
+
+      - name: Build solution without warnings
+        run: dotnet build PiggyFarm.slnx --configuration Release --no-restore -warnaserror
