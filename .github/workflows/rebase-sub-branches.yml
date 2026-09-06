@@ -1,0 +1,55 @@
+name: Rebase sub branches
+
+on:
+  workflow_run:
+    workflows:
+      - Build without warnings
+    types:
+      - completed
+
+permissions:
+  contents: write
+
+concurrency:
+  group: rebase-sub-branches
+  cancel-in-progress: false
+
+jobs:
+  rebase:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Rebase and push sub branches
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git fetch --prune origin main '+refs/heads/sub/*:refs/remotes/origin/sub/*'
+          branches=$(git for-each-ref --format='%(refname:strip=3)' refs/remotes/origin/sub/)
+
+          if [[ -z "$branches" ]]; then
+            echo "No sub/** branches found."
+            exit 0
+          fi
+
+          while IFS= read -r branch; do
+            [[ -z "$branch" ]] && continue
+            echo "Rebasing $branch onto origin/main"
+            git checkout -B "$branch" "origin/$branch"
+            git rebase origin/main
+            git push --force-with-lease origin "HEAD:$branch"
+          done <<< "$branches"
