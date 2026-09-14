@@ -1,0 +1,7 @@
+.env
+secrets/
+runtime/
+backups/
+dist/
+__pycache__/
+.venv/
