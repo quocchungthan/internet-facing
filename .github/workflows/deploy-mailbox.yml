@@ -474,6 +474,7 @@ jobs:
           SSH_USER: ${{ secrets.MAILBOX_SSH_USER }}
           SSH_PORT: ${{ vars.MAILBOX_SSH_PORT }}
           DEPLOY_DIR: ${{ needs.preflight.outputs.deploy_dir }}
+          MAIL_HOSTNAME: ${{ needs.preflight.outputs.mail_hostname }}
         run: |
           set -euo pipefail
           port="${SSH_PORT:-22}"
@@ -528,14 +529,16 @@ jobs:
           SSH_USER: ${{ secrets.MAILBOX_SSH_USER }}
           SSH_PORT: ${{ vars.MAILBOX_SSH_PORT }}
           DEPLOY_DIR: ${{ needs.preflight.outputs.deploy_dir }}
+          MAIL_HOSTNAME: ${{ needs.preflight.outputs.mail_hostname }}
         run: |
           set -euo pipefail
           port="${SSH_PORT:-22}"
           ssh -i ~/.ssh/id_deploy -p "$port" -o BatchMode=yes -o ConnectTimeout=15 \
-            "$SSH_USER@$SSH_HOST" "DEPLOY_DIR='$DEPLOY_DIR' bash -s" <<'REMOTE'
+            "$SSH_USER@$SSH_HOST" "DEPLOY_DIR='$DEPLOY_DIR' MAIL_HOSTNAME='$MAIL_HOSTNAME' bash -s" <<'REMOTE'
           set -euo pipefail
           cd "$DEPLOY_DIR"
           docker compose up -d --build
+          MAIL_HOSTNAME="$MAIL_HOSTNAME" MAIL_DEPLOY_DIR="$DEPLOY_DIR" bash scripts/configure-caddy-web.sh
           docker compose ps
           REMOTE
 
@@ -556,7 +559,7 @@ jobs:
           echo "$states"
 
           failed=0
-          for svc in maddy web proxy; do
+          for svc in maddy web; do
             if ! grep -Eq "^$svc (running|Up)" <<<"$states"; then
               echo "::error::Service '$svc' is not running after deploy."
               failed=1
@@ -580,6 +583,6 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
           if [[ "$failed" -ne 0 ]]; then
-            echo "::error::Post-deploy health check failed. Inspect: docker compose logs --tail=200 maddy web proxy"
+            echo "::error::Post-deploy health check failed. Inspect: docker compose logs --tail=200 maddy web"
             exit 1
           fi
