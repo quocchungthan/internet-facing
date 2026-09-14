@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="vi">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Maddy eldervibe.dev</title><link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"></head>
+<body>
+<header><a class="brand" href="{{ url_for('inbox') }}"><span class="logo">S</span> shuneo<span class="muted">mail</span></a><span class="badge">PRIVATE MAIL</span></header>
+<div class="layout">
+{% if user %}<aside><a class="button compose" href="{{ url_for('compose') }}">＋ Soạn thư</a><nav><a class="{{ 'active' if folder == 'inbox' }}" href="{{ url_for('inbox') }}">Hộp thư đến <span>↙</span></a><a class="{{ 'active' if folder == 'sent' }}" href="{{ url_for('inbox', folder='sent') }}">Đã gửi <span>↗</span></a></nav><div class="account"><span class="avatar">{{ user.email[0]|upper }}</span><strong>{{ user.email }}</strong><form action="{{ url_for('logout') }}" method="post"><input type="hidden" name="csrf" value="{{ csrf() }}"><button class="link">Đăng xuất</button></form></div></aside>{% endif %}
+<main class="{{ 'login-main' if not user }}">
+{% for category, message in get_flashed_messages(with_categories=true) %}<div class="notice {{ category }}" role="status">{{ message }}</div>{% endfor %}
+{% block content %}{% endblock %}
+</main></div><footer>Không gian thư của bạn · Maddy eldervibe.dev</footer>
+</body></html>
