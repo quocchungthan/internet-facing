@@ -27,10 +27,10 @@ Maddy ghi IMAP storage là beta. Đây là MVP cá nhân, cần backup và kiể
 ```text
 Internet -- SMTP 25 --> Maddy -- IMAP 993 --> Webapp
 Internet <-- SMTP 25 -- Maddy <-- STARTTLS 587 -- Webapp
-Trình duyệt -- HTTPS 443 --> Nginx --> Webapp nội bộ :8000
+Trình duyệt -- HTTPS 443 --> Caddy trên host --> Webapp nội bộ :8000
 ```
 
-`compose.yaml`: ba dịch vụ chạy thường xuyên (`maddy`, `web`, `proxy`) và `certbot` chỉ chạy khi cấp/gia hạn chứng chỉ. Maddy dùng image upstream 0.9.5; web được build từ `web/Dockerfile`. Database/thư nằm trong `runtime/mail`, được giữ qua việc tạo lại container. Không mount Docker socket vào ứng dụng.
+`compose.yaml`: hai dịch vụ chạy thường xuyên (`maddy`, `web`) và `certbot` chỉ chạy khi cấp/gia hạn chứng chỉ. Caddy trên host cung cấp HTTPS cho webmail; Maddy vẫn dùng cùng chứng chỉ cho SMTP/IMAP TLS. Maddy dùng image upstream 0.9.5; web được build từ `web/Dockerfile`. Database/thư nằm trong `runtime/mail`, được giữ qua việc tạo lại container. Không mount Docker socket vào ứng dụng.
 
 ## 1. Chuẩn bị VPS
 
@@ -110,7 +110,7 @@ Trong thư mục dự án, dùng một địa chỉ email hiện có để nhậ
 python3 scripts/manage.py certificate --email EMAIL_DANG_DUNG
 ```
 
-Lệnh này dùng Let's Encrypt, đồng ý điều khoản của Let's Encrypt, cần Internet và port 80 đang trống/truy cập được. Không bật `proxy` trước lần cấp đầu tiên. Nếu lỗi, kiểm tra A/AAAA, cổng 80, firewall và DNS proxy; tránh thử liên tục gây rate limit.
+Lệnh này dùng Let's Encrypt, đồng ý điều khoản của Let's Encrypt, cần Internet và port 80 đang trống/truy cập được. Caddy được dừng tạm trong lúc Certbot standalone sử dụng port 80. Nếu lỗi, kiểm tra A/AAAA, cổng 80, firewall và DNS proxy; tránh thử liên tục gây rate limit.
 
 Chứng chỉ dùng chung cho HTTPS, SMTP STARTTLS và IMAP. Khóa ở `runtime/letsencrypt`, không sửa quyền thành công khai. Image Maddy hiện chạy với quyền mặc định upstream để đọc khóa bind mount; chỉ nên cho người quản trị tin cậy truy cập host/Docker.
 
@@ -120,7 +120,7 @@ Chứng chỉ dùng chung cho HTTPS, SMTP STARTTLS và IMAP. Khóa ở `runtime/
 docker compose up -d --build
 python3 scripts/manage.py accounts
 docker compose ps
-docker compose logs --tail=100 maddy web proxy
+docker compose logs --tail=100 maddy web
 ```
 
 Nếu đã `docker load` image, có thể dùng `docker compose up -d --no-build` thay vì build.
@@ -169,7 +169,7 @@ Thêm vào **root crontab** bằng `sudo crontab -e` (thay đường dẫn nếu
 17 3 * * * cd /opt/shuneo-mail-mvp && /usr/bin/python3 scripts/manage.py renew >> /var/log/shuneo-mail-renew.log 2>&1
 ```
 
-Port 80 cần tiếp tục mở cho HTTP challenge. Script reload Nginx và restart Maddy sau renewal thành công (có gián đoạn ngắn, kể cả khi cert chưa đến hạn). Kiểm tra log và ngày hết hạn định kỳ; cron không tự gửi thông báo lỗi cho bạn.
+Port 80 cần tiếp tục mở cho HTTP challenge. Script dừng/khởi động lại Caddy trong quá trình renewal và reload Caddy cùng restart Maddy sau renewal thành công. Có thể có gián đoạn ngắn; kiểm tra log và ngày hết hạn định kỳ.
 
 ## 10. Backup và khôi phục
 
@@ -207,7 +207,7 @@ Lệnh thường dùng:
 ```bash
 docker compose ps
 docker compose logs --tail=100 maddy
-docker compose logs --tail=100 web proxy
+docker compose logs --tail=100 web
 df -h
 docker compose restart web
 docker compose down
@@ -235,7 +235,7 @@ Các bài test chỉ gửi giữa hai tài khoản local, kiểm tra Sent, tiế
 
 ```bash
 python scripts/manage.py package
-docker save -o dist/shuneo-mail-images-linux-amd64.tar shuneo-webmail:1.0.0 foxcpp/maddy:0.9.5 nginx:1.28-alpine certbot/certbot:v4.2.0
+docker save -o dist/shuneo-mail-images-linux-amd64.tar shuneo-webmail:1.0.0 foxcpp/maddy:0.9.5 certbot/certbot:v4.2.0
 ```
 
 ZIP chứa source/config/hướng dẫn, không chứa bí mật/dữ liệu. Image tar là tùy chọn để không phải build/pull trên VPS cùng kiến trúc; vẫn cần Internet để cấp TLS, DNS và gửi/nhận mail.
