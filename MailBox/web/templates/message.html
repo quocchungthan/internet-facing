@@ -1,0 +1,3 @@
+{% extends 'base.html' %}{% block content %}
+<a class="back" href="{{ url_for('inbox', folder=folder) }}">← Quay lại hộp thư</a><article class="message"><h1>{{ msg.get('Subject', '(Không có tiêu đề)') }}</h1><dl><dt>Từ</dt><dd>{{ msg.get('From', '') }}</dd><dt>Đến</dt><dd>{{ msg.get('To', '') }}</dd><dt>Ngày</dt><dd>{{ msg.get('Date', '') }}</dd></dl><pre class="body-text">{{ body }}</pre>{% if attachments %}<div class="notice">Thư có tệp đính kèm: {{ attachments|join(', ') }}. MVP chưa hỗ trợ tải tệp; hãy dùng ứng dụng IMAP để mở.</div>{% endif %}</article>
+{% endblock %}
