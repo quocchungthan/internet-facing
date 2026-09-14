@@ -1,0 +1,24 @@
+name: Deploy Storage
+
+on:
+  ## should not autodeploy for now
+  # push:
+  #   branches:
+  #     - sub/storage
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/reusable-deploy-service.yml
+    with:
+      image_name: ghcr.io/${{ github.repository_owner }}/internet-facing-storage
+      image_tag: ${{ github.sha }}
+      docker_context: Shed
+      dockerfile: Shed/Shed/Dockerfile
+      wrapper_path: Shed/deployment/deploy-shed.sh
+      common_script_path: deployment/deploy-nginx-service.sh
+      runtime_image_argument: STORAGE_IMAGE
+    secrets: inherit
