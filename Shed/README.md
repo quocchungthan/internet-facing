@@ -3,6 +3,8 @@
 Shed is the migrated file-management service from `piggy-farm/car/ValinaAspNet`.
 The migration preserves the Razor Pages, Identity authentication, file APIs, access-key sync endpoints, SQLite EF migrations, and legacy tests.
 
+> Only for personal large files with limited SSD VPS.
+
 ## Local validation
 
 ```powershell
