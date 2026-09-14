@@ -15,6 +15,9 @@ Fences is the central GitHub identity and workspace launcher for the Shuneo serv
 - `GET /api/github/repos` lists the user repositories
 - `POST /api/github/repos` finds or creates a repository
 - `GET /signin-github` is the GitHub OAuth callback
+- `GET /.well-known/openid-configuration` is the OIDC discovery document
+- `GET /connect/authorize` supports authorization code + PKCE and uses the existing GitHub login
+- `POST /connect/token` exchanges authorization codes for tokens
 
 ## Configuration
 
@@ -24,6 +27,30 @@ Set OAuth secrets with environment variables rather than committing them:
 - `Authentication__GitHub__ClientSecret`
 
 `IdentityApp:CookieDomain`, `AllowedReturnHosts`, and `AllowedCorsOrigins` retain the source deployment policy. The production cookie is `shuneo.identity`, secure, HTTP-only, SameSite Lax, and shared across `.shuneo.com` when configured. Return URLs are limited to relative paths or the configured allowed hosts.
+
+OIDC uses OpenIddict 7.0.0 with EF Core SQLite persistence. The stable subject is `github:<numeric-github-id>`, so a GitHub rename does not change the OIDC subject. The issuer is `https://identity.eldervibe.dev`; `identity.shuneo.com` remains a compatibility alias.
+
+`IdentityApp:OidcClients` registers public PKCE clients at startup. Each client needs a `ClientId`, one or more exact `RedirectUris`, and optional `PostLogoutRedirectUris`; do not add wildcard redirect URIs. For example:
+
+```text
+IdentityApp__OidcClients__0__ClientId=affine
+IdentityApp__OidcClients__0__DisplayName=Affine
+IdentityApp__OidcClients__0__RedirectUris__0=https://<your-affine-host>/oauth/callback
+```
+
+Development uses OpenIddict development certificates. Production refuses to start without both certificate files:
+
+```text
+IdentityApp__OidcIssuer=https://identity.eldervibe.dev
+IdentityApp__OidcSigningCertificatePath=/run/secrets/oidc-signing.pfx
+IdentityApp__OidcSigningCertificatePassword=<secret>
+IdentityApp__OidcEncryptionCertificatePath=/run/secrets/oidc-encryption.pfx
+IdentityApp__OidcEncryptionCertificatePassword=<secret>
+IdentityApp__IdentityDatabasePath=/var/lib/fences/identity.db
+IdentityApp__DataProtectionKeysPath=/var/lib/fences/keys
+```
+
+The SQLite file and Data Protection key directory are persistent runtime state and must be mounted from durable VPS storage. The MVP uses `EnsureCreated` rather than EF migrations; back up the SQLite file before schema/package upgrades and introduce an explicit migration process before schema changes.
 
 The Dockerfile expects the Docker build context to be `internet-facing`, publishes `Fences.dll`, and serves HTTP on port 80 behind the reverse proxy. It links Farm's canonical shared CSS tokens and base styles into the Fences publish output without maintaining a second copy.
 
@@ -57,14 +84,16 @@ FENCES_IMAGE=shuneo-fences:<image-tag> CERTBOT_EMAIL=ops@example.com \
 	bash Fences/scripts/deploy-fences.sh
 ```
 
-It manages only `identity.shuneo.com` and `127.0.0.1:5188`. It takes an exclusive lock, stages the HTTP ACME site, runs `nginx -t` and reloads nginx before Certbot, then verifies the certificate files and SAN before staging HTTPS. A matching existing Certbot renewal lineage is discovered from its renewal configuration and certificate SANs, including suffixed lineage names; otherwise a new `identity.shuneo.com` lineage is created. Failed nginx validation restores the previous managed site and does not touch unrelated enabled sites.
+It manages `identity.shuneo.com`, `identity.eldervibe.dev`, and `127.0.0.1:5188`. It takes an exclusive lock, stages the HTTP ACME site, runs `nginx -t` and reloads nginx before Certbot, then verifies the certificate files and SAN before staging HTTPS. A matching existing Certbot renewal lineage is discovered from its renewal configuration and certificate SANs, including suffixed lineage names; otherwise a new lineage covering both identity names is created. Failed nginx validation restores the previous managed site and does not touch unrelated enabled sites.
 
 The common script accepts `SERVICE_NAME`, `SERVICE_DOMAIN`, `SERVICE_UPSTREAM_PORT`, `SERVICE_CONTAINER`, `SERVICE_IMAGE`, and `SERVICE_ENV_FILE`, plus VPS path/tool overrides for `NGINX_SITES_AVAILABLE`, `NGINX_SITES_ENABLED`, `CERTBOT_WEBROOT`, `CERTBOT_CONFIG_DIR`, `CERTBOT_BIN`, `OPENSSL_BIN`, `NGINX_SERVICE`, `DEPLOY_LOCK_FILE`, `DOCKER_BIN`, and `NGINX_BIN`. To add another service, create a small wrapper beside Fences that exports those six service values and `exec bash`es the common script. When a wrapper is streamed over SSH, transfer the common script first and set `DEPLOY_NGINX_COMMON_SCRIPT` to its remote path.
 
 The deployment lock is service-specific by default. The managed nginx link and temporary configs are named from the service domain. The script never enumerates, rewrites, disables, or prunes unrelated nginx sites or Docker images.
 
-The VPS nginx configuration is operator-managed through this script; DNS remains operator-managed. The GitHub OAuth callback is:
+The VPS nginx configuration is operator-managed through this script; DNS remains operator-managed. The GitHub OAuth callback remains:
 `https://identity.shuneo.com/signin-github`.
+
+For the canonical host, the callback is `https://identity.eldervibe.dev/signin-github`. The canonical host uses a host-only `eldervibe.identity` cookie because browsers reject a `.shuneo.com` cookie set by `eldervibe.dev`; legacy hosts continue using the existing shared `shuneo.identity` cookie.
 
 ## GitHub Actions deployment
 
@@ -79,7 +108,7 @@ Configure a GitHub `production` environment with these secrets:
 - `VPS_KNOWN_HOSTS`: pinned `ssh-keyscan` output for the VPS host and port
 - `CERTBOT_EMAIL`: optional production environment variable or secret, used only when a new Fences lineage is required; a secret takes precedence when both are configured
 
-Before the first deployment, install Docker on the VPS, grant the SSH user Docker access, and create `/etc/shuneo/fences.env` with the required `Authentication__GitHub__ClientId` and `Authentication__GitHub__ClientSecret` values plus the intended `IdentityApp` settings. The SSH user must be able to bind the loopback port `5188`, and nginx must proxy `identity.shuneo.com` to that port. Keep the environment file readable only by the deployment user or its Docker access group.
+Before the first deployment, install Docker on the VPS, grant the SSH user Docker access, and create `/etc/shuneo/fences.env` with the required `Authentication__GitHub__ClientId`, `Authentication__GitHub__ClientSecret`, OIDC certificate variables, client redirect URI variables, and intended `IdentityApp` settings. The SSH user must be able to bind the loopback port `5188`, nginx must proxy both identity names to that port, and `/var/lib/fences` must be a durable mounted directory writable by the container. Keep the environment file and certificate files readable only by the deployment user or its Docker access group.
 
 Before the first workflow deployment, ensure nginx includes `sites-enabled`, `/var/www/certbot` is writable by the SSH user, `certbot`, `openssl`, `flock`, Docker, and `systemctl` are available, and the SSH user can reload the nginx service. The script uses a dedicated nginx site entry for `identity.shuneo.com`; it does not enumerate, rewrite, disable, or reload any unrelated domain configuration.
 
