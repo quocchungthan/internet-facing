@@ -1,9 +1,9 @@
 name: Deploy Fences
 
 on:
-  push:
-    branches:
-      - 'sub/identity'
+  # push:
+  #   branches:
+  #     - 'sub/identity'
   workflow_dispatch:
 
 permissions:
