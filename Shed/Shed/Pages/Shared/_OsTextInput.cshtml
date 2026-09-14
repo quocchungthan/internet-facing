@@ -1,0 +1,14 @@
+﻿@model Shed.Pages.Shared.OsTextInputModel
+
+<div class="os-field">
+    <label for="@Model.Id">@Model.Label</label>
+    <input class="os-input"
+           id="@Model.Id"
+           name="@Model.Name"
+           type="@Model.Type"
+           value="@Model.Value"
+           autocomplete="@Model.AutoComplete"
+           required="@Model.Required"
+           autofocus="@Model.AutoFocus" />
+</div>
+

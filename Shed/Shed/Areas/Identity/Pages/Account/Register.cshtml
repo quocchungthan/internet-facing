@@ -1,0 +1,32 @@
+﻿@page
+@model Shed.Areas.Identity.Pages.Account.RegisterModel
+@{
+    ViewData["Title"] = "Register";
+}
+
+<div asp-validation-summary="ModelOnly" class="auth-validation-error" role="alert"></div>
+
+<form id="registerForm" asp-route-returnUrl="@Model.ReturnUrl" method="post">
+    @Html.AntiForgeryToken()
+    <div class="auth-field">
+        <label asp-for="Input.Email">Email</label>
+        <input asp-for="Input.Email" class="auth-input" autocomplete="username" placeholder="name@example.com" />
+        <span asp-validation-for="Input.Email" class="auth-field-error"></span>
+    </div>
+    <div class="auth-field">
+        <label asp-for="Input.Password">Password</label>
+        <input asp-for="Input.Password" class="auth-input" autocomplete="new-password" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" />
+        <span asp-validation-for="Input.Password" class="auth-field-error"></span>
+    </div>
+    <div class="auth-field">
+        <label asp-for="Input.ConfirmPassword">Confirm password</label>
+        <input asp-for="Input.ConfirmPassword" class="auth-input" autocomplete="new-password" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" />
+        <span asp-validation-for="Input.ConfirmPassword" class="auth-field-error"></span>
+    </div>
+    <button type="submit" class="auth-submit">Create account</button>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
+

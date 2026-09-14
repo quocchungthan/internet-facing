@@ -1,0 +1,1133 @@
+﻿@page
+@model Shed.Pages.FilesModel
+@{
+    ViewData["Title"] = "Files";
+}
+
+@section TopbarLeft {
+    <form method="get" class="topbar-path-form" id="pathForm">
+        <input asp-for="ParentPath" class="topbar-path-input" aria-label="Parent path" />
+        <button type="submit" class="topbar-icon-button" aria-label="Reload" title="Reload">â†»</button>
+    </form>
+    <form method="post" enctype="multipart/form-data" asp-page-handler="Upload" id="uploadForm" class="topbar-upload-form">
+        <input type="hidden" asp-for="ParentPath" id="UploadParentPath" />
+        <input id="UploadFile" type="file" name="UploadFiles" class="topbar-upload-hidden" multiple />
+        <button type="button" class="topbar-icon-button" aria-label="Upload files" title="Upload files" onclick="document.getElementById('UploadFile').click();">â†‘</button>
+    </form>
+    <form method="post" asp-page-handler="CreateFolder" class="topbar-upload-form" id="createFolderForm">
+        <input type="hidden" asp-for="ParentPath" />
+        <input type="hidden" asp-for="FolderName" id="FolderNameInput" />
+        <button type="submit" class="topbar-icon-button" aria-label="Add folder" title="Add folder">+</button>
+    </form>
+}
+
+<div class="files-explorer-grid">
+@{
+    var currentSegments = (Model.ParentPath ?? "/")
+        .Replace('\\', '/')
+        .Split('/', StringSplitOptions.RemoveEmptyEntries)
+        .Where(p => p != "." && p != "..")
+        .ToArray();
+    var canGoUp = currentSegments.Length > 0;
+    var upPath = canGoUp
+        ? "/" + string.Join('/', currentSegments.Take(currentSegments.Length - 1))
+        : "/";
+    if (string.IsNullOrWhiteSpace(upPath))
+    {
+        upPath = "/";
+    }
+}
+@if (canGoUp)
+{
+    <a asp-page="/Files" asp-route-parentPath="@upPath" class="file-tile file-tile--folder file-entry" data-entry-path="@upPath" data-entry-type="folder" data-entry-id="__up__" data-entry-readonly="true" title="Go up one level" aria-label="Go up one level">
+        <div class="file-thumb file-thumb--folder" aria-hidden="true">â†©</div>
+        <div class="file-name">..</div>
+    </a>
+}
+@foreach (var item in Model.Items)
+{
+    var isFolder = string.Equals(item.ContentType, "inode/directory", StringComparison.OrdinalIgnoreCase);
+    var displayName = item.Path?.Split('/', StringSplitOptions.RemoveEmptyEntries).LastOrDefault() ?? item.Path;
+    var localizedTitle = item.Path == "/" ? "~/" : "~" + item.Path;
+
+    if (isFolder)
+    {
+        <a asp-page="/Files" asp-route-parentPath="@item.Path" class="file-tile file-tile--folder file-entry" data-entry-path="@item.Path" data-entry-type="folder" data-entry-id="@item.Id" title="@localizedTitle" aria-label="Open folder @displayName">
+            <div class="file-thumb file-thumb--folder" aria-hidden="true">ðŸ“</div>
+            <div class="file-name">@displayName</div>
+        </a>
+    }
+    else
+    {
+        <article class="file-tile file-entry" data-entry-path="@item.Path" data-entry-type="file" data-entry-id="@item.Id" title="@localizedTitle">
+            <img src="@item.ThumbnailUrl" alt="Thumbnail" class="file-thumb" />
+            <div class="file-name">@displayName</div>
+        </article>
+    }
+}
+</div>
+
+<div id="dropOverlay" class="drop-overlay" aria-hidden="true">
+    <div class="drop-overlay__inner">
+        <span class="drop-overlay__icon">â†‘</span>
+        <span class="drop-overlay__label">Drop files to upload</span>
+    </div>
+</div>
+
+<div id="uploadProgress" class="upload-progress" aria-hidden="true" aria-live="polite">
+    <div class="upload-progress__bar-wrap">
+        <div class="upload-progress__bar" id="uploadProgressBar"></div>
+    </div>
+    <span class="upload-progress__label" id="uploadProgressLabel">Uploadingâ€¦</span>
+</div>
+
+<div id="fileContextMenu" class="file-context-menu" role="menu" aria-hidden="true">
+    <button id="contextDownloadAction" type="button" role="menuitem" class="file-context-menu__item file-context-menu__item--default">Download</button>
+    <button id="contextShareAction" type="button" role="menuitem" class="file-context-menu__item file-context-menu__item--default">Share</button>
+    <button id="contextDeleteAction" type="button" role="menuitem" class="file-context-menu__item">Delete</button>
+</div>
+
+<div id="shareToast" class="file-share-toast" role="status" aria-live="polite" aria-atomic="true"></div>
+
+<form id="deleteFileForm" method="post" asp-page-handler="DeleteFile" class="file-action-form">
+    <input type="hidden" asp-for="ParentPath" />
+    <input type="hidden" asp-for="DeletePath" id="DeleteFilePathInput" />
+</form>
+
+<form id="deleteFolderForm" method="post" asp-page-handler="DeleteFolder" class="file-action-form">
+    <input type="hidden" asp-for="ParentPath" />
+    <input type="hidden" asp-for="DeletePath" id="DeleteFolderPathInput" />
+</form>
+
+<style>
+    .file-action-form {
+        display: none;
+    }
+
+    .file-entry--drag-source {
+        outline: 2px solid #2563eb;
+        outline-offset: 2px;
+        opacity: 0.72;
+    }
+
+    .file-entry--drop-target {
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.35);
+    }
+
+    .file-context-menu {
+        position: fixed;
+        z-index: 2000;
+        display: none;
+        min-width: 144px;
+        background: #ffffff;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.2);
+        padding: 6px;
+    }
+
+    .file-context-menu--open {
+        display: block;
+    }
+
+    .file-context-menu__item {
+        width: 100%;
+        border: 0;
+        background: transparent;
+        text-align: left;
+        padding: 8px 10px;
+        border-radius: 6px;
+        cursor: pointer;
+        color: #b91c1c;
+        font-size: 0.9rem;
+    }
+
+    .file-context-menu__item--default {
+        color: #1e3a5f;
+    }
+
+    .file-context-menu__item--default:hover {
+        background: #dbeafe;
+    }
+
+    .file-context-menu__item:hover {
+        background: #fee2e2;
+    }
+
+    .file-share-toast {
+        position: fixed;
+        bottom: 16px;
+        right: 16px;
+        z-index: 4200;
+        max-width: 340px;
+        padding: 10px 12px;
+        border-radius: 8px;
+        background: #0f766e;
+        color: #f8fafc;
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.2);
+        font-size: 0.875rem;
+        opacity: 0;
+        transform: translateY(8px);
+        pointer-events: none;
+        transition: opacity 0.18s ease, transform 0.18s ease;
+    }
+
+    .file-share-toast--visible {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    .file-share-toast--error {
+        background: #b91c1c;
+    }
+
+    .drop-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 3000;
+        pointer-events: none;
+        border: 3px dashed rgba(233, 84, 32, 0.7);
+        border-radius: 16px;
+        margin: 12px;
+        background: rgba(22, 23, 27, 0.18);
+        transition: background 0.15s;
+    }
+
+    .drop-overlay--active {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .drop-overlay--over {
+        background: rgba(233, 84, 32, 0.18);
+        border-color: #e95420;
+    }
+
+    .drop-overlay__inner {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.5rem;
+        color: #e95420;
+        font-size: 1.1rem;
+        font-weight: 600;
+        pointer-events: none;
+        user-select: none;
+    }
+
+    .drop-overlay__icon {
+        font-size: 3rem;
+    }
+
+    .upload-progress {
+        display: none;
+        position: fixed;
+        bottom: 48px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 4000;
+        background: rgba(22, 23, 27, 0.92);
+        border: 1px solid rgba(255,255,255,0.15);
+        border-radius: 12px;
+        padding: 0.75rem 1.25rem;
+        min-width: 280px;
+        gap: 0.5rem;
+        flex-direction: column;
+        align-items: stretch;
+        color: #eef0f5;
+        font-size: 0.88rem;
+    }
+
+    .upload-progress--active {
+        display: flex;
+    }
+
+    .upload-progress__bar-wrap {
+        background: rgba(255,255,255,0.12);
+        border-radius: 100px;
+        height: 6px;
+        overflow: hidden;
+    }
+
+    .upload-progress__bar {
+        height: 100%;
+        width: 0%;
+        background: #e95420;
+        border-radius: 100px;
+        transition: width 0.1s linear;
+    }
+</style>
+
+<script>
+    (() => {
+        const menu = document.getElementById("fileContextMenu");
+        const deleteAction = document.getElementById("contextDeleteAction");
+        const downloadAction = document.getElementById("contextDownloadAction");
+        const shareAction = document.getElementById("contextShareAction");
+        const fileForm = document.getElementById("deleteFileForm");
+        const folderForm = document.getElementById("deleteFolderForm");
+        const deleteFilePathInput = document.getElementById("DeleteFilePathInput");
+        const deleteFolderPathInput = document.getElementById("DeleteFolderPathInput");
+        const shareToast = document.getElementById("shareToast");
+
+        if (!menu || !deleteAction || !fileForm || !folderForm || !deleteFilePathInput || !deleteFolderPathInput) {
+            return;
+        }
+
+        let selectedPath = "";
+        let selectedType = "";
+        let selectedId = "";
+        let selectedReadOnly = false;
+        let suppressClickUntil = 0;
+        let shareToastTimer = 0;
+
+        const showShareToast = (message, isError = false) => {
+            if (!shareToast) {
+                return;
+            }
+
+            shareToast.textContent = message;
+            shareToast.classList.toggle("file-share-toast--error", isError);
+            shareToast.classList.add("file-share-toast--visible");
+
+            if (shareToastTimer) {
+                window.clearTimeout(shareToastTimer);
+            }
+
+            shareToastTimer = window.setTimeout(() => {
+                shareToast.classList.remove("file-share-toast--visible");
+            }, 2200);
+        };
+
+        const copyTextToClipboard = async (text) => {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                try {
+                    await navigator.clipboard.writeText(text);
+                    return true;
+                } catch {
+                    // Fallback is used when clipboard API is unavailable/blocked.
+                }
+            }
+
+            const fallbackInput = document.createElement("textarea");
+            fallbackInput.value = text;
+            fallbackInput.setAttribute("readonly", "readonly");
+            fallbackInput.style.position = "fixed";
+            fallbackInput.style.opacity = "0";
+            document.body.appendChild(fallbackInput);
+            fallbackInput.select();
+
+            let copied = false;
+            try {
+                copied = document.execCommand("copy");
+            } finally {
+                document.body.removeChild(fallbackInput);
+            }
+
+            return copied;
+        };
+
+        const closeMenu = () => {
+            menu.classList.remove("file-context-menu--open");
+            menu.setAttribute("aria-hidden", "true");
+            selectedPath = "";
+            selectedType = "";
+            selectedId = "";
+            selectedReadOnly = false;
+        };
+
+        const openMenu = (x, y) => {
+            menu.classList.add("file-context-menu--open");
+            menu.setAttribute("aria-hidden", "false");
+            menu.style.left = "8px";
+            menu.style.top = "8px";
+
+            const bounds = menu.getBoundingClientRect();
+            const safeX = Math.max(8, Math.min(x, window.innerWidth - bounds.width - 8));
+            const safeY = Math.max(8, Math.min(y, window.innerHeight - bounds.height - 8));
+            menu.style.left = safeX + "px";
+            menu.style.top = safeY + "px";
+            menu.querySelector("[role='menuitem']:not([disabled])")?.focus();
+        };
+
+        const bindTouchLongPress = (entry) => {
+            let timerId = null;
+            let pressPoint = null;
+            let longPressActivated = false;
+
+            const clearTimer = () => {
+                if (timerId) {
+                    window.clearTimeout(timerId);
+                    timerId = null;
+                }
+            };
+
+            entry.addEventListener("touchstart", (event) => {
+                if (event.touches.length !== 1) {
+                    return;
+                }
+
+                const touch = event.touches[0];
+                pressPoint = { x: touch.clientX, y: touch.clientY };
+                longPressActivated = false;
+                clearTimer();
+
+                timerId = window.setTimeout(() => {
+                    longPressActivated = true;
+                    suppressClickUntil = Date.now() + 700;
+                    selectedPath = entry.getAttribute("data-entry-path") || "";
+                    selectedType = entry.getAttribute("data-entry-type") || "";
+                    selectedId = entry.getAttribute("data-entry-id") || "";
+                    selectedReadOnly = entry.getAttribute("data-entry-readonly") === "true";
+                    if (!selectedPath || (selectedType !== "file" && selectedType !== "folder")) {
+                        closeMenu();
+                        return;
+                    }
+
+                    if (selectedReadOnly) {
+                        closeMenu();
+                        return;
+                    }
+
+                    if (downloadAction) {
+                        downloadAction.style.display = selectedType === "file" ? "" : "none";
+                    }
+
+                    openMenu(pressPoint.x, pressPoint.y);
+                }, 520);
+            }, { passive: false });
+
+            entry.addEventListener("touchmove", (event) => {
+                if (!timerId || !pressPoint || event.touches.length !== 1) {
+                    if (longPressActivated) {
+                        event.preventDefault();
+                    }
+                    return;
+                }
+
+                const touch = event.touches[0];
+                const deltaX = Math.abs(touch.clientX - pressPoint.x);
+                const deltaY = Math.abs(touch.clientY - pressPoint.y);
+                if (deltaX > 8 || deltaY > 8) {
+                    clearTimer();
+                }
+            }, { passive: false });
+
+            entry.addEventListener("touchend", (event) => {
+                if (longPressActivated) {
+                    event.preventDefault();
+                }
+                clearTimer();
+                longPressActivated = false;
+                pressPoint = null;
+            }, { passive: false });
+
+            entry.addEventListener("touchcancel", (event) => {
+                if (longPressActivated) {
+                    event.preventDefault();
+                }
+                clearTimer();
+                longPressActivated = false;
+                pressPoint = null;
+            }, { passive: false });
+
+            entry.addEventListener("click", (event) => {
+                if (Date.now() < suppressClickUntil) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+            }, true);
+        };
+
+        const wireContextEntries = () => {
+            document.querySelectorAll(".file-entry").forEach((entry) => {
+                if (entry.getAttribute("data-context-bound") === "true") {
+                    return;
+                }
+
+                entry.setAttribute("data-context-bound", "true");
+
+                entry.addEventListener("contextmenu", (event) => {
+                    event.preventDefault();
+
+                    selectedPath = entry.getAttribute("data-entry-path") || "";
+                    selectedType = entry.getAttribute("data-entry-type") || "";
+                    selectedId = entry.getAttribute("data-entry-id") || "";
+                    selectedReadOnly = entry.getAttribute("data-entry-readonly") === "true";
+                    if (!selectedPath || (selectedType !== "file" && selectedType !== "folder")) {
+                        closeMenu();
+                        return;
+                    }
+
+                    if (selectedReadOnly) {
+                        closeMenu();
+                        return;
+                    }
+
+                    if (downloadAction) {
+                        downloadAction.style.display = selectedType === "file" ? "" : "none";
+                    }
+
+                    openMenu(event.clientX, event.clientY);
+                });
+
+                bindTouchLongPress(entry);
+            });
+        };
+
+        wireContextEntries();
+        document.addEventListener("files:grid-updated", wireContextEntries);
+
+        if (downloadAction) {
+            downloadAction.addEventListener("click", () => {
+                if (!selectedPath || selectedType !== "file") {
+                    closeMenu();
+                    return;
+                }
+                const a = document.createElement("a");
+                a.href = `/api/files/download?path=${encodeURIComponent(selectedPath)}`;
+                a.style.display = "none";
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                closeMenu();
+            });
+        }
+
+        deleteAction.addEventListener("click", () => {
+            if (!selectedPath || (selectedType !== "file" && selectedType !== "folder")) {
+                closeMenu();
+                return;
+            }
+
+            const message = selectedType === "folder"
+                ? "Delete this folder and all files under it?"
+                : "Delete this file?";
+            if (!window.confirm(message)) {
+                closeMenu();
+                return;
+            }
+
+            if (selectedType === "folder") {
+                deleteFolderPathInput.value = selectedPath;
+                folderForm.submit();
+            } else {
+                deleteFilePathInput.value = selectedPath;
+                fileForm.submit();
+            }
+
+            closeMenu();
+        });
+
+        if (shareAction) {
+            shareAction.addEventListener("click", async () => {
+                if (!selectedPath) {
+                    closeMenu();
+                    return;
+                }
+
+                try {
+                    const response = await fetch("/api/download/share-link", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        credentials: "same-origin",
+                        body: JSON.stringify({
+                            targetPath: selectedPath,
+                            targetType: selectedType || "file"
+                        })
+                    });
+
+                    const result = await response.json().catch(() => null);
+                    if (!response.ok || !result || !result.shareUrl) {
+                        throw new Error(result?.error || "Failed to create share link.");
+                    }
+
+                    const copied = await copyTextToClipboard(result.shareUrl);
+                    if (copied) {
+                        showShareToast("Share link copied to clipboard.");
+                    } else {
+                        showShareToast("Share link created, but clipboard copy failed.", true);
+                    }
+                } catch (error) {
+                    showShareToast(error?.message || "Failed to create share link.", true);
+                } finally {
+                    closeMenu();
+                }
+            });
+        }
+
+        document.addEventListener("click", (event) => {
+            if (Date.now() < suppressClickUntil) {
+                event.preventDefault();
+                event.stopPropagation();
+                return;
+            }
+
+            if (!menu.classList.contains("file-context-menu--open")) {
+                return;
+            }
+
+            if (!menu.contains(event.target)) {
+                closeMenu();
+            }
+        });
+
+        document.addEventListener("keydown", (event) => {
+            if (event.key === "Escape") {
+                closeMenu();
+                return;
+            }
+
+            if (!menu.classList.contains("file-context-menu--open")
+                || !["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
+                return;
+            }
+
+            const items = Array.from(menu.querySelectorAll("[role='menuitem']:not([disabled])"))
+                .filter((item) => item.offsetParent !== null);
+            if (items.length === 0) return;
+
+            event.preventDefault();
+            const currentIndex = items.indexOf(document.activeElement);
+            let nextIndex = currentIndex;
+            if (event.key === "ArrowDown") nextIndex = (currentIndex + 1) % items.length;
+            if (event.key === "ArrowUp") nextIndex = (currentIndex - 1 + items.length) % items.length;
+            if (event.key === "Home") nextIndex = 0;
+            if (event.key === "End") nextIndex = items.length - 1;
+            items[nextIndex]?.focus();
+        });
+
+        window.addEventListener("scroll", closeMenu, true);
+        window.addEventListener("resize", closeMenu);
+    })();
+
+    // â”€â”€ XHR upload with progress + drag-drop â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    (() => {
+        const fileInput = document.getElementById("UploadFile");
+        const uploadForm = document.getElementById("uploadForm");
+        const pathForm = document.getElementById("pathForm");
+        const createFolderForm = document.getElementById("createFolderForm");
+        const pathInput = document.querySelector(".topbar-path-input");
+        const dropOverlay = document.getElementById("dropOverlay");
+        const progressWrap = document.getElementById("uploadProgress");
+        const progressBar = document.getElementById("uploadProgressBar");
+        const progressLabel = document.getElementById("uploadProgressLabel");
+
+        if (!fileInput || !uploadForm || !dropOverlay || !progressWrap || !progressBar || !progressLabel || !pathInput) {
+            return;
+        }
+
+        async function reloadExplorer(parentPath) {
+            const url = new URL(window.location.href);
+            url.searchParams.set("parentPath", parentPath || "/");
+
+            const response = await fetch(url.toString(), {
+                method: "GET",
+                credentials: "same-origin"
+            });
+
+            if (!response.ok) {
+                throw new Error("Failed to refresh files.");
+            }
+
+            const html = await response.text();
+            const parser = new DOMParser();
+            const nextDoc = parser.parseFromString(html, "text/html");
+
+            const nextGrid = nextDoc.querySelector(".files-explorer-grid");
+            const currentGrid = document.querySelector(".files-explorer-grid");
+            const nextPathInput = nextDoc.querySelector(".topbar-path-input");
+
+            if (!nextGrid || !currentGrid || !nextPathInput) {
+                throw new Error("Failed to refresh files.");
+            }
+
+            currentGrid.replaceWith(nextGrid);
+
+            const normalizedParentPath = nextPathInput.value || "/";
+            pathInput.value = normalizedParentPath;
+
+            document.querySelectorAll("input[name='ParentPath']").forEach((input) => {
+                input.value = normalizedParentPath;
+            });
+
+            window.history.replaceState(null, "", url.toString());
+            document.dispatchEvent(new Event("files:grid-updated"));
+        }
+
+        async function moveFileToFolder(sourcePath, targetFolderPath) {
+            const token = getAntiForgeryToken();
+            const payload = new FormData();
+            payload.append("SourcePath", sourcePath);
+            payload.append("TargetFolderPath", targetFolderPath);
+            payload.append("ParentPath", document.getElementById("UploadParentPath")?.value || "/");
+            payload.append("__RequestVerificationToken", token);
+
+            const response = await fetch("?handler=MoveFile", {
+                method: "POST",
+                body: payload,
+                credentials: "same-origin"
+            });
+
+            const result = await response.json().catch(() => ({ ok: false, message: "Move failed." }));
+            if (!response.ok || !result.ok) {
+                throw new Error(result.message || "Move failed.");
+            }
+        }
+
+        function getAntiForgeryToken() {
+            const el = document.querySelector("input[name='__RequestVerificationToken']");
+            return el ? el.value : "";
+        }
+
+        function doUpload(files) {
+            const selectedFiles = Array.from(files || []).filter((file) => file && file.size >= 0);
+            if (selectedFiles.length === 0) {
+                return;
+            }
+
+            const formData = new FormData();
+            const currentParentPath = document.getElementById("UploadParentPath")?.value || "/";
+            for (const file of selectedFiles) {
+                formData.append("UploadFiles", file);
+            }
+
+            formData.append("ParentPath", currentParentPath);
+            formData.append("__RequestVerificationToken", getAntiForgeryToken());
+
+            const totalBytes = selectedFiles.reduce((sum, file) => sum + file.size, 0);
+            const fileCount = selectedFiles.length;
+            const uploadLabel = fileCount === 1
+                ? `Uploading ${selectedFiles[0].name} (${(totalBytes / 1024).toFixed(1)} KB)â€¦`
+                : `Uploading ${fileCount} files (${(totalBytes / 1024).toFixed(1)} KB)â€¦`;
+
+            progressLabel.textContent = uploadLabel;
+            progressBar.style.width = "0%";
+            progressWrap.classList.add("upload-progress--active");
+            progressWrap.setAttribute("aria-hidden", "false");
+
+            const xhr = new XMLHttpRequest();
+            xhr.open("POST", "?handler=Upload");
+
+            xhr.upload.addEventListener("progress", (e) => {
+                if (e.lengthComputable) {
+                    const pct = Math.round((e.loaded / e.total) * 100);
+                    progressBar.style.width = pct + "%";
+                    const progressName = fileCount === 1 ? selectedFiles[0].name : `${fileCount} files`;
+                    progressLabel.textContent = `Uploading ${progressName} â€” ${pct}% (${(e.loaded / 1024).toFixed(1)} / ${(e.total / 1024).toFixed(1)} KB)`;
+                }
+            });
+
+            xhr.addEventListener("load", () => {
+                progressBar.style.width = "100%";
+                progressLabel.textContent = "Done!";
+                setTimeout(async () => {
+                    progressWrap.classList.remove("upload-progress--active");
+                    progressWrap.setAttribute("aria-hidden", "true");
+                    try {
+                        await reloadExplorer(currentParentPath);
+                    } catch {
+                        window.location.reload();
+                    }
+                }, 600);
+            });
+
+            xhr.addEventListener("error", () => {
+                progressLabel.textContent = "Upload failed.";
+                setTimeout(() => {
+                    progressWrap.classList.remove("upload-progress--active");
+                    progressWrap.setAttribute("aria-hidden", "true");
+                }, 2000);
+            });
+
+            xhr.send(formData);
+        }
+
+        function normalizeClipboardFile(file) {
+            const hasFileName = typeof file.name === "string" && file.name.trim().length > 0;
+            if (hasFileName) {
+                return file;
+            }
+
+            const extensionByType = {
+                "image/png": ".png",
+                "image/jpeg": ".jpg",
+                "image/gif": ".gif",
+                "image/webp": ".webp",
+                "text/plain": ".txt",
+                "application/pdf": ".pdf"
+            };
+
+            const ext = extensionByType[file.type] || "";
+            const safeName = `clipboard-${Date.now()}${ext}`;
+            return new File([file], safeName, {
+                type: file.type || "application/octet-stream",
+                lastModified: Date.now()
+            });
+        }
+
+        function isEditableElement(element) {
+            if (!element) {
+                return false;
+            }
+
+            const tagName = (element.tagName || "").toLowerCase();
+            if (tagName === "input" || tagName === "textarea" || tagName === "select") {
+                return true;
+            }
+
+            return element.isContentEditable === true;
+        }
+
+        fileInput.addEventListener("change", () => {
+            if (fileInput.files && fileInput.files.length > 0) {
+                doUpload(fileInput.files);
+                fileInput.value = "";
+            }
+        });
+
+        document.addEventListener("paste", (event) => {
+            if (isEditableElement(document.activeElement)) {
+                return;
+            }
+
+            const clipboardData = event.clipboardData;
+            if (!clipboardData) {
+                return;
+            }
+
+            let clipboardFile = null;
+
+            if (clipboardData.items && clipboardData.items.length > 0) {
+                for (const item of clipboardData.items) {
+                    if (item.kind === "file") {
+                        clipboardFile = item.getAsFile();
+                        if (clipboardFile) {
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (!clipboardFile && clipboardData.files && clipboardData.files.length > 0) {
+                clipboardFile = clipboardData.files[0];
+            }
+
+            if (!clipboardFile) {
+                return;
+            }
+
+            event.preventDefault();
+            doUpload([normalizeClipboardFile(clipboardFile)]);
+        });
+
+        if (pathForm) {
+            pathForm.addEventListener("submit", async (event) => {
+                event.preventDefault();
+                const targetPath = pathInput.value || "/";
+                try {
+                    await reloadExplorer(targetPath);
+                } catch (error) {
+                    window.alert(error.message || "Refresh failed.");
+                }
+            });
+        }
+
+        if (createFolderForm) {
+            createFolderForm.addEventListener("submit", async (event) => {
+                event.preventDefault();
+
+                const folderName = window.prompt("Folder name:");
+                if (!folderName) {
+                    return;
+                }
+
+                const hiddenInput = document.getElementById("FolderNameInput");
+                if (!hiddenInput) {
+                    return;
+                }
+
+                hiddenInput.value = folderName;
+
+                const payload = new FormData(createFolderForm);
+                payload.set("ParentPath", pathInput.value || "/");
+                payload.set("FolderName", folderName);
+
+                try {
+                    const response = await fetch("?handler=CreateFolder", {
+                        method: "POST",
+                        body: payload,
+                        credentials: "same-origin"
+                    });
+
+                    if (!response.ok) {
+                        throw new Error("Create folder failed.");
+                    }
+
+                    await reloadExplorer(pathInput.value || "/");
+                } catch (error) {
+                    window.alert(error.message || "Create folder failed.");
+                }
+            });
+        }
+
+        // Drag-drop
+        let dragCounter = 0;
+        let internalDragActive = false;
+
+        document.addEventListener("dragenter", (e) => {
+            if (internalDragActive) return;
+            if (!e.dataTransfer?.types?.includes("Files")) return;
+            e.preventDefault();
+            dragCounter++;
+            dropOverlay.classList.add("drop-overlay--active");
+            dropOverlay.setAttribute("aria-hidden", "false");
+        });
+
+        document.addEventListener("dragleave", (e) => {
+            if (internalDragActive) return;
+            dragCounter--;
+            if (dragCounter <= 0) {
+                dragCounter = 0;
+                dropOverlay.classList.remove("drop-overlay--active", "drop-overlay--over");
+                dropOverlay.setAttribute("aria-hidden", "true");
+            }
+        });
+
+        document.addEventListener("dragover", (e) => {
+            if (internalDragActive) return;
+            if (!e.dataTransfer?.types?.includes("Files")) return;
+            e.preventDefault();
+            dropOverlay.classList.add("drop-overlay--over");
+        });
+
+        document.addEventListener("drop", (e) => {
+            if (internalDragActive || dragSourceEntry) {
+                return;
+            }
+
+            e.preventDefault();
+            dragCounter = 0;
+            dropOverlay.classList.remove("drop-overlay--active", "drop-overlay--over");
+            dropOverlay.setAttribute("aria-hidden", "true");
+
+            const files = e.dataTransfer?.files;
+            if (files && files.length > 0) {
+                doUpload(files);
+            }
+        });
+
+        let dragSourceEntry = null;
+        let pointerDrag = null;
+        let lastTouchTargetFolder = null;
+
+        const clearFolderHighlights = () => {
+            document
+                .querySelectorAll(".file-entry[data-entry-type='folder']")
+                .forEach((entry) => entry.classList.remove("file-entry--drop-target"));
+        };
+
+        const setTargetHighlight = (folderEntry) => {
+            clearFolderHighlights();
+            if (folderEntry) {
+                folderEntry.classList.add("file-entry--drop-target");
+            }
+        };
+
+        const findFolderAtPoint = (x, y) => {
+            const element = document.elementFromPoint(x, y);
+            return element ? element.closest(".file-entry[data-entry-type='folder']") : null;
+        };
+
+        const completeMove = async (sourceEntry, targetFolderEntry) => {
+            if (!sourceEntry || !targetFolderEntry || sourceEntry === targetFolderEntry) {
+                return;
+            }
+
+            const sourcePath = sourceEntry.getAttribute("data-entry-path") || "";
+            const targetPath = targetFolderEntry.getAttribute("data-entry-path") || "";
+            const sourceType = sourceEntry.getAttribute("data-entry-type") || "";
+            if (!sourcePath || !targetPath) {
+                return;
+            }
+
+            if (sourceType === "folder") {
+                if (targetPath === sourcePath || targetPath.startsWith(sourcePath + "/")) {
+                    window.alert("Cannot move a folder into itself.");
+                    return;
+                }
+            }
+
+            try {
+                await moveFileToFolder(sourcePath, targetPath);
+                await reloadExplorer(pathInput.value || "/");
+            } catch (error) {
+                window.alert(error.message || "Move failed.");
+            }
+        };
+
+        const wireMoveEntries = () => {
+            const entries = Array.from(document.querySelectorAll(".file-entry"));
+            const movableEntries = entries.filter((entry) => {
+                const type = entry.getAttribute("data-entry-type");
+                const isReadOnly = entry.getAttribute("data-entry-readonly") === "true";
+                return (type === "file" || type === "folder") && !isReadOnly;
+            });
+            const folderEntries = entries.filter((entry) => entry.getAttribute("data-entry-type") === "folder");
+
+            movableEntries.forEach((entry) => {
+                if (entry.getAttribute("data-dnd-bound") === "true") {
+                    return;
+                }
+
+                entry.setAttribute("data-dnd-bound", "true");
+                entry.setAttribute("draggable", "true");
+
+                entry.addEventListener("dragstart", (event) => {
+                    dragSourceEntry = entry;
+                    internalDragActive = true;
+                    entry.classList.add("file-entry--drag-source");
+                    entry.setAttribute("data-just-dragged", "true");
+                    window.setTimeout(() => entry.removeAttribute("data-just-dragged"), 250);
+                    if (event.dataTransfer) {
+                        event.dataTransfer.effectAllowed = "move";
+                        event.dataTransfer.setData("text/plain", entry.getAttribute("data-entry-path") || "");
+                    }
+                });
+
+                entry.addEventListener("dragend", () => {
+                    entry.classList.remove("file-entry--drag-source");
+                    clearFolderHighlights();
+                    dragSourceEntry = null;
+                    internalDragActive = false;
+                });
+
+                entry.addEventListener("click", (event) => {
+                    if (entry.getAttribute("data-just-dragged") === "true") {
+                        event.preventDefault();
+                        event.stopPropagation();
+                    }
+                }, true);
+
+                entry.addEventListener("touchstart", (event) => {
+                    if (event.touches.length !== 1) {
+                        return;
+                    }
+
+                    const touch = event.touches[0];
+                    pointerDrag = {
+                        sourceEntry: entry,
+                        startX: touch.clientX,
+                        startY: touch.clientY,
+                        active: false
+                    };
+                    lastTouchTargetFolder = null;
+                }, { passive: true });
+
+                entry.addEventListener("touchmove", (event) => {
+                    if (!pointerDrag || pointerDrag.sourceEntry !== entry || event.touches.length !== 1) {
+                        return;
+                    }
+
+                    const touch = event.touches[0];
+                    const moveX = Math.abs(touch.clientX - pointerDrag.startX);
+                    const moveY = Math.abs(touch.clientY - pointerDrag.startY);
+
+                    if (!pointerDrag.active && (moveX > 10 || moveY > 10)) {
+                        pointerDrag.active = true;
+                        pointerDrag.sourceEntry.classList.add("file-entry--drag-source");
+                    }
+
+                    if (!pointerDrag.active) {
+                        return;
+                    }
+
+                    event.preventDefault();
+                    const folder = findFolderAtPoint(touch.clientX, touch.clientY);
+                    lastTouchTargetFolder = folder && folder !== pointerDrag.sourceEntry ? folder : null;
+                    setTargetHighlight(lastTouchTargetFolder);
+                }, { passive: false });
+
+                entry.addEventListener("touchend", async (event) => {
+                    if (!pointerDrag || pointerDrag.sourceEntry !== entry) {
+                        return;
+                    }
+
+                    const sourceEntry = pointerDrag.sourceEntry;
+                    const targetFolder = pointerDrag.active ? lastTouchTargetFolder : null;
+                    if (pointerDrag.active) {
+                        event.preventDefault();
+                    }
+
+                    sourceEntry.classList.remove("file-entry--drag-source");
+                    clearFolderHighlights();
+                    pointerDrag = null;
+                    lastTouchTargetFolder = null;
+
+                    if (targetFolder) {
+                        await completeMove(sourceEntry, targetFolder);
+                    }
+                }, { passive: false });
+
+                entry.addEventListener("touchcancel", () => {
+                    if (!pointerDrag || pointerDrag.sourceEntry !== entry) {
+                        return;
+                    }
+
+                    entry.classList.remove("file-entry--drag-source");
+                    clearFolderHighlights();
+                    pointerDrag = null;
+                    lastTouchTargetFolder = null;
+                }, { passive: true });
+            });
+
+            folderEntries.forEach((entry) => {
+                if (entry.getAttribute("data-drop-bound") === "true") {
+                    return;
+                }
+
+                entry.setAttribute("data-drop-bound", "true");
+
+                entry.addEventListener("dragover", (event) => {
+                    if (!dragSourceEntry) {
+                        return;
+                    }
+
+                    event.preventDefault();
+                    event.stopPropagation();
+                    if (event.dataTransfer) {
+                        event.dataTransfer.dropEffect = "move";
+                    }
+                    setTargetHighlight(entry);
+                });
+
+                entry.addEventListener("dragleave", () => {
+                    entry.classList.remove("file-entry--drop-target");
+                });
+
+                entry.addEventListener("drop", async (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const sourceEntry = dragSourceEntry;
+                    clearFolderHighlights();
+                    if (!sourceEntry) {
+                        return;
+                    }
+
+                    await completeMove(sourceEntry, entry);
+                    sourceEntry.classList.remove("file-entry--drag-source");
+                    dragSourceEntry = null;
+                    internalDragActive = false;
+                });
+            });
+        };
+
+        wireMoveEntries();
+        document.addEventListener("files:grid-updated", wireMoveEntries);
+    })();
+</script>
+
