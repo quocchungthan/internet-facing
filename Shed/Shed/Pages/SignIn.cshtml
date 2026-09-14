@@ -1,0 +1,87 @@
+﻿@page "/signin"
+@attribute [AllowAnonymous]
+@model Shed.Pages.SignInModel
+@using Microsoft.AspNetCore.Authorization
+@using Shed.Pages.Shared
+@inject IConfiguration Configuration
+@{
+    ViewData["Title"] = "Sign In";
+}
+
+@if (Model.IsBridgeEnabled)
+{
+    <div class="os-login-form"
+         style="--os-card-text:@Model.CardTextColor; --os-label-text:@Model.LabelTextColor; --os-aux-text:@Model.AuxTextColor; --os-link-text:@Model.LinkTextColor;">
+        <p class="os-status">You are signed out. Continue with GitHub to sign in again.</p>
+        <a class="os-login-button" href="@Model.BridgeSignInUrl">Sign in with GitHub</a>
+    </div>
+}
+else
+{
+    <form method="post"
+          class="os-login-form"
+          asp-route-returnUrl="@Model.ReturnUrl"
+          style="--os-card-text:@Model.CardTextColor; --os-label-text:@Model.LabelTextColor; --os-aux-text:@Model.AuxTextColor; --os-link-text:@Model.LinkTextColor;">
+        @Html.AntiForgeryToken()
+        @if (!string.IsNullOrWhiteSpace(Model.InfoMessage))
+        {
+            <div class="os-status">@Model.InfoMessage</div>
+        }
+        @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+        {
+            <div class="os-error">@Model.ErrorMessage</div>
+        }
+
+        @if (Model.UseRememberedAccount && !string.IsNullOrWhiteSpace(Model.RememberedEmail))
+        {
+            <input type="hidden" name="Email" value="@Model.RememberedEmail" />
+            <div class="os-account-chip" role="status" aria-live="polite">
+                <div class="os-account-chip__label">Signed in recently as</div>
+                <div class="os-account-chip__value">@Model.RememberedEmail</div>
+                <a asp-page="/SignIn" asp-route-switchAccount="true" asp-route-returnUrl="@Model.ReturnUrl">Use another account</a>
+            </div>
+        }
+        else
+        {
+            <partial name="_OsTextInput" model='new OsTextInputModel
+            {
+                Id = "email",
+                Name = "Email",
+                Label = "Email",
+                Type = "email",
+                AutoComplete = "username",
+                Value = Model.Email,
+                AutoFocus = true
+            }' />
+        }
+
+        <partial name="_OsTextInput" model='new OsTextInputModel
+        {
+            Id = "password",
+            Name = "Password",
+            Label = "Password",
+            Type = "password",
+            AutoComplete = "current-password"
+        }' />
+
+        <label class="os-remember" for="RememberMe">
+            <input asp-for="RememberMe" />
+            <span>Remember session</span>
+        </label>
+
+        <button class="os-login-button" type="submit">Unlock</button>
+
+        <div class="os-login-links">
+            @if (Model.ShowForgotPassword)
+            {
+                <a asp-area="Identity" asp-page="/Account/ForgotPassword">@Model.ForgotPasswordText</a>
+            }
+
+            @if (Model.ShowRegister)
+            {
+                <a asp-area="Identity" asp-page="/Account/Register">@Model.RegisterText</a>
+            }
+        </div>
+    </form>
+}
+

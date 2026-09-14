@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>{SITE_TITLE} - Confirm your email</title>
+  <style>
+    /* Email-friendly CSS with explicit colors (avoid CSS variables for email clients) */
+    html,body{margin:0;padding:20px;font-family:Ubuntu,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1f1f1f;background:#f8f5f1}
+    a{color:#e95420}
+    .email-card{max-width:600px;margin:0 auto;border:1px solid #dcdcdc;border-radius:6px;padding:24px;background:#ffffff}
+    h1{font-size:20px;margin:0 0 8px;color:#e95420}
+    p{margin:0 0 12px;line-height:1.4;color:#333}
+    .btn{display:inline-block;padding:10px 16px;background:#e95420;color:#ffffff;text-decoration:none;border-radius:4px}
+    .meta{font-size:12px;color:#666}
+    @media (max-width:480px){.email-card{padding:16px}}
+  </style>
+</head>
+<body>
+  <div class="email-card" style="border:1px solid #dcdcdc;background:#ffffff;">
+    <h1 style="color:#e95420">{SITE_TITLE}</h1>
+    <p>Hello {EMAIL},</p>
+    <p>Thanks for creating an account. Please confirm your email address by clicking the button below.</p>
+    <p><a class="btn" href="{CONFIRM_LINK}" style="background:#e95420;color:#ffffff;display:inline-block;padding:10px 16px;border-radius:4px;text-decoration:none;">Confirm your email</a></p>
+    <p>If the button above doesn't work, copy and paste the following URL into your browser:</p>
+    <p><a href="{CONFIRM_LINK}">{CONFIRM_LINK}</a></p>
+    <hr />
+    <p style="font-size:12px;color:#666">This email was sent by {SITE_TITLE} running on an Ubuntu server.</p>
+  </div>
+</body>
+</html>

@@ -1,0 +1,182 @@
+﻿@page
+@model Shed.Pages.UserSettingsModel
+@{
+    ViewData["Title"] = "Settings";
+}
+
+<section class="page-header">
+    <div>
+        <h1>Settings</h1>
+        <p>Manage your display preferences.</p>
+    </div>
+</section>
+
+@* Hidden form keeps antiforgery token in DOM for fetch *@
+<form id="settingsFormToken" method="post" style="display:none">
+    <input type="hidden" id="ShowHiddenFilesHidden" name="ShowHiddenFiles" value="@Model.ShowHiddenFiles.ToString().ToLower()" />
+</form>
+
+<div class="panel settings-panel">
+    <div class="settings-row">
+        <div class="settings-row__label">
+            <span class="settings-row__title">Show hidden files</span>
+            <span class="settings-row__hint">Display files and folders starting with <code>.</code></span>
+        </div>
+        <label class="os-toggle" aria-label="Show hidden files">
+            <input type="checkbox" id="ShowHiddenFiles" @(Model.ShowHiddenFiles ? "checked" : "") />
+            <span class="os-toggle__track"><span class="os-toggle__thumb"></span></span>
+        </label>
+    </div>
+</div>
+
+<div id="settingsSavedToast" class="settings-toast" aria-live="polite">Saved</div>
+
+@if (Model.LastUpdatedAt != default)
+{
+    <p class="hint">Last saved: @Model.LastUpdatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</p>
+}
+
+<style>
+    .settings-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+    }
+
+    .settings-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 1rem 0;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.07);
+    }
+
+    .settings-row:last-child {
+        border-bottom: 0;
+    }
+
+    .settings-row__label {
+        display: flex;
+        flex-direction: column;
+        gap: 0.15rem;
+    }
+
+    .settings-row__title {
+        font-weight: 500;
+        font-size: 0.97rem;
+    }
+
+    .settings-row__hint {
+        font-size: 0.82rem;
+        color: var(--muted, #6f6f78);
+    }
+
+    /* OS-style toggle */
+    .os-toggle {
+        display: inline-flex;
+        align-items: center;
+        cursor: pointer;
+        flex-shrink: 0;
+    }
+
+    .os-toggle input[type=checkbox] {
+        position: absolute;
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    .os-toggle__track {
+        position: relative;
+        width: 52px;
+        height: 28px;
+        background: #c7c9ce;
+        border-radius: 100px;
+        transition: background 0.22s;
+        display: block;
+    }
+
+    .os-toggle__thumb {
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: #fff;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.28);
+        transition: transform 0.22s cubic-bezier(.4, 0, .2, 1);
+        display: block;
+    }
+
+    .os-toggle input:checked + .os-toggle__track {
+        background: var(--ubuntu-orange, #e95420);
+    }
+
+    .os-toggle input:checked + .os-toggle__track .os-toggle__thumb {
+        transform: translateX(24px);
+    }
+
+    .os-toggle input:focus-visible + .os-toggle__track {
+        outline: 2px solid var(--ubuntu-orange, #e95420);
+        outline-offset: 2px;
+    }
+
+    .settings-toast {
+        position: fixed;
+        bottom: 60px;
+        left: 50%;
+        transform: translateX(-50%) translateY(8px);
+        background: rgba(22, 23, 27, 0.9);
+        color: #eef0f5;
+        border-radius: 100px;
+        padding: 0.45rem 1.1rem;
+        font-size: 0.85rem;
+        z-index: 9999;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.18s, transform 0.18s;
+    }
+
+    .settings-toast--visible {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+</style>
+
+@section Scripts {
+    <script>
+        (() => {
+            const toggle = document.getElementById("ShowHiddenFiles");
+            const tokenForm = document.getElementById("settingsFormToken");
+            const toast = document.getElementById("settingsSavedToast");
+            if (!toggle || !tokenForm) return;
+
+            function showToast() {
+                if (!toast) return;
+                toast.classList.add("settings-toast--visible");
+                setTimeout(() => toast.classList.remove("settings-toast--visible"), 1600);
+            }
+
+            toggle.addEventListener("change", async () => {
+                const formData = new FormData(tokenForm);
+                formData.set("ShowHiddenFiles", toggle.checked ? "true" : "false");
+                // Carry blank values for other fields the server expects
+                formData.set("TranslatedText", "");
+                formData.set("ThumbnailLogoUrl", "");
+                formData.set("FontStyle", "Ubuntu");
+                formData.set("Theme", "ubuntu");
+                formData.set("PrimaryColor", "#E95420");
+
+                try {
+                    await fetch(window.location.pathname, { method: "POST", body: formData });
+                    showToast();
+                } catch {
+                    // silently ignore network error; user can reload
+                }
+            });
+        })();
+    </script>
+}
+
