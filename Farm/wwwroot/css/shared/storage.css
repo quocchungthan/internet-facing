@@ -1,0 +1,448 @@
+/* Shared Shuneo Storage theme. Loaded after Storage's local fallback CSS. */
+.system-storage {
+  --ubuntu-orange: var(--system-accent);
+  --ubuntu-aubergine: var(--system-accent);
+  --ink: var(--system-text);
+  --muted: var(--system-text-muted);
+  --panel-bg: var(--system-surface);
+  --surface: var(--system-canvas);
+  --line: var(--system-border);
+  color: var(--system-text);
+  font-family: var(--font-body);
+  background: var(--system-canvas);
+}
+
+.system-storage a {
+  color: var(--system-accent);
+}
+
+.system-storage .app-shell {
+  grid-template-columns: 272px minmax(0, 1fr);
+}
+
+.system-storage .app-shell.is-collapsed {
+  grid-template-columns: 76px minmax(0, 1fr);
+}
+
+.system-storage .side-nav {
+  grid-template-rows: auto auto 1fr;
+  gap: 14px;
+  padding: 14px 12px;
+  border-right: 3px solid var(--system-border-strong);
+  color: var(--cream);
+  background:
+    linear-gradient(rgba(255, 255, 255, .04) 1px, transparent 1px) 0 0 / 18px 18px,
+    linear-gradient(160deg, #234d35, #173d2c 65%, #102e22);
+}
+
+.system-storage .side-nav__brand {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 10px;
+  padding: 4px;
+  color: var(--cream);
+  font: 900 14px/1 var(--font-display);
+  letter-spacing: .06em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.system-storage .side-nav__brand-mark {
+  display: inline-grid;
+  width: 38px;
+  height: 36px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 2px solid color-mix(in srgb, var(--cream) 62%, transparent);
+  border-radius: var(--system-radius-sm);
+  background: color-mix(in srgb, var(--system-accent-bright) 25%, transparent);
+  font-size: 11px;
+}
+
+.system-storage .side-nav__toggle,
+.system-storage .topbar-icon-button,
+.system-storage .icon-logout {
+  border: 2px solid color-mix(in srgb, var(--cream) 38%, transparent);
+  border-radius: var(--system-radius-sm);
+  color: var(--cream);
+  background: color-mix(in srgb, var(--cream) 9%, transparent);
+}
+
+.system-storage .side-nav__toggle:hover,
+.system-storage .topbar-icon-button:hover,
+.system-storage .icon-logout:hover {
+  border-color: var(--system-focus);
+  background: color-mix(in srgb, var(--cream) 17%, transparent);
+}
+
+.system-storage .side-nav__user {
+  color: color-mix(in srgb, var(--cream) 78%, transparent);
+  font: 800 12px/1.2 var(--font-display);
+}
+
+.system-storage .side-nav .nav-link {
+  min-height: 44px;
+  border: 2px solid color-mix(in srgb, var(--cream) 16%, transparent);
+  border-radius: var(--system-radius-sm);
+  color: var(--cream);
+  background: color-mix(in srgb, var(--cream) 7%, transparent);
+  font: 800 13px/1.2 var(--font-body);
+}
+
+.system-storage .side-nav .nav-link:hover {
+  border-color: color-mix(in srgb, var(--cream) 45%, transparent);
+  background: color-mix(in srgb, var(--cream) 14%, transparent);
+}
+
+.system-storage .side-nav .nav-link.is-active {
+  border-color: var(--system-border-strong);
+  color: var(--system-text);
+  background: var(--system-focus);
+  box-shadow: 3px 3px 0 rgba(15, 35, 24, .38);
+}
+
+.system-storage .app-shell.is-collapsed .side-nav__brand .nav-text {
+  display: none;
+}
+
+.system-storage .app-shell.is-collapsed .side-nav__brand {
+  justify-content: center;
+}
+
+.system-storage .workspace-pane {
+  background: var(--system-canvas);
+}
+
+.system-storage .utility-topbar {
+  min-height: 54px;
+  height: 54px;
+  padding: 0 14px;
+  border-bottom: 3px solid var(--system-border-strong);
+  color: var(--system-text);
+  background: var(--system-surface);
+  box-shadow: 0 4px 0 color-mix(in srgb, var(--system-border-strong) 14%, transparent);
+}
+
+.system-storage .utility-topbar .topbar-icon-button,
+.system-storage .utility-topbar .icon-logout {
+  border-color: var(--system-border);
+  color: var(--system-text);
+  background: var(--system-surface-raised);
+}
+
+.system-storage .utility-topbar__user {
+  color: var(--system-text-muted);
+  font: 800 12px/1.2 var(--font-display);
+}
+
+.system-storage .topbar-path-input {
+  height: 36px;
+  border: 2px solid var(--system-border);
+  border-radius: var(--system-radius-sm);
+  color: var(--system-text);
+  background: var(--system-surface-raised);
+}
+
+.system-storage .topbar-path-input:focus {
+  outline: 3px solid var(--system-focus);
+  outline-offset: 1px;
+  border-color: var(--system-border-strong);
+}
+
+.system-storage .main-content {
+  max-height: calc(100vh - 92px);
+  padding: clamp(18px, 3vw, 36px);
+  color: var(--system-text);
+  background:
+    linear-gradient(color-mix(in srgb, var(--system-border) 10%, transparent) 1px, transparent 1px) 0 0 / 22px 22px,
+    linear-gradient(90deg, color-mix(in srgb, var(--system-border) 10%, transparent) 1px, transparent 1px) 0 0 / 22px 22px,
+    var(--system-canvas-soft);
+}
+
+.system-storage .page-header h1 {
+  color: var(--system-text);
+  font: 900 clamp(24px, 4vw, 38px)/1.1 var(--font-display);
+  letter-spacing: -.03em;
+}
+
+.system-storage .page-header p,
+.system-storage .hint {
+  color: var(--system-text-muted);
+}
+
+.system-storage .panel,
+.system-storage .file-card {
+  border: 2px solid var(--system-border);
+  border-radius: var(--system-radius-md);
+  color: var(--system-text);
+  background: var(--system-surface);
+  box-shadow: var(--system-shadow-sm);
+}
+
+.system-storage .files-explorer-grid {
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 14px;
+}
+
+.system-storage .file-tile {
+  min-height: 150px;
+  border: 2px solid var(--system-border);
+  border-radius: var(--system-radius-md);
+  color: var(--system-text);
+  background: var(--system-surface);
+  box-shadow: var(--system-shadow-sm);
+}
+
+.system-storage .file-tile:hover {
+  border-color: var(--system-border-strong);
+  background: var(--system-surface-raised);
+  transform: translateY(-2px);
+}
+
+.system-storage .file-tile--folder {
+  border-color: color-mix(in srgb, var(--system-accent) 70%, var(--system-border));
+  background: color-mix(in srgb, var(--system-accent) 9%, var(--system-surface));
+}
+
+.system-storage .file-tile .file-thumb {
+  border: 2px solid var(--system-border);
+  border-radius: var(--system-radius-sm);
+  background: var(--system-surface-raised);
+}
+
+.system-storage .file-name {
+  color: var(--system-text);
+  font-weight: 800;
+}
+
+.system-storage input,
+.system-storage textarea,
+.system-storage select,
+.system-storage button {
+  border-radius: var(--system-radius-sm);
+  font-family: var(--font-body);
+}
+
+.system-storage input:focus-visible,
+.system-storage textarea:focus-visible,
+.system-storage select:focus-visible,
+.system-storage button:focus-visible,
+.system-storage a:focus-visible {
+  outline: 3px solid var(--system-focus);
+  outline-offset: 2px;
+}
+
+.system-storage button:not(.side-nav__toggle, .topbar-icon-button, .icon-logout, .file-context-menu__item) {
+  border: 2px solid var(--system-border-strong);
+  color: var(--cream);
+  background: var(--system-accent);
+  box-shadow: var(--system-shadow-sm);
+  font-weight: 900;
+}
+
+.system-storage button.danger {
+  background: var(--system-danger);
+}
+
+.system-storage .file-context-menu,
+.system-storage .upload-progress,
+.system-storage .settings-toast {
+  border: 3px solid var(--system-border-strong);
+  border-radius: var(--system-radius-md);
+  color: var(--system-text);
+  background: var(--system-surface-raised);
+  box-shadow: var(--system-shadow-md);
+}
+
+.system-storage .file-context-menu__item {
+  color: var(--system-danger);
+}
+
+.system-storage .file-context-menu__item--default {
+  color: var(--system-text);
+}
+
+.system-storage .file-context-menu__item:hover,
+.system-storage .file-context-menu__item--default:hover {
+  background: color-mix(in srgb, var(--system-accent) 14%, var(--system-surface));
+}
+
+.system-storage .login-shell {
+  background-image:
+    linear-gradient(rgba(22, 48, 34, .55), rgba(32, 48, 31, .64)),
+    var(--login-background-image, none),
+    linear-gradient(145deg, var(--system-accent), var(--system-canvas));
+}
+
+.system-storage .auth-card {
+  width: min(430px, calc(100vw - 28px));
+  border: 3px solid var(--system-border-strong);
+  border-radius: var(--system-radius-lg);
+  color: var(--system-text);
+  background:
+    linear-gradient(rgba(255, 255, 255, .12) 1px, transparent 1px) 0 0 / 18px 18px,
+    color-mix(in srgb, var(--system-surface) 94%, transparent);
+  box-shadow: var(--system-shadow-md);
+  backdrop-filter: blur(10px);
+}
+
+.system-storage .auth-card__logo {
+  color: var(--system-accent);
+}
+
+.system-storage .auth-card__title,
+.system-storage .login-form-host,
+.system-storage .login-form-host h1,
+.system-storage .login-form-host h2,
+.system-storage .login-form-host h3,
+.system-storage .login-form-host h4 {
+  color: var(--system-text);
+}
+
+.system-storage .auth-card__title {
+  font: 900 20px/1.2 var(--font-display);
+}
+
+.system-storage .auth-tabs {
+  border-bottom-color: var(--system-border);
+}
+
+.system-storage .auth-tab {
+  color: var(--system-text-muted);
+}
+
+.system-storage .auth-tab:hover,
+.system-storage .auth-tab--active {
+  color: var(--system-text);
+}
+
+.system-storage .auth-tab--active {
+  border-bottom-color: var(--system-accent);
+}
+
+.system-storage .login-form-host p,
+.system-storage .login-form-host .text-muted,
+.system-storage .login-form-host .text-body-secondary,
+.system-storage .login-form-host .text-secondary,
+.system-storage .login-form-host label,
+.system-storage .auth-field label {
+  color: var(--system-text-muted) !important;
+}
+
+.system-storage .login-form-host input[type="email"],
+.system-storage .login-form-host input[type="password"],
+.system-storage .login-form-host input[type="text"],
+.system-storage .login-form-host .os-input,
+.system-storage .auth-input,
+.system-storage .os-input {
+  border: 2px solid var(--system-border);
+  color: var(--system-text);
+  background: var(--system-surface-raised);
+}
+
+.system-storage .login-form-host input:focus,
+.system-storage .auth-input:focus,
+.system-storage .os-input:focus {
+  border-color: var(--system-border-strong);
+  box-shadow: 0 0 0 3px var(--system-focus);
+}
+
+.system-storage .login-form-host button[type="submit"],
+.system-storage .login-form-host input[type="submit"],
+.system-storage .auth-submit,
+.system-storage .os-login-button {
+  border: 3px solid var(--system-border-strong);
+  border-radius: var(--system-radius-sm);
+  color: var(--cream);
+  background: var(--system-accent);
+  box-shadow: var(--system-shadow-sm);
+}
+
+.system-storage .login-form-host a,
+.system-storage .os-login-links a {
+  color: var(--system-accent);
+  font-weight: 800;
+}
+
+.system-storage .footer {
+  border-top: 3px solid var(--system-border-strong);
+  color: var(--system-text-muted);
+  background: var(--system-surface);
+}
+
+@media (max-width: 880px) {
+  .system-storage .page-frame,
+  .system-storage .app-shell,
+  .system-storage .workspace-pane,
+  .system-storage .utility-topbar,
+  .system-storage .main-content {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .system-storage .app-shell,
+  .system-storage .app-shell.is-collapsed {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .system-storage .side-nav {
+    width: min(82vw, 300px);
+  }
+
+  .system-storage .utility-topbar__left {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .system-storage .topbar-path-form {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .system-storage .topbar-path-input {
+    width: auto;
+    min-width: 72px;
+    flex: 1 1 auto;
+  }
+
+  .system-storage .utility-topbar .side-nav__toggle,
+  .system-storage .utility-topbar .topbar-icon-button,
+  .system-storage .utility-topbar .icon-logout {
+    flex-shrink: 0;
+  }
+
+  .system-storage .main-content {
+    padding: 18px 14px;
+  }
+
+  .system-storage .files-explorer-grid {
+    grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .system-storage .utility-topbar {
+    gap: 4px;
+    padding: 0 8px;
+  }
+
+  .system-storage .utility-topbar__left,
+  .system-storage .topbar-path-form {
+    gap: 4px;
+  }
+
+  .system-storage .topbar-path-input {
+    width: auto;
+    min-width: 56px;
+  }
+
+  .system-storage .files-explorer-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .system-storage .file-tile {
+    min-height: 128px;
+  }
+}

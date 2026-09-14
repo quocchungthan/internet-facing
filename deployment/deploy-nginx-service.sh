@@ -23,6 +23,12 @@ set -Eeuo pipefail
 
 [[ "$SERVICE_DOMAIN" != */* ]] || { echo "SERVICE_DOMAIN must not contain a slash" >&2; exit 2; }
 
+server_names="$SERVICE_DOMAIN${SERVICE_ALIASES:+ $SERVICE_ALIASES}"
+certbot_domains=(--domain "$SERVICE_DOMAIN")
+for alias in $SERVICE_ALIASES; do
+    certbot_domains+=(--domain "$alias")
+done
+
 renewal_dir="$CERTBOT_CONFIG_DIR/renewal"
 live_dir="$CERTBOT_CONFIG_DIR/live"
 managed_link="$NGINX_SITES_ENABLED/$SERVICE_DOMAIN.conf"
@@ -118,7 +124,7 @@ cat > "$http_config" <<EOF
 server {
     listen 80;
     listen [::]:80;
-    server_name $SERVICE_DOMAIN $SERVICE_ALIASES;
+    server_name $server_names;
 
     location ^~ /.well-known/acme-challenge/ {
         root $CERTBOT_WEBROOT;
@@ -137,12 +143,14 @@ stage_config "$http_config"
 systemctl reload "$NGINX_SERVICE"
 
 if [[ -f "$renewal_dir/$lineage.conf" ]]; then
-    "$CERTBOT_BIN" renew --config-dir "$CERTBOT_CONFIG_DIR" --cert-name "$lineage" --webroot-path "$CERTBOT_WEBROOT" --non-interactive
+    certificate="$live_dir/$lineage/cert.pem"
+    if certificate_covers_domain "$certificate"; then
+        "$CERTBOT_BIN" renew --config-dir "$CERTBOT_CONFIG_DIR" --cert-name "$lineage" --webroot-path "$CERTBOT_WEBROOT" --non-interactive
+    else
+        "$CERTBOT_BIN" certonly --config-dir "$CERTBOT_CONFIG_DIR" --webroot --webroot-path "$CERTBOT_WEBROOT" \
+            --cert-name "$lineage" "${certbot_domains[@]}" --expand --non-interactive
+    fi
 else
-    certbot_domains=(--domain "$SERVICE_DOMAIN")
-    for alias in $SERVICE_ALIASES; do
-        certbot_domains+=(--domain "$alias")
-    done
     "$CERTBOT_BIN" certonly --config-dir "$CERTBOT_CONFIG_DIR" --webroot --webroot-path "$CERTBOT_WEBROOT" \
         --cert-name "$lineage" "${certbot_domains[@]}" \
         --email "$CERTBOT_EMAIL" --agree-tos --non-interactive
@@ -159,7 +167,7 @@ cat > "$https_config" <<EOF
 server {
     listen 80;
     listen [::]:80;
-    server_name $SERVICE_DOMAIN $SERVICE_ALIASES;
+    server_name $server_names;
 
     location ^~ /.well-known/acme-challenge/ {
         root $CERTBOT_WEBROOT;
@@ -172,7 +180,7 @@ server {
 server {
     listen 443 ssl;
     listen [::]:443 ssl;
-    server_name $SERVICE_DOMAIN $SERVICE_ALIASES;
+    server_name $server_names;
     ssl_certificate $certificate;
     ssl_certificate_key $private_key;
 

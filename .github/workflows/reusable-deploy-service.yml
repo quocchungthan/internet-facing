@@ -42,6 +42,8 @@ on:
         required: true
       VPS_KNOWN_HOSTS:
         required: true
+      GH_NUGET_TOKEN:
+        required: false
       CERTBOT_EMAIL:
         required: false
 
@@ -62,7 +64,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build service image
-        run: docker build --pull --tag "${{ inputs.image_name }}:${{ inputs.image_tag }}" --file "${{ inputs.dockerfile }}" "${{ inputs.docker_context }}"
+        env:
+          GH_NUGET_TOKEN: ${{ secrets.GH_NUGET_TOKEN }}
+        run: docker build --pull --build-arg "GH_NUGET_TOKEN=$GH_NUGET_TOKEN" --tag "${{ inputs.image_name }}:${{ inputs.image_tag }}" --file "${{ inputs.dockerfile }}" "${{ inputs.docker_context }}"
 
       - name: Configure SSH host verification
         env:
