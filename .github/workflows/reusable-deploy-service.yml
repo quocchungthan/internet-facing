@@ -23,8 +23,8 @@ on:
         description: Service deployment wrapper path
         required: true
         type: string
-      common_script_path:
-        description: Shared nginx deployment script path
+      deploy_common_script:
+        description: Shared ingress deployment script path
         required: true
         type: string
       runtime_image_argument:
@@ -42,7 +42,7 @@ on:
         required: true
       VPS_KNOWN_HOSTS:
         required: true
-      CERTBOT_EMAIL:
+      ACME_EMAIL:
         required: false
 
 permissions:
@@ -107,23 +107,23 @@ jobs:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_PORT: ${{ secrets.VPS_PORT }}
           VPS_USER: ${{ secrets.VPS_USER }}
-          CERTBOT_EMAIL: ${{ secrets.CERTBOT_EMAIL || vars.CERTBOT_EMAIL }}
+          ACME_EMAIL: ${{ secrets.ACME_EMAIL || vars.ACME_EMAIL }}
         run: |
           set -euo pipefail
-          common_script=/tmp/deploy-nginx-common.sh
+          common_script=/tmp/deploy-common.sh
           ssh \
             -p "$VPS_PORT" \
             -o BatchMode=yes \
             -o StrictHostKeyChecking=yes \
             "$VPS_USER@$VPS_HOST" \
             "cat > '$common_script'" \
-            < "${{ inputs.common_script_path }}"
-          printf 'export CERTBOT_EMAIL=%q\n' "$CERTBOT_EMAIL" > /tmp/deploy-service-wrapper.sh
+            < "${{ inputs.deploy_common_script }}"
+          printf 'export ACME_EMAIL=%q\n' "$ACME_EMAIL" > /tmp/deploy-service-wrapper.sh
           cat "${{ inputs.wrapper_path }}" >> /tmp/deploy-service-wrapper.sh
           ssh \
             -p "$VPS_PORT" \
             -o BatchMode=yes \
             -o StrictHostKeyChecking=yes \
             "$VPS_USER@$VPS_HOST" \
-            "trap 'rm -f $common_script' EXIT; DEPLOY_NGINX_COMMON_SCRIPT='$common_script' ${{ inputs.runtime_image_argument }}='${{ inputs.image_name }}:${{ inputs.image_tag }}' bash -s" \
+            "trap 'rm -f $common_script' EXIT; DEPLOY_COMMON_SCRIPT='$common_script' ${{ inputs.runtime_image_argument }}='${{ inputs.image_name }}:${{ inputs.image_tag }}' bash -s" \
             < /tmp/deploy-service-wrapper.sh
