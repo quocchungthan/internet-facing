@@ -1,0 +1,585 @@
+name: Deploy MailBox
+
+on:
+  ## The mailbox is running well, do not auto trigger.
+  # push:
+  #   branches:
+  #     - 'sub/**'
+  #   paths:
+  #     - 'MailBox/**'
+  #     - '.github/workflows/deploy-mailbox.yml'
+  workflow_dispatch:
+    inputs:
+      subdomain:
+        description: 'Override the subdomain (default: derived from the sub/<name> branch)'
+        required: false
+        type: string
+      base_domain:
+        description: 'Override the base domain'
+        required: false
+        default: 'eldervibe.dev'
+        type: string
+      dry_run:
+        description: 'Plan only — run preflight checks and skip the deploy job'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-mailbox-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  DEFAULT_BASE_DOMAIN: eldervibe.dev
+  DEFAULT_DEPLOY_DIR: /opt/shuneo-mail-mvp
+
+jobs:
+  preflight:
+    name: Preflight checks
+    runs-on: ubuntu-latest
+    outputs:
+      mail_hostname: ${{ steps.derive.outputs.mail_hostname }}
+      base_domain: ${{ steps.derive.outputs.base_domain }}
+      subdomain: ${{ steps.derive.outputs.subdomain }}
+      deploy_dir: ${{ steps.derive.outputs.deploy_dir }}
+      ssh_ready: ${{ steps.ssh-check.outputs.ssh_ready }}
+      secrets_ok: ${{ steps.secret-check.outputs.secrets_ok }}
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Derive domain from branch name
+        id: derive
+        shell: bash
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_SUBDOMAIN: ${{ inputs.subdomain }}
+          INPUT_BASE_DOMAIN: ${{ inputs.base_domain }}
+          VAR_BASE_DOMAIN: ${{ vars.MAILBOX_BASE_DOMAIN }}
+          VAR_DEPLOY_DIR: ${{ vars.MAILBOX_DEPLOY_DIR }}
+        run: |
+          set -euo pipefail
+
+          sub="${INPUT_SUBDOMAIN:-}"
+          if [[ -z "$sub" ]]; then
+            if [[ "$REF_NAME" != sub/* ]]; then
+              echo "::error::Branch '$REF_NAME' does not match the required 'sub/<name>' convention."
+              echo "::error::This workflow derives the mail subdomain from the branch name."
+              echo "::error::Fix: run on a branch such as 'sub/mail' (=> mail.eldervibe.dev), or re-run via"
+              echo "::error::workflow_dispatch and supply the 'subdomain' input explicitly."
+              exit 1
+            fi
+            sub="${REF_NAME#sub/}"
+          fi
+
+          # A branch like sub/feature/mail would leave a slash behind — reject it.
+          if [[ ! "$sub" =~ ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$ ]]; then
+            echo "::error::Derived subdomain '$sub' is not a valid DNS label."
+            echo "::error::Expected lowercase letters, digits and hyphens (1-63 chars, no leading/trailing hyphen)."
+            echo "::error::Fix: rename the branch to 'sub/<dns-label>' or pass a valid 'subdomain' input."
+            exit 1
+          fi
+
+          base="${INPUT_BASE_DOMAIN:-}"
+          base="${base:-${VAR_BASE_DOMAIN:-}}"
+          base="${base:-$DEFAULT_BASE_DOMAIN}"
+          if [[ ! "$base" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$ ]]; then
+            echo "::error::Base domain '$base' is not a valid domain name."
+            exit 1
+          fi
+
+          deploy_dir="${VAR_DEPLOY_DIR:-$DEFAULT_DEPLOY_DIR}"
+
+          {
+            echo "subdomain=$sub"
+            echo "base_domain=$base"
+            echo "mail_hostname=${sub}.${base}"
+            echo "deploy_dir=$deploy_dir"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "Branch          : $REF_NAME"
+          echo "Subdomain       : $sub"
+          echo "Base domain     : $base"
+          echo "Mail hostname   : ${sub}.${base}"
+          echo "Deploy directory: $deploy_dir"
+
+      - name: Check required GitHub secrets and variables
+        id: secret-check
+        shell: bash
+        env:
+          S_SSH_HOST: ${{ secrets.MAILBOX_SSH_HOST }}
+          S_SSH_USER: ${{ secrets.MAILBOX_SSH_USER }}
+          S_SSH_KEY: ${{ secrets.MAILBOX_SSH_PRIVATE_KEY }}
+          S_KNOWN_HOSTS: ${{ secrets.MAILBOX_SSH_KNOWN_HOSTS }}
+          S_LE_EMAIL: ${{ secrets.MAILBOX_LETSENCRYPT_EMAIL }}
+          V_VPS_IP: ${{ vars.MAILBOX_VPS_IP }}
+          V_SSH_PORT: ${{ vars.MAILBOX_SSH_PORT }}
+        run: |
+          set -euo pipefail
+
+          missing=()
+          # Values are only tested for emptiness; never printed.
+          [[ -n "${S_SSH_HOST:-}" ]]    || missing+=("secret MAILBOX_SSH_HOST")
+          [[ -n "${S_SSH_USER:-}" ]]    || missing+=("secret MAILBOX_SSH_USER")
+          [[ -n "${S_SSH_KEY:-}" ]]     || missing+=("secret MAILBOX_SSH_PRIVATE_KEY")
+          [[ -n "${S_KNOWN_HOSTS:-}" ]] || missing+=("secret MAILBOX_SSH_KNOWN_HOSTS")
+          [[ -n "${S_LE_EMAIL:-}" ]]    || missing+=("secret MAILBOX_LETSENCRYPT_EMAIL")
+
+          optional=()
+          [[ -n "${V_VPS_IP:-}" ]]   || optional+=("variable MAILBOX_VPS_IP (PTR/SPF checks fall back to the resolved A record)")
+          [[ -n "${V_SSH_PORT:-}" ]] || optional+=("variable MAILBOX_SSH_PORT (defaults to 22)")
+
+          {
+            echo "## MailBox deploy — preflight report"
+            echo
+            echo "### 1. GitHub secrets / variables"
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ ${#missing[@]} -eq 0 ]]; then
+            echo "secrets_ok=true" >> "$GITHUB_OUTPUT"
+            echo "- PASS — all required secrets are present." >> "$GITHUB_STEP_SUMMARY"
+            echo "PASS: all required secrets are present."
+          else
+            echo "secrets_ok=false" >> "$GITHUB_OUTPUT"
+            echo "- FAIL — the following are MISSING and must be created in repository settings:" >> "$GITHUB_STEP_SUMMARY"
+            for item in "${missing[@]}"; do
+              echo "  - \`$item\`" >> "$GITHUB_STEP_SUMMARY"
+              echo "MISSING: $item"
+            done
+          fi
+
+          if [[ ${#optional[@]} -gt 0 ]]; then
+            echo "- NOTE — optional settings not configured:" >> "$GITHUB_STEP_SUMMARY"
+            for item in "${optional[@]}"; do
+              echo "  - \`$item\`" >> "$GITHUB_STEP_SUMMARY"
+            done
+          fi
+          echo >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Verify shared design assets can be staged
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Fails loudly here (including on dry_run) rather than during the VPS image build.
+          python3 MailBox/scripts/stage-shared-assets.py
+          python3 MailBox/scripts/stage-shared-assets.py --check
+
+      - name: Check DNS preconditions
+        id: dns-check
+        shell: bash
+        env:
+          MAIL_HOSTNAME: ${{ steps.derive.outputs.mail_hostname }}
+          BASE_DOMAIN: ${{ steps.derive.outputs.base_domain }}
+          V_VPS_IP: ${{ vars.MAILBOX_VPS_IP }}
+        run: |
+          set -euo pipefail
+
+          if ! command -v dig >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq dnsutils >/dev/null
+          fi
+
+          summary() { echo "$1" >> "$GITHUB_STEP_SUMMARY"; }
+
+          summary "### 2. DNS records for \`$MAIL_HOSTNAME\`"
+          summary ""
+          summary "| Check | Result | Observed | Required value if missing |"
+          summary "|---|---|---|---|"
+
+          a_record="$(dig +short A "$MAIL_HOSTNAME" | tail -n1 || true)"
+          if [[ -n "$a_record" ]]; then
+            summary "| A \`$MAIL_HOSTNAME\` | PASS | \`$a_record\` | — |"
+          else
+            summary "| A \`$MAIL_HOSTNAME\` | FAIL | (none) | \`A  ${MAIL_HOSTNAME%%.*}  <VPS_IPv4>\` — Cloudflare: DNS only (grey cloud) |"
+          fi
+
+          vps_ip="${V_VPS_IP:-$a_record}"
+          echo "resolved_ip=$vps_ip" >> "$GITHUB_OUTPUT"
+
+          mx_record="$(dig +short MX "$BASE_DOMAIN" | tr -d '\r' | paste -sd'; ' - || true)"
+          if echo "$mx_record" | grep -qi "$MAIL_HOSTNAME"; then
+            summary "| MX \`$BASE_DOMAIN\` | PASS | \`$mx_record\` | — |"
+          else
+            summary "| MX \`$BASE_DOMAIN\` | FAIL | \`${mx_record:-(none)}\` | \`MX  @  10 ${MAIL_HOSTNAME}.\` |"
+          fi
+
+          if [[ -n "$vps_ip" ]]; then
+            ptr="$(dig +short -x "$vps_ip" | tr -d '\r' | paste -sd'; ' - || true)"
+            if echo "$ptr" | grep -qi "$MAIL_HOSTNAME"; then
+              summary "| PTR \`$vps_ip\` | PASS | \`$ptr\` | — |"
+            else
+              summary "| PTR \`$vps_ip\` | FAIL | \`${ptr:-(none)}\` | \`$vps_ip -> $MAIL_HOSTNAME\` — set by the VPS provider only |"
+            fi
+          else
+            summary "| PTR | SKIP | no IP known | set \`MAILBOX_VPS_IP\` or create the A record first |"
+          fi
+
+          spf="$(dig +short TXT "$BASE_DOMAIN" | tr -d '"' | grep -i 'v=spf1' | paste -sd'; ' - || true)"
+          if [[ -n "$spf" ]]; then
+            summary "| SPF TXT \`$BASE_DOMAIN\` | PASS | \`$spf\` | — |"
+          else
+            summary "| SPF TXT \`$BASE_DOMAIN\` | FAIL | (none) | \`TXT  @  v=spf1 ip4:${vps_ip:-<VPS_IPv4>} -all\` — exactly one SPF record |"
+          fi
+
+          dmarc="$(dig +short TXT "_dmarc.$BASE_DOMAIN" | tr -d '"' | grep -i 'v=DMARC1' | paste -sd'; ' - || true)"
+          if [[ -n "$dmarc" ]]; then
+            summary "| DMARC TXT \`_dmarc.$BASE_DOMAIN\` | PASS | \`$dmarc\` | — |"
+          else
+            summary "| DMARC TXT \`_dmarc.$BASE_DOMAIN\` | FAIL | (none) | \`TXT  _dmarc  v=DMARC1; p=none; rua=mailto:admin@$BASE_DOMAIN\` |"
+          fi
+
+          dkim="$(dig +short TXT "default._domainkey.$BASE_DOMAIN" | tr -d '"' | grep -i 'v=DKIM1' | cut -c1-60 || true)"
+          if [[ -n "$dkim" ]]; then
+            summary "| DKIM TXT \`default._domainkey.$BASE_DOMAIN\` | PASS | \`${dkim}...\` | — |"
+          else
+            summary "| DKIM TXT \`default._domainkey.$BASE_DOMAIN\` | FAIL | (none) | value is generated by Maddy — see ACTION REQUIRED below |"
+          fi
+          summary ""
+
+      - name: Check port reachability
+        shell: bash
+        env:
+          MAIL_HOSTNAME: ${{ steps.derive.outputs.mail_hostname }}
+          TARGET_IP: ${{ steps.dns-check.outputs.resolved_ip }}
+        run: |
+          set -euo pipefail
+
+          summary() { echo "$1" >> "$GITHUB_STEP_SUMMARY"; }
+
+          summary "### 3. Port reachability from the GitHub runner"
+          summary ""
+
+          target="${TARGET_IP:-}"
+          if [[ -z "$target" ]]; then
+            summary "SKIP — no IP resolved for \`$MAIL_HOSTNAME\`."
+            summary ""
+            exit 0
+          fi
+
+          summary "| Port | Purpose | Result |"
+          summary "|---|---|---|"
+          check_port() {
+            local port="$1" purpose="$2"
+            if nc -z -w 6 "$target" "$port" >/dev/null 2>&1; then
+              summary "| $port | $purpose | OPEN |"
+            elif [[ "$port" == "25" ]]; then
+              summary "| 25 | $purpose | INCONCLUSIVE — GitHub-hosted runners block outbound TCP 25; test from elsewhere |"
+            else
+              summary "| $port | $purpose | CLOSED / filtered |"
+            fi
+          }
+          check_port 25 "inbound SMTP"
+          check_port 587 "submission (STARTTLS)"
+          check_port 993 "IMAP over TLS"
+          check_port 80 "HTTP / ACME challenge"
+          check_port 443 "webmail HTTPS"
+          summary ""
+
+      - name: Set up SSH
+        id: ssh-setup
+        if: steps.secret-check.outputs.secrets_ok == 'true'
+        shell: bash
+        env:
+          SSH_KEY: ${{ secrets.MAILBOX_SSH_PRIVATE_KEY }}
+          KNOWN_HOSTS: ${{ secrets.MAILBOX_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Check VPS reachability and prerequisites
+        id: ssh-check
+        if: steps.secret-check.outputs.secrets_ok == 'true'
+        continue-on-error: true
+        shell: bash
+        env:
+          SSH_HOST: ${{ secrets.MAILBOX_SSH_HOST }}
+          SSH_USER: ${{ secrets.MAILBOX_SSH_USER }}
+          SSH_PORT: ${{ vars.MAILBOX_SSH_PORT }}
+          DEPLOY_DIR: ${{ steps.derive.outputs.deploy_dir }}
+          MAIL_HOSTNAME: ${{ steps.derive.outputs.mail_hostname }}
+        run: |
+          set -euo pipefail
+
+          port="${SSH_PORT:-22}"
+          ssh_opts=(-i ~/.ssh/id_deploy -p "$port" -o BatchMode=yes -o ConnectTimeout=15)
+
+          summary() { echo "$1" >> "$GITHUB_STEP_SUMMARY"; }
+          summary "### 4. VPS state"
+          summary ""
+
+          if ! report="$(ssh "${ssh_opts[@]}" "$SSH_USER@$SSH_HOST" \
+              "DEPLOY_DIR='$DEPLOY_DIR' MAIL_HOSTNAME='$MAIL_HOSTNAME' bash -s" <<'REMOTE'
+          set -uo pipefail
+          echo "ssh=OK"
+          command -v docker >/dev/null 2>&1 && echo "docker=OK ($(docker --version 2>/dev/null))" || echo "docker=MISSING"
+          docker compose version >/dev/null 2>&1 && echo "compose=OK ($(docker compose version --short 2>/dev/null))" || echo "compose=MISSING"
+          [ -d "$DEPLOY_DIR" ] && echo "deploy_dir=OK" || echo "deploy_dir=MISSING"
+          [ -f "$DEPLOY_DIR/.env" ] && echo "env_file=OK" || echo "env_file=MISSING"
+          [ -f "$DEPLOY_DIR/secrets/accounts.json" ] && echo "accounts=OK" || echo "accounts=MISSING"
+          cert="$DEPLOY_DIR/runtime/letsencrypt/live/$MAIL_HOSTNAME/fullchain.pem"
+          if [ -f "$cert" ]; then
+            expiry=$(openssl x509 -enddate -noout -in "$cert" 2>/dev/null | cut -d= -f2)
+            echo "cert=OK (expires ${expiry:-unknown})"
+          elif [ -f "/etc/letsencrypt/live/$MAIL_HOSTNAME/fullchain.pem" ]; then
+            expiry=$(sudo -n openssl x509 -enddate -noout -in "/etc/letsencrypt/live/$MAIL_HOSTNAME/fullchain.pem" 2>/dev/null | cut -d= -f2)
+            echo "cert=OK-host (expires ${expiry:-unknown})"
+          else
+            echo "cert=MISSING"
+          fi
+          REMOTE
+          )"; then
+            echo "ssh_ready=false" >> "$GITHUB_OUTPUT"
+            summary "- FAIL — cannot reach the VPS over SSH."
+            summary "  - Verify \`MAILBOX_SSH_HOST\`, \`MAILBOX_SSH_USER\`, \`MAILBOX_SSH_PRIVATE_KEY\` and \`MAILBOX_SSH_KNOWN_HOSTS\`."
+            summary "  - Regenerate known_hosts with \`ssh-keyscan -p <port> <host>\` and paste the output into the secret."
+            summary ""
+            exit 0
+          fi
+
+          echo "$report"
+          summary '```text'
+          summary "$report"
+          summary '```'
+
+          blocking=0
+          grep -q '^docker=OK' <<<"$report"     || { summary "- FAIL — Docker Engine is not installed (README section 1.5)."; blocking=1; }
+          grep -q '^compose=OK' <<<"$report"    || { summary "- FAIL — Docker Compose v2 is not available (\`docker compose version\`)."; blocking=1; }
+          grep -q '^deploy_dir=OK' <<<"$report" || { summary "- FAIL — \`$DEPLOY_DIR\` does not exist on the VPS."; blocking=1; }
+          grep -q '^env_file=OK' <<<"$report"   || { summary "- FAIL — \`.env\` is missing: run \`manage.py init\` manually (README section 3)."; blocking=1; }
+          grep -q '^accounts=OK' <<<"$report"   || { summary "- FAIL — \`secrets/accounts.json\` is missing: run \`manage.py init\` manually (README section 3)."; blocking=1; }
+          if grep -q '^cert=MISSING' <<<"$report"; then
+            summary "- FAIL — no TLS certificate for \`$MAIL_HOSTNAME\`: run \`manage.py certificate --email ...\` (README section 5)."
+            blocking=1
+          fi
+
+          summary ""
+          if [[ "$blocking" -eq 0 ]]; then
+            echo "ssh_ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ssh_ready=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Emit ACTION REQUIRED report
+        if: always()
+        shell: bash
+        env:
+          MAIL_HOSTNAME: ${{ steps.derive.outputs.mail_hostname }}
+          BASE_DOMAIN: ${{ steps.derive.outputs.base_domain }}
+          DEPLOY_DIR: ${{ steps.derive.outputs.deploy_dir }}
+          VPS_IP: ${{ steps.dns-check.outputs.resolved_ip }}
+        run: |
+          set -euo pipefail
+          ip="${VPS_IP:-<VPS_IPv4>}"
+          cat >> "$GITHUB_STEP_SUMMARY" <<EOF
+          ---
+
+          ## ACTION REQUIRED — do this manually
+
+          These steps cannot be automated by this workflow. Nothing below is performed by CI.
+
+          **A. VPS provider (ticket + control panel)**
+          1. Ask the provider to unblock **inbound and outbound TCP 25**. An in-VM firewall rule cannot lift this.
+          2. Ask the provider to set **PTR / rDNS**: \`$ip -> $MAIL_HOSTNAME\`.
+          3. Open inbound TCP **25, 587, 993, 80, 443** in the provider network firewall / security group.
+          4. On the VPS, verify Docker traffic is not dropped by \`DOCKER-USER\`:
+             \`sudo iptables -L DOCKER-USER -n -v --line-numbers\` (MANUAL_PIGGY_FARM section 9).
+
+          **B. DNS provider**
+          | Type | Name | Value |
+          |---|---|---|
+          | A | \`${MAIL_HOSTNAME%%.*}\` | \`$ip\` (Cloudflare: DNS only / grey cloud) |
+          | MX | \`@\` | priority \`10\`, \`$MAIL_HOSTNAME\` |
+          | TXT | \`@\` | \`v=spf1 ip4:$ip -all\` (only one SPF record) |
+          | TXT | \`_dmarc\` | \`v=DMARC1; p=none; rua=mailto:admin@$BASE_DOMAIN\` |
+          | TXT | \`default._domainkey\` | value printed by Maddy — see step C4 |
+
+          **C. One-time bootstrap on the VPS (README sections 3-7)**
+          Run these yourself in \`$DEPLOY_DIR\`. The deploy job refuses to run them because
+          re-running them can overwrite existing credentials and mail data.
+          \`\`\`bash
+          cd $DEPLOY_DIR
+          python3 scripts/manage.py init --domain $BASE_DOMAIN --hostname $MAIL_HOSTNAME
+          python3 scripts/manage.py certificate --email <an-existing-mailbox>
+          docker compose up -d --build
+          python3 scripts/manage.py accounts
+          docker compose exec maddy sh -c 'cat /data/dkim_keys/*.dns'   # C4: copy the TXT record into DNS
+          \`\`\`
+          Passwords live in \`$DEPLOY_DIR/secrets/accounts.json\` (mode 0600). Never commit or upload it.
+
+          **D. Recurring operations (not run by CI)**
+          - Certificate renewal cron as root (README section 9):
+            \`17 3 * * * cd $DEPLOY_DIR && /usr/bin/python3 scripts/manage.py renew >> /var/log/shuneo-mail-renew.log 2>&1\`
+          - Backups (README section 10): \`python3 scripts/manage.py backup\`, then copy the archive off the VPS.
+          - Deliverability check: send to/from Gmail and confirm SPF, DKIM and DMARC PASS in *Show original*.
+
+          **E. Never touched by this workflow**
+          \`.env\`, \`secrets/\`, \`runtime/\` and \`backups/\` on the VPS are excluded from every upload.
+          EOF
+
+      - name: Fail if preflight is blocking
+        if: ${{ !inputs.dry_run }}
+        shell: bash
+        env:
+          SECRETS_OK: ${{ steps.secret-check.outputs.secrets_ok }}
+          SSH_READY: ${{ steps.ssh-check.outputs.ssh_ready }}
+        run: |
+          set -euo pipefail
+          if [[ "${SECRETS_OK:-false}" != "true" || "${SSH_READY:-false}" != "true" ]]; then
+            echo "::error::Preflight failed. Read the 'ACTION REQUIRED' block in the job summary, fix the reported items, then re-run."
+            exit 1
+          fi
+          echo "Preflight passed."
+
+  deploy:
+    name: Deploy to VPS
+    needs: preflight
+    if: ${{ !inputs.dry_run && needs.preflight.outputs.ssh_ready == 'true' }}
+    runs-on: ubuntu-latest
+    environment:
+      name: mailbox-production
+      url: https://${{ needs.preflight.outputs.mail_hostname }}
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up SSH
+        shell: bash
+        env:
+          SSH_KEY: ${{ secrets.MAILBOX_SSH_PRIVATE_KEY }}
+          KNOWN_HOSTS: ${{ secrets.MAILBOX_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Verify runtime state still exists on the VPS
+        shell: bash
+        env:
+          SSH_HOST: ${{ secrets.MAILBOX_SSH_HOST }}
+          SSH_USER: ${{ secrets.MAILBOX_SSH_USER }}
+          SSH_PORT: ${{ vars.MAILBOX_SSH_PORT }}
+          DEPLOY_DIR: ${{ needs.preflight.outputs.deploy_dir }}
+        run: |
+          set -euo pipefail
+          port="${SSH_PORT:-22}"
+          if ! ssh -i ~/.ssh/id_deploy -p "$port" -o BatchMode=yes -o ConnectTimeout=15 \
+              "$SSH_USER@$SSH_HOST" \
+              "test -f '$DEPLOY_DIR/.env' && test -f '$DEPLOY_DIR/secrets/accounts.json'"; then
+            echo "::error::'$DEPLOY_DIR/.env' or '$DEPLOY_DIR/secrets/accounts.json' is missing on the VPS."
+            echo "::error::Stopping before any upload. Run 'manage.py init', 'certificate' and 'accounts' manually"
+            echo "::error::on the VPS first (README sections 3-6). This workflow never creates or resets credentials."
+            exit 1
+          fi
+
+      - name: Stage shared design assets into the MailBox payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Farm/ is never uploaded, so the shared tokens and favicon must be copied into
+          # MailBox/web/static before the rsync below; the image build on the VPS fails
+          # without them.
+          python3 MailBox/scripts/stage-shared-assets.py
+          python3 MailBox/scripts/stage-shared-assets.py --check
+          ls -l MailBox/web/static/shared/variables.css \
+                MailBox/web/static/shared/base.css \
+                MailBox/web/static/favicon.ico
+
+      - name: Upload MailBox source (excludes .env, secrets, runtime, backups)
+        shell: bash
+        env:
+          SSH_HOST: ${{ secrets.MAILBOX_SSH_HOST }}
+          SSH_USER: ${{ secrets.MAILBOX_SSH_USER }}
+          SSH_PORT: ${{ vars.MAILBOX_SSH_PORT }}
+          DEPLOY_DIR: ${{ needs.preflight.outputs.deploy_dir }}
+        run: |
+          set -euo pipefail
+          port="${SSH_PORT:-22}"
+          rsync -az --delete \
+            --exclude '.env' \
+            --exclude 'secrets/' \
+            --exclude 'runtime/' \
+            --exclude 'backups/' \
+            --exclude 'dist/' \
+            --exclude '.git/' \
+            --exclude '__pycache__/' \
+            --exclude '.pytest_cache/' \
+            -e "ssh -i $HOME/.ssh/id_deploy -p $port -o BatchMode=yes -o ConnectTimeout=15" \
+            MailBox/ "$SSH_USER@$SSH_HOST:$DEPLOY_DIR/"
+
+      - name: Build and start services
+        shell: bash
+        env:
+          SSH_HOST: ${{ secrets.MAILBOX_SSH_HOST }}
+          SSH_USER: ${{ secrets.MAILBOX_SSH_USER }}
+          SSH_PORT: ${{ vars.MAILBOX_SSH_PORT }}
+          DEPLOY_DIR: ${{ needs.preflight.outputs.deploy_dir }}
+        run: |
+          set -euo pipefail
+          port="${SSH_PORT:-22}"
+          ssh -i ~/.ssh/id_deploy -p "$port" -o BatchMode=yes -o ConnectTimeout=15 \
+            "$SSH_USER@$SSH_HOST" "DEPLOY_DIR='$DEPLOY_DIR' bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd "$DEPLOY_DIR"
+          docker compose up -d --build
+          docker compose ps
+          REMOTE
+
+      - name: Post-deploy health check
+        shell: bash
+        env:
+          SSH_HOST: ${{ secrets.MAILBOX_SSH_HOST }}
+          SSH_USER: ${{ secrets.MAILBOX_SSH_USER }}
+          SSH_PORT: ${{ vars.MAILBOX_SSH_PORT }}
+          DEPLOY_DIR: ${{ needs.preflight.outputs.deploy_dir }}
+          MAIL_HOSTNAME: ${{ needs.preflight.outputs.mail_hostname }}
+        run: |
+          set -euo pipefail
+          port="${SSH_PORT:-22}"
+
+          states="$(ssh -i ~/.ssh/id_deploy -p "$port" -o BatchMode=yes -o ConnectTimeout=15 \
+            "$SSH_USER@$SSH_HOST" "cd '$DEPLOY_DIR' && docker compose ps --format '{{.Service}} {{.State}}'")"
+          echo "$states"
+
+          failed=0
+          for svc in maddy web proxy; do
+            if ! grep -Eq "^$svc (running|Up)" <<<"$states"; then
+              echo "::error::Service '$svc' is not running after deploy."
+              failed=1
+            fi
+          done
+
+          code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "https://$MAIL_HOSTNAME/" || echo 000)"
+          echo "HTTPS https://$MAIL_HOSTNAME/ -> $code"
+          if [[ ! "$code" =~ ^(200|301|302|303)$ ]]; then
+            echo "::error::HTTPS health check for $MAIL_HOSTNAME returned $code."
+            failed=1
+          fi
+
+          {
+            echo "## Deploy result"
+            echo
+            echo '```text'
+            echo "$states"
+            echo "https://$MAIL_HOSTNAME/ -> $code"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ "$failed" -ne 0 ]]; then
+            echo "::error::Post-deploy health check failed. Inspect: docker compose logs --tail=200 maddy web proxy"
+            exit 1
+          fi
