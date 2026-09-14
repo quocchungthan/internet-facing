@@ -1,28 +1,82 @@
 using System.Net.Http.Headers;
 using System.Security.Claims;
+using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
+using Fences.Data;
 using Fences.Models;
 using Fences.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OAuth;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.HttpOverrides;
+using OpenIddict.Abstractions;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.Configure<IdentityAppOptions>(builder.Configuration.GetSection("IdentityApp"));
 var identityOptions = builder.Configuration.GetSection("IdentityApp").Get<IdentityAppOptions>() ?? new IdentityAppOptions();
 var persistentLoginDays = identityOptions.PersistentLoginDays > 0 ? identityOptions.PersistentLoginDays : 30;
+var dataProtectionKeysPath = Path.GetFullPath(identityOptions.DataProtectionKeysPath);
+var identityDatabasePath = Path.GetFullPath(identityOptions.IdentityDatabasePath);
+Directory.CreateDirectory(Path.GetDirectoryName(dataProtectionKeysPath)!);
+Directory.CreateDirectory(Path.GetDirectoryName(identityDatabasePath)!);
+
+builder.Services.AddDataProtection().PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath));
+builder.Services.AddDbContext<IdentityDbContext>(options =>
+{
+    options.UseSqlite($"Data Source={identityDatabasePath}");
+    options.UseOpenIddict();
+});
+
+builder.Services.AddOpenIddict()
+    .AddCore(options => options.UseEntityFrameworkCore().UseDbContext<IdentityDbContext>())
+    .AddServer(options =>
+    {
+        options.SetIssuer(new Uri(identityOptions.OidcIssuer));
+        options.SetAuthorizationEndpointUris("/connect/authorize");
+        options.SetTokenEndpointUris("/connect/token");
+        options.AllowAuthorizationCodeFlow().RequireProofKeyForCodeExchange();
+        options.RegisterScopes(OpenIddictConstants.Scopes.OpenId, OpenIddictConstants.Scopes.Profile, OpenIddictConstants.Scopes.Email);
+
+        if (builder.Environment.IsDevelopment())
+        {
+            options.AddDevelopmentEncryptionCertificate()
+                   .AddDevelopmentSigningCertificate();
+        }
+        else
+        {
+            options.AddEncryptionCertificate(LoadCertificate(identityOptions.OidcEncryptionCertificatePath, identityOptions.OidcEncryptionCertificatePassword, "encryption"));
+            options.AddSigningCertificate(LoadCertificate(identityOptions.OidcSigningCertificatePath, identityOptions.OidcSigningCertificatePassword, "signing"));
+        }
+
+        options.UseAspNetCore(aspNetCore =>
+        {
+            aspNetCore.EnableAuthorizationEndpointPassthrough();
+            if (builder.Environment.IsDevelopment())
+            {
+                aspNetCore.DisableTransportSecurityRequirement();
+            }
+        });
+    });
 
 builder.Services.AddSingleton<IAppCatalog, AppCatalog>();
 builder.Services.AddSingleton<ReturnUrlPolicy>();
 builder.Services.AddScoped<IGitHubRepositoryService, GitHubRepositoryService>();
 builder.Services.AddAuthentication(options =>
 {
-    options.DefaultAuthenticateScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-    options.DefaultSignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+    options.DefaultAuthenticateScheme = "IdentityCookies";
+    options.DefaultSignInScheme = "IdentityCookies";
     options.DefaultChallengeScheme = "GitHub";
 })
-.AddCookie(options =>
+.AddPolicyScheme("IdentityCookies", null, options =>
+{
+    options.ForwardDefaultSelector = context =>
+        context.Request.Host.Host.Equals("identity.eldervibe.dev", StringComparison.OrdinalIgnoreCase)
+            ? "CanonicalCookie"
+            : "LegacyCookie";
+})
+.AddCookie("LegacyCookie", options =>
 {
     options.Cookie.Name = "shuneo.identity";
     var configuredDomain = builder.Configuration["IdentityApp:CookieDomain"];
@@ -50,8 +104,31 @@ builder.Services.AddAuthentication(options =>
         return Task.CompletedTask;
     };
 })
+.AddCookie("CanonicalCookie", options =>
+{
+    options.Cookie.Name = "eldervibe.identity";
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.Cookie.SameSite = SameSiteMode.Lax;
+    options.ExpireTimeSpan = TimeSpan.FromDays(persistentLoginDays);
+    options.Cookie.MaxAge = options.ExpireTimeSpan;
+    options.SlidingExpiration = true;
+    options.LoginPath = "/auth/login";
+    options.Events.OnRedirectToLogin = context =>
+    {
+        if (context.Request.Path.StartsWithSegments("/api"))
+        {
+            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return Task.CompletedTask;
+        }
+
+        context.Response.Redirect(context.RedirectUri);
+        return Task.CompletedTask;
+    };
+})
 .AddOAuth("GitHub", options =>
 {
+    options.SignInScheme = "IdentityCookies";
     options.ClientId = builder.Configuration["Authentication:GitHub:ClientId"] ?? string.Empty;
     options.ClientSecret = builder.Configuration["Authentication:GitHub:ClientSecret"] ?? string.Empty;
     options.CallbackPath = "/signin-github";
@@ -107,6 +184,11 @@ builder.Services.AddCors(options => options.AddPolicy("IdentityCors", policy =>
 }));
 
 var app = builder.Build();
+using (var scope = app.Services.CreateScope())
+{
+    scope.ServiceProvider.GetRequiredService<IdentityDbContext>().Database.EnsureCreated();
+    await SeedOidcClientsAsync(scope.ServiceProvider, identityOptions.OidcClients);
+}
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/");
@@ -122,3 +204,45 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 app.Run();
+
+static X509Certificate2 LoadCertificate(string path, string password, string purpose)
+{
+    if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+    {
+        throw new InvalidOperationException($"A production OIDC {purpose} certificate path is required and must exist.");
+    }
+
+    return new X509Certificate2(path, password, X509KeyStorageFlags.MachineKeySet | X509KeyStorageFlags.EphemeralKeySet);
+}
+
+static async Task SeedOidcClientsAsync(IServiceProvider services, IEnumerable<OidcClientOptions> clients)
+{
+    var manager = services.GetRequiredService<IOpenIddictApplicationManager>();
+    foreach (var client in clients.Where(client => !string.IsNullOrWhiteSpace(client.ClientId)))
+    {
+        if (await manager.FindByClientIdAsync(client.ClientId) is not null)
+        {
+            continue;
+        }
+
+        var descriptor = new OpenIddictApplicationDescriptor
+        {
+            ClientId = client.ClientId,
+            DisplayName = string.IsNullOrWhiteSpace(client.DisplayName) ? client.ClientId : client.DisplayName,
+            ClientType = OpenIddictConstants.ClientTypes.Public,
+            ConsentType = OpenIddictConstants.ConsentTypes.Implicit
+        };
+        descriptor.RedirectUris.UnionWith(client.RedirectUris.Select(uri => new Uri(uri)));
+        descriptor.PostLogoutRedirectUris.UnionWith(client.PostLogoutRedirectUris.Select(uri => new Uri(uri)));
+        descriptor.Permissions.UnionWith([
+            OpenIddictConstants.Permissions.Endpoints.Authorization,
+            OpenIddictConstants.Permissions.Endpoints.Token,
+            OpenIddictConstants.Permissions.GrantTypes.AuthorizationCode,
+            OpenIddictConstants.Permissions.ResponseTypes.Code,
+            OpenIddictConstants.Permissions.Scopes.Profile,
+            OpenIddictConstants.Permissions.Scopes.Email
+        ]);
+
+        await manager.CreateAsync(descriptor);
+    }
+}

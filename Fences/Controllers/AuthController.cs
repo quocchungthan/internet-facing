@@ -37,7 +37,7 @@ public sealed class AuthController(ReturnUrlPolicy returnUrlPolicy, IOptions<Ide
     [HttpGet("/auth/logout")]
     public async Task<IActionResult> Logout([FromQuery] string? callbackUrl, [FromQuery] string? returnUrl)
     {
-        await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        await HttpContext.SignOutAsync("IdentityCookies");
         return Redirect(returnUrlPolicy.ResolveSafeReturnUrl(returnUrl ?? callbackUrl));
     }
 }

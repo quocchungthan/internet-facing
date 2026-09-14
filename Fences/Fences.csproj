@@ -6,6 +6,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.0" />
+    <PackageReference Include="OpenIddict.AspNetCore" Version="7.0.0" />
+    <PackageReference Include="OpenIddict.EntityFrameworkCore" Version="7.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Content Include="..\Farm\wwwroot\css\shared\variables.css" Link="wwwroot\css\shared\variables.css" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Always" />
     <Content Include="..\Farm\wwwroot\css\shared\base.css" Link="wwwroot\css\shared\base.css" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Always" />
     <Content Include="..\Farm\wwwroot\css\shared\tokens.css" Link="wwwroot\css\shared\tokens.css" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Always" />
