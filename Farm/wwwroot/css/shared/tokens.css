@@ -1,0 +1,72 @@
+:root {
+  --tile-size: 64px;
+  --ink: #2b1a12;
+  --ink-soft: #5c3b25;
+  --cream: #fff1c7;
+  --parchment: #f5d99a;
+  --parchment-dark: #c58a46;
+  --wood: #754222;
+  --wood-dark: #402314;
+  --leaf: #2f6b3d;
+  --leaf-bright: #72a94b;
+  --grass: #70a94a;
+  --grass-dark: #3e793e;
+  --gold: #f4bd4c;
+  --sky: #99d8dd;
+  --water: #4a9ca9;
+  --shadow: rgba(45, 32, 18, .28);
+  --pixel-border: 4px;
+  --page-gutter: clamp(16px, 4vw, 56px);
+  --font-display: "Courier New", "Lucida Console", monospace;
+  --font-body: ui-rounded, "Trebuchet MS", system-ui, sans-serif;
+
+  /* Shared application theme */
+  --system-canvas: #ead29a;
+  --system-canvas-soft: #f7e8bd;
+  --system-surface: #fff5d7;
+  --system-surface-raised: #fffaf0;
+  --system-surface-sunken: #ead09a;
+  --system-border: #8a5a32;
+  --system-border-strong: #4a2c19;
+  --system-text: #352114;
+  --system-text-muted: #72543b;
+  --system-accent: var(--leaf);
+  --system-accent-bright: var(--leaf-bright);
+  --system-danger: #a33d32;
+  --system-focus: #f4bd4c;
+  --system-shadow-sm: 0 3px 0 rgba(64, 35, 20, .22);
+  --system-shadow-md: 0 8px 0 rgba(64, 35, 20, .24);
+  --system-radius-sm: 5px;
+  --system-radius-md: 8px;
+  --system-radius-lg: 12px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  color: var(--ink);
+  font-family: var(--font-body);
+}
+
+a {
+  color: inherit;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+::selection {
+  color: var(--cream);
+  background: var(--wood);
+}
+

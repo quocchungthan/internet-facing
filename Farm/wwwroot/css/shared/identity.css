@@ -1,0 +1,249 @@
+/* Shared Shuneo Identity theme. Loaded after the app's local fallback CSS. */
+.system-identity {
+  --identity-grid: color-mix(in srgb, var(--system-border) 12%, transparent);
+  min-height: 100vh;
+  color: var(--system-text);
+  font-family: var(--font-body);
+  background:
+    linear-gradient(var(--identity-grid) 1px, transparent 1px) 0 0 / 24px 24px,
+    linear-gradient(90deg, var(--identity-grid) 1px, transparent 1px) 0 0 / 24px 24px,
+    radial-gradient(circle at 16% 12%, color-mix(in srgb, var(--system-accent-bright) 22%, transparent), transparent 30%),
+    var(--system-canvas);
+}
+
+.system-identity .skip-link {
+  border: 3px solid var(--system-border-strong);
+  border-radius: var(--system-radius-sm);
+  color: var(--system-text);
+  background: var(--system-surface-raised);
+  box-shadow: var(--system-shadow-sm);
+}
+
+.system-identity .topbar {
+  min-height: 64px;
+  padding: 10px var(--page-gutter);
+  border: 0;
+  border-bottom: 3px solid var(--system-border-strong);
+  border-radius: 0;
+  color: var(--system-text);
+  background: color-mix(in srgb, var(--system-surface) 94%, transparent);
+  box-shadow: 0 5px 0 color-mix(in srgb, var(--system-border-strong) 15%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+.system-identity .brand {
+  gap: 10px;
+  color: var(--system-text);
+  font: 900 13px/1 var(--font-display);
+  letter-spacing: .08em;
+}
+
+.system-identity .brand-mark,
+.system-identity .login-panel__mark {
+  display: inline-grid;
+  place-items: center;
+  border: 3px solid var(--system-border-strong);
+  border-radius: var(--system-radius-sm);
+  color: var(--cream);
+  background: var(--system-accent);
+  box-shadow: var(--system-shadow-sm);
+  text-shadow: none;
+}
+
+.system-identity .brand-mark {
+  width: 38px;
+  height: 34px;
+}
+
+.system-identity .actions {
+  gap: 10px;
+}
+
+.system-identity .user {
+  max-width: min(34vw, 280px);
+  overflow: hidden;
+  color: var(--system-text-muted);
+  font: 800 12px/1.2 var(--font-display);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.system-identity main {
+  width: 100%;
+  max-width: 1180px;
+  min-height: calc(100vh - 64px);
+  margin: 0 auto;
+  padding: clamp(24px, 5vw, 64px) var(--page-gutter);
+}
+
+.system-identity .login-screen {
+  min-height: calc(100vh - 192px);
+}
+
+.system-identity .login-panel,
+.system-identity .dashboard {
+  width: min(100%, 960px);
+  border: 3px solid var(--system-border-strong);
+  border-radius: var(--system-radius-lg);
+  color: var(--system-text);
+  background:
+    linear-gradient(rgba(255, 255, 255, .16) 1px, transparent 1px) 0 0 / 20px 20px,
+    var(--system-surface);
+  box-shadow: var(--system-shadow-md);
+}
+
+.system-identity .login-panel {
+  width: min(100%, 620px);
+  padding: clamp(28px, 6vw, 56px);
+  text-align: center;
+}
+
+.system-identity .login-panel__mark {
+  width: 64px;
+  height: 58px;
+  margin: 0 auto 24px;
+  font: 900 19px/1 var(--font-display);
+}
+
+.system-identity .eyebrow {
+  color: var(--system-accent);
+  font: 900 11px/1.2 var(--font-display);
+  letter-spacing: .13em;
+}
+
+.system-identity h1,
+.system-identity .dashboard h1,
+.system-identity .login-panel h1 {
+  color: var(--system-text);
+  font-family: var(--font-display);
+  letter-spacing: -.03em;
+  text-transform: none;
+  text-shadow: none;
+}
+
+.system-identity .dashboard p,
+.system-identity .login-panel p {
+  color: var(--system-text-muted);
+}
+
+.system-identity .login-panel p {
+  margin-inline: auto;
+}
+
+.system-identity .login-panel__note {
+  margin-top: 18px;
+  font-size: 12px;
+}
+
+.system-identity .apps {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+  gap: 16px;
+}
+
+.system-identity .card {
+  display: flex;
+  min-height: 230px;
+  flex-direction: column;
+  padding: 22px;
+  border: 2px solid var(--system-border);
+  border-radius: var(--system-radius-md);
+  color: var(--system-text);
+  background: var(--system-surface-raised);
+  box-shadow: var(--system-shadow-sm);
+}
+
+.system-identity .card:hover {
+  border-color: var(--system-border-strong);
+  transform: translateY(-2px);
+}
+
+.system-identity .card__label {
+  width: fit-content;
+  margin-bottom: 18px;
+  padding: 5px 8px;
+  border: 2px solid color-mix(in srgb, var(--system-accent) 65%, var(--system-border));
+  border-radius: var(--system-radius-sm);
+  color: var(--system-accent);
+  background: color-mix(in srgb, var(--system-accent) 10%, var(--system-surface));
+  font: 900 10px/1 var(--font-display);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.system-identity .card h2 {
+  color: var(--system-text);
+  font: 900 19px/1.25 var(--font-display);
+}
+
+.system-identity .card p {
+  flex: 1;
+  color: var(--system-text-muted);
+}
+
+.system-identity .btn {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 3px solid var(--system-border-strong);
+  border-radius: var(--system-radius-sm);
+  color: var(--cream);
+  background: var(--system-accent);
+  box-shadow: var(--system-shadow-sm);
+  font: 900 12px/1 var(--font-display);
+  letter-spacing: .04em;
+}
+
+.system-identity .btn.ghost {
+  color: var(--system-text);
+  background: var(--system-surface);
+  box-shadow: var(--system-shadow-sm);
+}
+
+.system-identity .btn:hover {
+  color: var(--cream);
+  background: color-mix(in srgb, var(--system-accent) 82%, var(--wood-dark));
+  box-shadow: 0 5px 0 rgba(64, 35, 20, .28);
+  filter: none;
+}
+
+.system-identity .btn.ghost:hover {
+  color: var(--cream);
+}
+
+.system-identity .btn:focus-visible,
+.system-identity .brand:focus-visible,
+.system-identity .skip-link:focus-visible {
+  outline: 3px solid var(--system-focus);
+  outline-offset: 3px;
+}
+
+@media (max-width: 680px) {
+  .system-identity .topbar {
+    min-height: 58px;
+    padding: 10px 14px;
+  }
+
+  .system-identity main {
+    min-height: calc(100vh - 58px);
+    padding: 22px 14px;
+  }
+
+  .system-identity .login-panel,
+  .system-identity .dashboard {
+    padding: 24px 18px;
+  }
+
+  .system-identity .actions {
+    width: auto;
+  }
+
+  .system-identity .user {
+    display: none;
+  }
+
+  .system-identity .btn {
+    width: 100%;
+  }
+}
