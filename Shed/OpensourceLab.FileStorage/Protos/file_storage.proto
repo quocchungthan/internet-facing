@@ -1,0 +1,111 @@
+syntax = "proto3";
+
+option csharp_namespace = "OpensourceLab.FileStorage.Grpc";
+
+package filestorage;
+
+// ─────────────────────────────────────────────
+// Shared message types
+// ─────────────────────────────────────────────
+
+message FileCardMessage {
+  string id           = 1;
+  string path         = 2;
+  string content_type = 3;
+  string thumbnail_url = 4;
+  bool   is_public    = 5;
+  string owner_type   = 6;
+  string owner_id     = 7;
+  string permission   = 8;
+  string updated_at   = 9; // ISO-8601 UTC
+}
+
+// ─────────────────────────────────────────────
+// FileStorage service (gRPC)
+// ─────────────────────────────────────────────
+
+service FileStorageService {
+  // List direct children of a virtual path
+  rpc ListFiles (ListFilesRequest) returns (ListFilesResponse);
+
+  // Upload a file (client-streaming, each message is a chunk)
+  rpc UploadFile (stream UploadChunk) returns (UploadFileResponse);
+
+  // Download a file (server-streaming, each message is a chunk)
+  rpc DownloadFile (DownloadFileRequest) returns (stream DownloadChunk);
+
+  // Delete a single file
+  rpc DeleteFile (DeleteFileRequest) returns (DeleteFileResponse);
+
+  // Delete a folder and all contents
+  rpc DeleteFolder (DeleteFolderRequest) returns (DeleteFolderResponse);
+}
+
+// ─── ListFiles ───────────────────────────────
+
+message ListFilesRequest {
+  string parent_path = 1;
+}
+
+message ListFilesResponse {
+  repeated FileCardMessage files = 1;
+}
+
+// ─── UploadFile ──────────────────────────────
+
+message UploadChunk {
+  // First message must include metadata; subsequent messages carry data only.
+  oneof payload {
+    UploadMetadata metadata = 1;
+    bytes          data     = 2;
+  }
+}
+
+message UploadMetadata {
+  string file_name    = 1;
+  string content_type = 2;
+  string parent_path  = 3;
+  int64  total_size   = 4; // bytes, 0 if unknown
+}
+
+message UploadFileResponse {
+  string file_id   = 1;
+  string path      = 2;
+  bool   succeeded = 3;
+  string error     = 4; // populated when succeeded = false
+}
+
+// ─── DownloadFile ────────────────────────────
+
+message DownloadFileRequest {
+  string file_id = 1;
+}
+
+message DownloadChunk {
+  bytes  data          = 1;
+  int64  offset        = 2;
+  int64  total_size    = 3; // echoed on every chunk so client can show progress
+}
+
+// ─── DeleteFile ──────────────────────────────
+
+message DeleteFileRequest {
+  string virtual_path = 1;
+}
+
+message DeleteFileResponse {
+  bool   succeeded = 1;
+  string error     = 2;
+}
+
+// ─── DeleteFolder ────────────────────────────
+
+message DeleteFolderRequest {
+  string virtual_folder_path = 1;
+}
+
+message DeleteFolderResponse {
+  bool   succeeded      = 1;
+  int32  files_removed  = 2;
+  string error          = 3;
+}
