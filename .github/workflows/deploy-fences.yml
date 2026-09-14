@@ -1,0 +1,27 @@
+name: Deploy Fences
+
+on:
+  push:
+    branches:
+      - 'sub/identity'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-fences-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/reusable-deploy-service.yml
+    with:
+      image_name: shuneo-fences
+      image_tag: ${{ github.sha }}
+      docker_context: .
+      dockerfile: Fences/Dockerfile
+      wrapper_path: Fences/scripts/deploy-fences.sh
+      common_script_path: deployment/deploy-nginx-service.sh
+      runtime_image_argument: FENCES_IMAGE
+    secrets: inherit
