@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-: "${DEPLOY_NGINX_COMMON_SCRIPT:?DEPLOY_NGINX_COMMON_SCRIPT must identify the shared deployment script}"
+: "${DEPLOY_COMMON_SCRIPT:?DEPLOY_COMMON_SCRIPT must identify the shared deployment script}"
 : "${STORAGE_IMAGE:?STORAGE_IMAGE must identify the Storage image}"
 
 export SERVICE_NAME=storage
@@ -13,4 +13,4 @@ export SERVICE_IMAGE="$STORAGE_IMAGE"
 export SERVICE_ENV_FILE=/etc/storage/storage.env
 export SERVICE_VOLUME=/srv/storage/data:/app/data
 
-exec bash "$DEPLOY_NGINX_COMMON_SCRIPT"
+exec bash "$DEPLOY_COMMON_SCRIPT"
