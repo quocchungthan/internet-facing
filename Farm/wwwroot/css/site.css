@@ -1,3 +1,6 @@
+@import url("shared/variables.css");
+@import url("shared/base.css");
+
 html {
   font-size: 14px;
 }

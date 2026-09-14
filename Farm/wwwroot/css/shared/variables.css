@@ -1,0 +1,64 @@
+/* CANONICAL SOURCE: Farm/wwwroot/css/shared/variables.css
+   Shared design tokens for the PiggyFarm / eldervibe.dev apps.
+   MailBox is a separate deployable; its copy at MailBox/web/static/shared/variables.css
+   is staged from here at build time and is not committed. Edit only this file. */
+
+:root {
+  /* Palette */
+  --ev-color-ink: #183d35;
+  --ev-color-accent: #246d56;
+  --ev-color-accent-strong: #18543f;
+  --ev-color-accent-soft: #e3ede3;
+  --ev-color-accent-softer: #eaf0e7;
+  --ev-color-paper: #f5f6f2;
+  --ev-color-surface: #ffffff;
+  --ev-color-surface-alt: #fbfcfa;
+  --ev-color-surface-hover: #f8faf6;
+  --ev-color-muted: #7a8882;
+  --ev-color-muted-strong: #66756d;
+  --ev-color-line: #e2e7df;
+  --ev-color-line-strong: #d7dfd3;
+  --ev-color-line-contrast: #ccd7cc;
+  --ev-color-line-neutral: #e5e5e5;
+  --ev-color-tint: #edf2e9;
+  --ev-color-tint-strong: #e0e8dc;
+  --ev-color-leaf: #809c75;
+  --ev-color-focus-ring: #8bae90;
+  --ev-color-success-bg: #e8f1e4;
+  --ev-color-success-line: #cbdcc5;
+  --ev-color-danger-bg: #fff0ea;
+  --ev-color-danger-line: #e8c6b9;
+  --ev-color-danger-ink: #864632;
+
+  /* Typography */
+  --ev-font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --ev-font-size-base: 15px;
+  --ev-font-size-sm: 13px;
+  --ev-font-size-xs: 12px;
+  --ev-font-size-2xs: 10px;
+  --ev-line-height-base: 1.6;
+  --ev-line-height-loose: 1.9;
+  --ev-line-height-tight: 1.25;
+
+  /* Spacing scale */
+  --ev-space-2: 8px;
+  --ev-space-3: 12px;
+  --ev-space-4: 16px;
+  --ev-space-5: 20px;
+  --ev-space-6: 24px;
+  --ev-space-8: 32px;
+  --ev-space-10: 40px;
+  --ev-space-12: 48px;
+
+  /* Radius */
+  --ev-radius-sm: 8px;
+  --ev-radius-md: 9px;
+  --ev-radius-lg: 10px;
+  --ev-radius-xl: 12px;
+  --ev-radius-2xl: 15px;
+  --ev-radius-3xl: 20px;
+  --ev-radius-round: 50%;
+
+  /* Elevation */
+  --ev-shadow-soft: 0 .25rem .75rem rgba(0, 0, 0, .05);
+}
