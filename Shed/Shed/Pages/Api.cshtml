@@ -1,0 +1,472 @@
+﻿@page
+@model Shed.Pages.ApiModel
+@{
+    ViewData["Title"] = "API Keys";
+    var sortedKeys = Model.AccessKeys.OrderByDescending(k => k.CreatedAt).ToList();
+}
+
+<section class="page-header">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+        <div>
+            <h1>API Keys</h1>
+            <p>Use these keys to authenticate requests from your own services.</p>
+        </div>
+        <button type="button" class="u-button--ubuntu" onclick="openCreateDialog()">+ New Key</button>
+    </div>
+</section>
+
+@if (sortedKeys.Count == 0)
+{
+    <p class="hint">No API keys yet. Create one to get started.</p>
+}
+else
+{
+    <div class="panel api-key-table-wrap">
+        <table class="api-key-table">
+            <thead>
+                <tr>
+                    <th>Key</th>
+                    <th>Access</th>
+                    <th>Remark</th>
+                    <th>Created</th>
+                    <th>Updated</th>
+                    <th class="col-actions">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var key in sortedKeys)
+            {
+                <tr>
+                    <td>
+                        <span class="key-masked" title="Click to copy">@(string.Concat(key.Key.Take(8)))â€¦</span>
+                    </td>
+                    <td>
+                        <span class="key-badge @(key.CanRead ? "key-badge--on" : "key-badge--off")">Read @(key.CanRead ? "on" : "off")</span>
+                        <span class="key-badge @(key.CanWrite ? "key-badge--on" : "key-badge--off")">Write @(key.CanWrite ? "on" : "off")</span>
+                    </td>
+                    <td class="key-remark">@(!string.IsNullOrWhiteSpace(key.Remark) ? key.Remark : "full access")</td>
+                    <td class="key-date">@key.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                    <td class="key-date">@key.UpdatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                    <td class="col-actions">
+                        <button type="button" class="u-button--action view-key-btn"
+                            data-key="@key.Key"
+                            data-paths="@string.Join("\n", key.AllowedPaths)"
+                            data-can-read="@key.CanRead"
+                            data-can-write="@key.CanWrite"
+                            data-remark="@key.Remark"
+                            title="View detail">
+                            View
+                        </button>
+                        <form method="post" asp-page-handler="Revoke" style="display:inline" onsubmit="return confirm('Revoke this key?')">
+                            <input type="hidden" name="AccessKey" value="@key.Key" />
+                            <button type="submit" class="u-button--action u-button--action-danger" title="Revoke">Revoke</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+}
+
+@* Create Key dialog *@
+<dialog id="createKeyDialog" class="os-dialog">
+    <header class="os-dialog__header">
+        <h2>New API Key</h2>
+        <button type="button" class="os-dialog__close" onclick="closeDialog('createKeyDialog')" aria-label="Close">Ã—</button>
+    </header>
+    <form method="post" asp-page-handler="Create" class="os-dialog__body">
+        <label for="AllowedPathsInput">Allowed paths <small>(one per line, wildcards ok)</small></label>
+        <textarea id="AllowedPathsInput" asp-for="AllowedPathsInput" rows="4" placeholder="/public/*&#10;/shared/reports/*"></textarea>
+        <label class="os-checkline"><input asp-for="CanReadInput" type="checkbox" checked /> Read access</label>
+        <label class="os-checkline"><input asp-for="CanWriteInput" type="checkbox" checked /> Write access</label>
+        <label for="RemarkInput">Remark</label>
+        <input id="RemarkInput" asp-for="RemarkInput" type="text" placeholder="full-access-..." />
+        <div class="os-dialog__footer">
+            <button type="submit" class="u-button--ubuntu">Create Key</button>
+        </div>
+    </form>
+</dialog>
+
+@* Detail/Edit dialog *@
+<dialog id="detailDialog" class="os-dialog">
+    <header class="os-dialog__header">
+        <h2>Key Detail</h2>
+        <button type="button" class="os-dialog__close" onclick="closeDialog('detailDialog')" aria-label="Close">Ã—</button>
+    </header>
+    <div class="os-dialog__body">
+        <label>Key</label>
+        <div class="key-copy-row">
+            <input id="detailKeyInput" type="password" class="key-display" readonly />
+            <button type="button" class="u-button--action" onclick="copyKey()" title="Copy to clipboard">Copy</button>
+        </div>
+        <form method="post" asp-page-handler="UpdatePaths" id="updatePathsForm">
+            <input type="hidden" name="AccessKey" id="detailKeyHidden" />
+            <label for="detailAllowedPaths">Allowed paths</label>
+            <textarea id="detailAllowedPaths" name="EditAllowedPathsInput" rows="4"></textarea>
+            <label class="os-checkline"><input id="detailCanRead" name="EditCanReadInput" type="checkbox" /> Read access</label>
+            <label class="os-checkline"><input id="detailCanWrite" name="EditCanWriteInput" type="checkbox" /> Write access</label>
+            <label for="detailRemark">Remark</label>
+            <input id="detailRemark" name="EditRemarkInput" type="text" />
+        </form>
+        <form method="post" asp-page-handler="Revoke" class="detail-revoke-form" onsubmit="return confirm('Revoke this key?')">
+            <input type="hidden" name="AccessKey" id="detailRevokeKeyHidden" />
+        </form>
+        <div class="os-dialog__footer" style="gap: 1rem; flex-direction: row-reverse;">
+            <button type="submit" form="updatePathsForm" class="u-button--ubuntu">Save</button>
+            <button type="submit" form="detail-revoke-form" class="u-button--ubuntu u-button--danger">Revoke key</button>
+        </div>
+    </div>
+</dialog>
+
+<div class="panel" style="margin-top:1.5rem;">
+    <h3>Using your API key</h3>
+    <p>Include the key in every request as a header:</p>
+    <pre class="code-block">X-Access-Key: &lt;your-key&gt;</pre>
+    <p>Allowed paths are evaluated on the server. The same wildcard scope is applied to file APIs and sync APIs.</p>
+
+    <h4>Wildcard rules</h4>
+    <ul>
+        <li><code>/public/*</code> matches <code>/public</code> and any nested path such as <code>/public/a.txt</code> or <code>/public/reports/2026/july.csv</code>.</li>
+        <li><code>/public/readme.md</code> matches exactly one file path.</li>
+        <li>Paths outside the allowed wildcard list are ignored by sync clients and rejected by protected write endpoints.</li>
+    </ul>
+
+    <h4>File API examples</h4>
+    <pre class="code-block">GET    /api/files?parentPath=/public
+POST   /api/files/upload        (multipart/form-data)
+DELETE /api/files/{id}</pre>
+
+    <h4>Sync API</h4>
+    <p>The sync handshake returns the effective allowed wildcard scope for the key. Clients must use that returned scope when scanning local files and processing remote changes.</p>
+    <pre class="code-block">POST /api/sync/handshake
+POST /api/sync/pull
+POST /api/sync/metadata-upsert
+POST /api/sync/upload-chunk
+POST /api/sync/upload-commit
+POST /api/sync/tombstone</pre>
+
+    <h4>Sync behavior</h4>
+    <ul>
+        <li>Two-way sync applies only to paths matched by the key's allowed wildcard list.</li>
+        <li>Nested folders inside an allowed prefix are included automatically.</li>
+        <li><code>metadata-upsert</code> prepares an upload but does not create a pull-visible file-content change by itself.</li>
+        <li><code>upload-commit</code> publishes the create or update change that other clients can pull.</li>
+        <li><code>tombstone</code> publishes deletions for matched paths.</li>
+    </ul>
+
+    <h4>Handshake response example</h4>
+    <pre class="code-block">{
+  "succeeded": true,
+  "cursor": "12345",
+  "serverId": "server-1",
+  "serverUtc": "2026-07-10T07:00:00Z",
+  "allowedPathWildcards": [
+    "/public/*"
+  ],
+  "error": ""
+}</pre>
+</div>
+
+<div id="copyToast" class="copy-toast" aria-live="polite" aria-atomic="true">Copied to clipboard!</div>
+
+<style>
+    .api-key-table-wrap {
+        overflow-x: auto;
+    }
+
+    .api-key-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9rem;
+    }
+
+    .api-key-table th,
+    .api-key-table td {
+        padding: 0.65rem 0.9rem;
+        text-align: left;
+        border-bottom: 1px solid rgba(0,0,0,0.08);
+    }
+
+    .api-key-table th {
+        font-weight: 600;
+        color: var(--muted);
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    .api-key-table tbody tr:hover {
+        background: rgba(233, 84, 32, 0.04);
+    }
+
+    .col-actions {
+        text-align: right;
+        white-space: nowrap;
+    }
+
+    .key-masked {
+        font-family: monospace;
+        font-size: 0.88rem;
+        color: var(--ink);
+    }
+
+    .key-date {
+        white-space: nowrap;
+        color: var(--muted);
+        font-size: 0.85rem;
+    }
+
+    .u-button--ubuntu {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        border: 1px solid var(--ubuntu-orange);
+        background: var(--ubuntu-orange);
+        color: #fff;
+        font-size: 0.88rem;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .u-button--ubuntu:hover {
+        background: #c44219;
+        border-color: #c44219;
+    }
+
+    .u-button--ubuntu.u-button--danger {
+        background: #b91c1c;
+        border-color: #b91c1c;
+    }
+
+    .u-button--ubuntu.u-button--danger:hover {
+        background: #991b1b;
+        border-color: #991b1b;
+    }
+
+    .u-button--action {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.3rem 0.75rem;
+        border-radius: 7px;
+        border: 1px solid #d1d5db;
+        background: transparent;
+        color: var(--ink, #1f1f1f);
+        font-size: 0.82rem;
+        font-weight: 500;
+        cursor: pointer;
+        white-space: nowrap;
+    }
+
+    .u-button--action:hover {
+        background: rgba(0, 0, 0, 0.06);
+    }
+
+    .u-button--action-danger {
+        border-color: #f87171;
+        color: #b91c1c;
+    }
+
+    .u-button--action-danger:hover {
+        background: #fee2e2;
+    }
+
+    .u-button--icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 7px;
+        border: 1px solid #ccc;
+        background: transparent;
+        cursor: pointer;
+        font-size: 0.9rem;
+        display: inline-grid;
+        place-items: center;
+    }
+
+    .u-button--icon:hover {
+        background: rgba(0,0,0,0.06);
+    }
+
+    .u-button--icon.u-button--danger {
+        border-color: #f87171;
+        color: #b91c1c;
+    }
+
+    .u-button--icon.u-button--danger:hover {
+        background: #fee2e2;
+    }
+
+    .os-dialog {
+        border: 1px solid rgba(0,0,0,0.15);
+        border-radius: 14px;
+        padding: 0;
+        min-width: min(440px, 94vw);
+        max-width: 520px;
+        box-shadow: 0 16px 40px rgba(0,0,0,0.18);
+    }
+
+    .os-dialog::backdrop {
+        background: rgba(0,0,0,0.4);
+    }
+
+    .os-dialog__header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1rem 1.2rem 0.6rem;
+        border-bottom: 1px solid rgba(0,0,0,0.08);
+    }
+
+    .os-dialog__header h2 {
+        margin: 0;
+        font-size: 1.05rem;
+        font-weight: 600;
+    }
+
+    .os-dialog__close {
+        width: 30px;
+        height: 30px;
+        border-radius: 7px;
+        border: 1px solid #d1d5db;
+        background: transparent;
+        cursor: pointer;
+        font-size: 0.85rem;
+        display: inline-grid;
+        place-items: center;
+    }
+
+    .os-dialog__body {
+        padding: 1.1rem 1.2rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.7rem;
+    }
+
+    .os-dialog__body label {
+        font-size: 0.87rem;
+        font-weight: 500;
+    }
+
+    .os-dialog__body textarea,
+    .os-dialog__body input[type=text],
+    .os-dialog__body input[type=password],
+    .os-dialog__body .key-display {
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        padding: 0.5rem 0.7rem;
+        font-size: 0.9rem;
+        width: 100%;
+        font-family: monospace;
+    }
+
+    .key-copy-row {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+    }
+
+    .key-copy-row .key-display {
+        flex: 1;
+    }
+
+    .os-dialog__footer {
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.6rem;
+        padding-top: 0.6rem;
+    }
+
+    .code-block {
+        background: #f1f5f9;
+        border-radius: 8px;
+        padding: 0.75rem 1rem;
+        font-family: monospace;
+        font-size: 0.85rem;
+        overflow-x: auto;
+        white-space: pre;
+        color: #1e293b;
+        border: 1px solid #e2e8f0;
+        margin: 0.25rem 0;
+    }
+
+    .copy-toast {
+        position: fixed;
+        bottom: 60px;
+        left: 50%;
+        transform: translateX(-50%) translateY(10px);
+        background: rgba(22,23,27,0.92);
+        color: #eef0f5;
+        border-radius: 100px;
+        padding: 0.5rem 1.2rem;
+        font-size: 0.88rem;
+        z-index: 9999;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s, transform 0.2s;
+    }
+
+    .copy-toast--visible {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+</style>
+
+<script>
+    function openCreateDialog() {
+        document.getElementById("createKeyDialog").showModal();
+    }
+
+    function openDetailDialog(key, allowedPaths, canRead, canWrite, remark) {
+        document.getElementById("detailKeyInput").value = key;
+        document.getElementById("detailKeyHidden").value = key;
+        document.getElementById("detailRevokeKeyHidden").value = key;
+        document.getElementById("detailAllowedPaths").value = allowedPaths;
+        document.getElementById("detailCanRead").checked = canRead === "true";
+        document.getElementById("detailCanWrite").checked = canWrite === "true";
+        document.getElementById("detailRemark").value = remark || "";
+        document.getElementById("detailDialog").showModal();
+    }
+
+    function closeDialog(id) {
+        document.getElementById(id).close();
+    }
+
+    // Wire View buttons via data attributes (avoids HTML quote escaping bugs)
+    document.querySelectorAll(".view-key-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            openDetailDialog(
+                btn.getAttribute("data-key") || "",
+                btn.getAttribute("data-paths") || "",
+                btn.getAttribute("data-can-read") || "true",
+                btn.getAttribute("data-can-write") || "true",
+                btn.getAttribute("data-remark") || ""
+            );
+        });
+    });
+
+    // Close dialog when clicking the backdrop
+    document.querySelectorAll(".os-dialog").forEach(dialog => {
+        dialog.addEventListener("click", (e) => {
+            const rect = dialog.getBoundingClientRect();
+            if (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) {
+                dialog.close();
+            }
+        });
+    });
+
+    function copyKey() {
+        const input = document.getElementById("detailKeyInput");
+        if (!input) return;
+        navigator.clipboard.writeText(input.value).then(() => showToast());
+    }
+
+    function showToast() {
+        const toast = document.getElementById("copyToast");
+        if (!toast) return;
+        toast.classList.add("copy-toast--visible");
+        setTimeout(() => toast.classList.remove("copy-toast--visible"), 2000);
+    }
+</script>
+
