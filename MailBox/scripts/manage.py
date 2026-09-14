@@ -142,6 +142,15 @@ def backup(args):
 
 
 def package(args):
+    # The ZIP is unpacked on a VPS where Farm/ is absent, so stage the generated shared
+    # assets now or the packaged webmail ships unstyled. Packaging from a copy that has
+    # no Farm/ alongside it is still fine as long as the artifacts are already present.
+    staged = subprocess.run([sys.executable, str(ROOT / 'scripts' / 'stage-shared-assets.py')])
+    if staged.returncode != 0:
+        required = ['web/static/shared/variables.css', 'web/static/shared/base.css', 'web/static/favicon.ico']
+        if not all(Path(name).is_file() for name in required):
+            sys.exit('Shared assets could not be staged and are not present. Run package from a full checkout of the repository.')
+        print('Reusing previously staged shared assets.')
     Path('dist').mkdir(exist_ok=True)
     target = Path('dist/shuneo-mail-mvp.zip')
     excluded = {'.git', '.venv', 'runtime', 'secrets', 'backups', 'dist', '__pycache__', '.pytest_cache'}
