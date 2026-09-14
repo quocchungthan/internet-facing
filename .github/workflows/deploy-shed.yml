@@ -19,7 +19,7 @@ jobs:
       docker_context: Shed
       dockerfile: Shed/Shed/Dockerfile
       wrapper_path: Shed/deployment/deploy-shed.sh
-      common_script_path: deployment/deploy-nginx-service.sh
+      deploy_common_script: deployment/deploy-caddy-service.sh
       runtime_image_argument: STORAGE_IMAGE
     secrets:
       VPS_HOST: ${{ secrets.VPS_HOST }}
@@ -27,4 +27,4 @@ jobs:
       VPS_USER: ${{ secrets.VPS_USER }}
       VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
       VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
-      CERTBOT_EMAIL: ${{ secrets.CERTBOT_EMAIL || vars.CERTBOT_EMAIL }}
+      ACME_EMAIL: ${{ secrets.ACME_EMAIL || vars.ACME_EMAIL }}
