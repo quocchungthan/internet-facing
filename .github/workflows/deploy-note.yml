@@ -1,9 +1,10 @@
 name: Deploy Note
 
 on:
-  push:
-    branches:
-      - sub/note
+  ## Do not auto deploy for now
+  # push:
+  #   branches:
+  #     - sub/note
   workflow_dispatch:
 
 permissions:
