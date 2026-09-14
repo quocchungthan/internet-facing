@@ -18,7 +18,10 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 
 ENV ASPNETCORE_URLS=http://+:80
+ENV IdentityApp__IdentityDatabasePath=/var/lib/fences/identity.db
+ENV IdentityApp__DataProtectionKeysPath=/var/lib/fences/keys
 EXPOSE 80
+VOLUME ["/var/lib/fences"]
 
 COPY --from=build /app/publish .
 ENTRYPOINT ["dotnet", "Fences.dll"]
