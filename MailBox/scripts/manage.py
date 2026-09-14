@@ -89,7 +89,14 @@ def certificate(args):
         sys.exit('Local configuration; create a fresh production directory.')
     if not args.email:
         sys.exit('--email is required for Let\'s Encrypt registration.')
-    compose('run', '--rm', '--service-ports', 'certbot', 'certonly', '--standalone', '--non-interactive', '--agree-tos', '--email', args.email, '-d', config['MAIL_HOSTNAME'])
+    caddy_was_active = subprocess.run(['systemctl', 'is-active', '--quiet', 'caddy']).returncode == 0
+    if caddy_was_active:
+        run(['systemctl', 'stop', 'caddy'])
+    try:
+        compose('run', '--rm', '--service-ports', 'certbot', 'certonly', '--standalone', '--non-interactive', '--agree-tos', '--email', args.email, '-d', config['MAIL_HOSTNAME'])
+    finally:
+        if caddy_was_active:
+            run(['systemctl', 'start', 'caddy'])
 
 
 def accounts(args):
@@ -118,9 +125,16 @@ def accounts(args):
 def renew(args):
     if settings().get('LOCAL_TEST'):
         sys.exit('Renewal is for production certificates only.')
-    compose('run', '--rm', 'certbot', 'renew', '--webroot', '-w', '/var/www/acme', *(['--dry-run'] if args.dry_run else []))
+    caddy_was_active = subprocess.run(['systemctl', 'is-active', '--quiet', 'caddy']).returncode == 0
+    if caddy_was_active:
+        run(['systemctl', 'stop', 'caddy'])
+    try:
+        compose('run', '--rm', '--service-ports', 'certbot', 'renew', *(['--dry-run'] if args.dry_run else []))
+    finally:
+        if caddy_was_active:
+            run(['systemctl', 'start', 'caddy'])
     if not args.dry_run:
-        compose('exec', '-T', 'proxy', 'nginx', '-s', 'reload')
+        run(['systemctl', 'reload', 'caddy'])
         # Maddy reloads certificate files automatically; restart also guarantees pickup.
         compose('restart', 'maddy')
 
@@ -129,7 +143,7 @@ def backup(args):
     settings()
     Path('backups').mkdir(exist_ok=True)
     target = ROOT / 'backups' / (datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ') + '.tar.gz')
-    compose('stop', 'proxy', 'web', 'maddy')
+    compose('stop', 'web', 'maddy')
     try:
         with tarfile.open(target, 'w:gz') as archive:
             for name in ['runtime', '.env', 'secrets', 'maddy', 'compose.yaml']:
