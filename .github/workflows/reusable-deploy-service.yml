@@ -1,0 +1,129 @@
+name: Reusable service deployment
+
+on:
+  workflow_call:
+    inputs:
+      image_name:
+        description: Docker image name to build and transfer
+        required: true
+        type: string
+      image_tag:
+        description: Docker image tag to build and transfer
+        required: true
+        type: string
+      docker_context:
+        description: Docker build context
+        required: true
+        type: string
+      dockerfile:
+        description: Dockerfile path relative to the repository
+        required: true
+        type: string
+      wrapper_path:
+        description: Service deployment wrapper path
+        required: true
+        type: string
+      common_script_path:
+        description: Shared nginx deployment script path
+        required: true
+        type: string
+      runtime_image_argument:
+        description: Environment variable name consumed by the service wrapper
+        required: true
+        type: string
+    secrets:
+      VPS_HOST:
+        required: true
+      VPS_PORT:
+        required: true
+      VPS_USER:
+        required: true
+      VPS_SSH_KEY:
+        required: true
+      VPS_KNOWN_HOSTS:
+        required: true
+      CERTBOT_EMAIL:
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-service-${{ inputs.image_name }}-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Build service image
+        run: docker build --pull --tag "${{ inputs.image_name }}:${{ inputs.image_tag }}" --file "${{ inputs.dockerfile }}" "${{ inputs.docker_context }}"
+
+      - name: Configure SSH host verification
+        env:
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$VPS_KNOWN_HOSTS"
+          mkdir -p "$HOME/.ssh"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+      - name: Load SSH key
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$VPS_SSH_KEY"
+          eval "$(ssh-agent -s)"
+          ssh-add - <<< "$VPS_SSH_KEY"
+          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
+          echo "SSH_AGENT_PID=$SSH_AGENT_PID" >> "$GITHUB_ENV"
+
+      - name: Transfer image to VPS
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          set -euo pipefail
+          test -n "$VPS_HOST"
+          test -n "$VPS_PORT"
+          test -n "$VPS_USER"
+          docker save "${{ inputs.image_name }}:${{ inputs.image_tag }}" | gzip | ssh \
+            -p "$VPS_PORT" \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            "$VPS_USER@$VPS_HOST" \
+            'docker load'
+
+      - name: Transfer common script and invoke service wrapper
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          CERTBOT_EMAIL: ${{ secrets.CERTBOT_EMAIL || vars.CERTBOT_EMAIL }}
+        run: |
+          set -euo pipefail
+          common_script=/tmp/deploy-nginx-common.sh
+          ssh \
+            -p "$VPS_PORT" \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            "$VPS_USER@$VPS_HOST" \
+            "cat > '$common_script'" \
+            < "${{ inputs.common_script_path }}"
+          printf 'export CERTBOT_EMAIL=%q\n' "$CERTBOT_EMAIL" > /tmp/deploy-service-wrapper.sh
+          cat "${{ inputs.wrapper_path }}" >> /tmp/deploy-service-wrapper.sh
+          ssh \
+            -p "$VPS_PORT" \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            "$VPS_USER@$VPS_HOST" \
+            "trap 'rm -f $common_script' EXIT; DEPLOY_NGINX_COMMON_SCRIPT='$common_script' ${{ inputs.runtime_image_argument }}='${{ inputs.image_name }}:${{ inputs.image_tag }}' bash -s" \
+            < /tmp/deploy-service-wrapper.sh
