@@ -1,0 +1,29 @@
+@inject Microsoft.Extensions.Options.IOptions<Fences.Models.IdentityAppOptions> IdentityOptions
+@{
+    var configuredBrandName = IdentityOptions.Value.BrandName;
+    var brandName = string.IsNullOrWhiteSpace(configuredBrandName) ? "Shuneo" : configuredBrandName;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#183d35" />
+    <title>Identity | @brandName</title>
+    <link rel="icon" href="~/favicon.ico" type="image/x-icon" />
+    <link rel="stylesheet" href="~/css/shared/tokens.css" data-system-theme="tokens" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/shared/identity.css" data-system-theme="identity" />
+</head>
+<body class="system-identity">
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    @if (User.Identity?.IsAuthenticated == true)
+    {
+        <header class="topbar">
+            <a class="brand" href="/" aria-label="Identity home"><span class="brand-mark" aria-hidden="true">ID</span><span>@brandName Identity</span></a>
+            <nav class="actions"><span class="user">@User.Identity.Name</span><a class="btn ghost" href="/auth/logout">Logout</a></nav>
+        </header>
+    }
+    <main id="main-content">@RenderBody()</main>
+</body>
+</html>
