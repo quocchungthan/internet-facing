@@ -1,0 +1,23 @@
+@model IReadOnlyList<IdentityNavigationApp>
+@inject Microsoft.Extensions.Options.IOptions<Fences.Models.IdentityAppOptions> IdentityOptions
+@{
+    var returnUrl = ViewData["ReturnUrl"]?.ToString();
+    var configuredBrandName = IdentityOptions.Value.BrandName;
+    var brandName = string.IsNullOrWhiteSpace(configuredBrandName) ? "Shuneo" : configuredBrandName;
+}
+@if (User.Identity?.IsAuthenticated == true)
+{
+    <section class="dashboard">
+        <header class="dashboard-head"><p class="eyebrow">@brandName system</p><h1>Your workspace</h1><p>Signed in as <strong>@User.Identity?.Name</strong>. Choose a service to continue.</p></header>
+        <div class="apps">
+            @foreach (var app in Model)
+            {
+                <article class="card" data-app-key="@app.Key"><div class="card__label">@app.Key</div><h2>@app.Name</h2><p>@app.Description</p><a class="btn ghost" href="@app.Url" aria-label="Open @app.Name">Open service <span aria-hidden="true">&#8594;</span></a></article>
+            }
+        </div>
+    </section>
+}
+else
+{
+    <section class="login-screen"><article class="login-panel" aria-live="polite"><div class="login-panel__mark" aria-hidden="true">ID</div><p class="eyebrow">One account · every service</p><h1>Welcome to @brandName</h1><p>Use your GitHub account to securely access Storage, Note, and the rest of your workspace.</p><a class="btn pixel-login" href="@(string.IsNullOrWhiteSpace(returnUrl) ? "/auth/login" : $"/auth/login?returnUrl={Uri.EscapeDataString(returnUrl)}")">Continue with GitHub <span aria-hidden="true">&#8594;</span></a><p class="login-panel__note">You will return to the service you started from after signing in.</p></article></section>
+}
