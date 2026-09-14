@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="15" fill="#173d2c"/>
+  <!-- car body -->
+  <path d="M8 38 Q8 44 14 44 H50 Q56 44 56 38 L54 34 L44 34 L38 24 Q36 22 30 22 L20 22 Q16 22 14 26 L10 34 Z"
+        fill="#ead29a" stroke="#f7edcf" stroke-width="2.5" stroke-linejoin="round"/>
+  <!-- windshield + window -->
+  <path d="M21 33 L25 24 L37 24 L42 33 Z" fill="#2f6948" stroke="#f7edcf" stroke-width="1.5" stroke-linejoin="round"/>
+  <line x1="33" y1="24" x2="33" y2="33" stroke="#f7edcf" stroke-width="1.5"/>
+  <!-- wheels -->
+  <circle cx="18" cy="44" r="7" fill="#6f4329" stroke="#f7edcf" stroke-width="2"/>
+  <circle cx="18" cy="44" r="3" fill="#d68143"/>
+  <circle cx="46" cy="44" r="7" fill="#6f4329" stroke="#f7edcf" stroke-width="2"/>
+  <circle cx="46" cy="44" r="3" fill="#d68143"/>
+  <!-- headlight -->
+  <rect x="52" y="34" width="5" height="4" rx="1" fill="#f7edcf" opacity="0.85"/>
+</svg>
