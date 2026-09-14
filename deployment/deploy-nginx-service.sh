@@ -3,10 +3,12 @@ set -Eeuo pipefail
 
 : "${SERVICE_NAME:?SERVICE_NAME must identify the service}"
 : "${SERVICE_DOMAIN:?SERVICE_DOMAIN must identify the public domain}"
+: "${SERVICE_ALIASES:=}"
 : "${SERVICE_UPSTREAM_PORT:?SERVICE_UPSTREAM_PORT must identify the container port}"
 : "${SERVICE_CONTAINER:?SERVICE_CONTAINER must identify the container}"
 : "${SERVICE_IMAGE:?SERVICE_IMAGE must name the image loaded on the VPS}"
 : "${SERVICE_ENV_FILE:?SERVICE_ENV_FILE must identify the Docker environment file}"
+: "${SERVICE_VOLUME:=}"
 : "${NGINX_SITES_AVAILABLE:=/etc/nginx/sites-available}"
 : "${NGINX_SITES_ENABLED:=/etc/nginx/sites-enabled}"
 : "${CERTBOT_WEBROOT:=/var/www/certbot}"
@@ -83,10 +85,12 @@ stage_config() {
 
 certificate_covers_domain() {
     local certificate="$1"
-    local san_names
-    "$OPENSSL_BIN" x509 -in "$certificate" -noout -checkhost "$SERVICE_DOMAIN" >/dev/null 2>&1 || return 1
+    local san_names domain
     san_names=$("$OPENSSL_BIN" x509 -in "$certificate" -noout -ext subjectAltName 2>/dev/null) || return 1
-    printf '%s\n' "$san_names" | grep -Eq "DNS:${SERVICE_DOMAIN}([,[:space:]]|$)"
+    for domain in $SERVICE_DOMAIN $SERVICE_ALIASES; do
+        "$OPENSSL_BIN" x509 -in "$certificate" -noout -checkhost "$domain" >/dev/null 2>&1 || return 1
+        printf '%s\n' "$san_names" | grep -Eq "DNS:${domain}([,[:space:]]|$)" || return 1
+    done
 }
 
 discover_lineage() {
@@ -114,7 +118,7 @@ cat > "$http_config" <<EOF
 server {
     listen 80;
     listen [::]:80;
-    server_name $SERVICE_DOMAIN;
+    server_name $SERVICE_DOMAIN $SERVICE_ALIASES;
 
     location ^~ /.well-known/acme-challenge/ {
         root $CERTBOT_WEBROOT;
@@ -135,8 +139,12 @@ systemctl reload "$NGINX_SERVICE"
 if [[ -f "$renewal_dir/$lineage.conf" ]]; then
     "$CERTBOT_BIN" renew --config-dir "$CERTBOT_CONFIG_DIR" --cert-name "$lineage" --webroot-path "$CERTBOT_WEBROOT" --non-interactive
 else
+    certbot_domains=(--domain "$SERVICE_DOMAIN")
+    for alias in $SERVICE_ALIASES; do
+        certbot_domains+=(--domain "$alias")
+    done
     "$CERTBOT_BIN" certonly --config-dir "$CERTBOT_CONFIG_DIR" --webroot --webroot-path "$CERTBOT_WEBROOT" \
-        --cert-name "$lineage" --domain "$SERVICE_DOMAIN" \
+        --cert-name "$lineage" "${certbot_domains[@]}" \
         --email "$CERTBOT_EMAIL" --agree-tos --non-interactive
 fi
 
@@ -151,7 +159,7 @@ cat > "$https_config" <<EOF
 server {
     listen 80;
     listen [::]:80;
-    server_name $SERVICE_DOMAIN;
+    server_name $SERVICE_DOMAIN $SERVICE_ALIASES;
 
     location ^~ /.well-known/acme-challenge/ {
         root $CERTBOT_WEBROOT;
@@ -164,7 +172,7 @@ server {
 server {
     listen 443 ssl;
     listen [::]:443 ssl;
-    server_name $SERVICE_DOMAIN;
+    server_name $SERVICE_DOMAIN $SERVICE_ALIASES;
     ssl_certificate $certificate;
     ssl_certificate_key $private_key;
 
@@ -180,7 +188,12 @@ stage_config "$https_config"
 systemctl reload "$NGINX_SERVICE"
 
 "$DOCKER_BIN" rm --force "$SERVICE_CONTAINER" >/dev/null 2>&1 || true
+docker_volume_args=()
+if [[ -n "$SERVICE_VOLUME" ]]; then
+    docker_volume_args+=(--volume "$SERVICE_VOLUME")
+fi
 "$DOCKER_BIN" run --detach --name "$SERVICE_CONTAINER" --restart unless-stopped \
     --publish "127.0.0.1:$SERVICE_UPSTREAM_PORT:80" \
+    "${docker_volume_args[@]}" \
     --env-file "$SERVICE_ENV_FILE" "$SERVICE_IMAGE" >/dev/null
 echo "$SERVICE_NAME deployed at https://$SERVICE_DOMAIN using Certbot lineage $lineage"
