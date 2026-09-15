@@ -1,0 +1,53 @@
+services:
+  db:
+    image: mariadb:10.11
+    container_name: seafile-mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-seafile_db_pass}
+      - MYSQL_LOG_CONSOLE=true
+      - MARIADB_AUTO_UPGRADE=1
+    volumes:
+      - ${STORAGE_BASE_DIR:-/srv/storage}/mysql:/var/lib/mysql
+    networks:
+      - seafile-net
+    restart: unless-stopped
+
+  memcached:
+    image: memcached:1.6-alpine
+    container_name: seafile-memcached
+    entrypoint: memcached -m 256
+    networks:
+      - seafile-net
+    restart: unless-stopped
+
+  seafile:
+    image: seafileltd/seafile-mc:11.0.12
+    container_name: seafile-server
+    ports:
+      - "127.0.0.1:${SERVICE_UPSTREAM_PORT:-8080}:80"
+    environment:
+      - DB_HOST=db
+      - DB_ROOT_PASSWD=${MYSQL_ROOT_PASSWORD:-seafile_db_pass}
+      - TIME_ZONE=${TIME_ZONE:-Asia/Ho_Chi_Minh}
+      - SEAFILE_ADMIN_EMAIL=${SEAFILE_ADMIN_EMAIL:-admin@eldervibe.dev}
+      - SEAFILE_ADMIN_PASSWORD=${SEAFILE_ADMIN_PASSWORD:-admin_secret}
+      - SEAFILE_SERVER_LETSENCRYPT=false
+      - SEAFILE_SERVER_HOSTNAME=${SERVICE_DOMAIN:-storage.eldervibe.dev}
+      - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:-seafile}
+      - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-}
+      - OAUTH_REDIRECT_URL=${OAUTH_REDIRECT_URL:-https://storage.eldervibe.dev/oauth/callback/}
+      - OAUTH_AUTHORIZATION_URL=${OAUTH_AUTHORIZATION_URL:-https://identity.eldervibe.dev/connect/authorize}
+      - OAUTH_TOKEN_URL=${OAUTH_TOKEN_URL:-https://identity.eldervibe.dev/connect/token}
+      - OAUTH_USER_INFO_URL=${OAUTH_USER_INFO_URL:-https://identity.eldervibe.dev/connect/userinfo}
+    volumes:
+      - ${STORAGE_BASE_DIR:-/srv/storage}/data:/shared
+    networks:
+      - seafile-net
+    depends_on:
+      - db
+      - memcached
+    restart: unless-stopped
+
+networks:
+  seafile-net:
+    driver: bridge
