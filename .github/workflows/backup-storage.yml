@@ -1,0 +1,87 @@
+name: Backup Storage Data
+
+on:
+  schedule:
+    # Run daily at 02:00 UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      retention_days:
+        description: 'Backup retention in days (older archives pruned)'
+        required: false
+        default: '14'
+      download_archive:
+        description: 'Download the created backup archive as a GitHub artifact (true/false)'
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup-storage-production
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$VPS_KNOWN_HOSTS"
+          test -n "$VPS_SSH_KEY"
+          mkdir -p "$HOME/.ssh"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+          eval "$(ssh-agent -s)"
+          ssh-add - <<< "$VPS_SSH_KEY"
+          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
+
+      - name: Trigger Remote Seafile Backup
+        id: run_backup
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          RETENTION_DAYS: ${{ github.event.inputs.retention_days || '14' }}
+        run: |
+          set -euo pipefail
+          ssh \
+            -p "$VPS_PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            "$VPS_USER@$VPS_HOST" \
+            "RETENTION_DAYS='$RETENTION_DAYS' bash -s" \
+            < Shed/deployment/backup-storage.sh | tee backup_output.log
+
+          BACKUP_FILE=$(grep '^BACKUP_FILE=' backup_output.log | cut -d'=' -f2)
+          echo "backup_file=$BACKUP_FILE" >> "$GITHUB_OUTPUT"
+
+      - name: Download Backup Archive as Artifact (Optional)
+        if: ${{ github.event.inputs.download_archive == true || github.event.inputs.download_archive == 'true' }}
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          BACKUP_FILE: ${{ steps.run_backup.outputs.backup_file }}
+        run: |
+          set -euo pipefail
+          mkdir -p ./downloaded-backup
+          scp -P "$VPS_PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            "$VPS_USER@$VPS_HOST:$BACKUP_FILE" ./downloaded-backup/
+
+      - name: Upload Artifact
+        if: ${{ github.event.inputs.download_archive == true || github.event.inputs.download_archive == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: seafile-backup-${{ github.run_id }}
+          path: ./downloaded-backup/*
+          retention-days: 7
