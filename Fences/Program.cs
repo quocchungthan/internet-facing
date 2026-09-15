@@ -212,7 +212,7 @@ static X509Certificate2 LoadCertificate(string path, string password, string pur
         throw new InvalidOperationException($"A production OIDC {purpose} certificate path is required and must exist.");
     }
 
-    return new X509Certificate2(path, password, X509KeyStorageFlags.MachineKeySet | X509KeyStorageFlags.EphemeralKeySet);
+    return X509CertificateLoader.LoadPkcs12FromFile(path, password, X509KeyStorageFlags.MachineKeySet | X509KeyStorageFlags.EphemeralKeySet);
 }
 
 static async Task SeedOidcClientsAsync(IServiceProvider services, IEnumerable<OidcClientOptions> clients)
