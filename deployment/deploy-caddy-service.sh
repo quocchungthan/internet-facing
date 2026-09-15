@@ -9,6 +9,7 @@ set -Eeuo pipefail
 : "${SERVICE_IMAGE:?SERVICE_IMAGE must name the image loaded on the VPS}"
 : "${SERVICE_ENV_FILE:?SERVICE_ENV_FILE must identify the Docker environment file}"
 : "${SERVICE_VOLUME:=}"
+: "${SERVICE_SECRET_DIR:=}"
 : "${CADDY_SITES_DIR:=/etc/caddy/sites}"
 : "${CADDY_CONFIG:=/etc/caddy/Caddyfile}"
 : "${CADDY_BIN:=caddy}"
@@ -69,6 +70,11 @@ fi
 if [[ ! "$SERVICE_UPSTREAM_PORT" =~ ^[0-9]+$ || ! "$SERVICE_CANDIDATE_PORT" =~ ^[0-9]+$ ]]; then
 	echo "SERVICE_UPSTREAM_PORT and SERVICE_CANDIDATE_PORT must be numeric" >&2
 	exit 2
+fi
+
+if [[ -n "$SERVICE_SECRET_DIR" && ! -d "$SERVICE_SECRET_DIR" ]]; then
+	echo "SERVICE_SECRET_DIR must identify an existing directory: $SERVICE_SECRET_DIR" >&2
+	exit 1
 fi
 
 fragment="$CADDY_SITES_DIR/$SERVICE_DOMAIN.caddy"
@@ -155,9 +161,15 @@ if [[ -n "$SERVICE_VOLUME" ]]; then
 	docker_volume_args+=(--volume "$SERVICE_VOLUME")
 fi
 
+docker_secret_args=()
+if [[ -n "$SERVICE_SECRET_DIR" ]]; then
+	docker_secret_args+=(--mount "type=bind,source=$SERVICE_SECRET_DIR,destination=/run/secrets,readonly")
+fi
+
 docker run --detach --name "$candidate_container" --restart no \
 	--publish "127.0.0.1:$candidate_port:80" \
 	"${docker_volume_args[@]}" \
+	"${docker_secret_args[@]}" \
 	--env-file "$SERVICE_ENV_FILE" "$SERVICE_IMAGE" >/dev/null
 candidate_started=true
 

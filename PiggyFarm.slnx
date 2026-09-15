@@ -1,3 +1,4 @@
 <Solution>
     <Project Path="Farm/Farm.csproj" />
+    <Project Path="Fences/Fences.csproj" />
 </Solution>
