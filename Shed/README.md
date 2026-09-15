@@ -1,36 +1,72 @@
-# Shed
+# Seafile Server Storage (`storage.eldervibe.dev`)
 
-Shed is the migrated file-management service from `piggy-farm/car/ValinaAspNet`.
-The migration preserves the Razor Pages, Identity authentication, file APIs, access-key sync endpoints, SQLite EF migrations, and legacy tests.
+Open-source cloud storage powered by [Seafile Community Edition](https://github.com/haiwen/seafile-server) behind Caddy reverse proxy, authenticated via OpenID Connect / OAuth2 from Fences (`identity.eldervibe.dev`).
 
-> Only for personal large files with limited SSD VPS.
+Replaces previous custom-built storage implementation (`Shed`) with official, production-grade Seafile server components while keeping the repository folder name `Shed/`.
 
-## Local validation
+---
 
-```powershell
-dotnet restore .\Shed\Shed.csproj
-dotnet build .\Shed\Shed.csproj --configuration Release --no-restore
-dotnet test .\Shed.Tests\Shed.Tests.csproj --configuration Release --no-restore
-```
+## Architecture
 
-The app uses SQLite files under `/app/data` in the container and stores managed files under `/app/data/prodstorage`. Local development can override `ConnectionStrings` and `Storage:RootPath` with environment variables or user secrets.
+- **Seafile Server (`seafile-server`)**: Runs `seafileltd/seafile-mc` handling Web UI (Seahub), WebDAV, file syncing daemon, and chunk file server (`seafhttp`).
+- **Database (`seafile-mysql`)**: MariaDB 10.11 for Seafile metadata, accounts, and sharing permissions.
+- **Cache (`seafile-memcached`)**: Memcached for session and cache layer.
+- **Ingress**: Caddy reverse proxy on the host handling automatic TLS and proxying `storage.eldervibe.dev` to container port `8080`.
 
-Shed consumes the shared Farm CSS from `Farm/wwwroot/css/shared`. `Shed/Shed.csproj` links `variables.css`, `base.css`, `tokens.css`, and `storage.css` from that directory and copies them into Shed's runtime output and publish output. Farm owns these shared CSS sources; update them there rather than adding separate Shed copies.
+---
 
-The `OpensourceLab.FileStorage` contract project is vendored locally at `Shed/OpensourceLab.FileStorage`. Shed references this project directly, including its generated protobuf and gRPC contracts, so local and deployment builds do not require the private GitHub NuGet package feed.
+## Directory Structure on VPS
 
-## Deployment assumptions
+- Compose & root config: `/srv/storage/docker-compose.yml`
+- MariaDB data: `/srv/storage/mysql`
+- Seafile & Seahub data / configs: `/srv/storage/data`
+  - Seahub settings: `/srv/storage/data/seafile/conf/seahub_settings.py`
 
-The manual or `sub/storage` deployment workflow builds from the repository root with `Shed` as the Docker context, transfers the image to the VPS, and invokes `deployment/deploy-shed.sh` with the shared `deployment/deploy-nginx-service.sh` script.
+---
 
-The wrapper assumes:
+## OpenID Connect / OAuth2 Configuration with Fences
 
-- Public domain: `storage.eldervibe.dev` (`sub/storage` -> `storage.eldervibe.dev`)
-- Container and upstream port: `8080`
-- Container name: `storage`
-- VPS env file: `/etc/storage/storage.env`
-- Persistent host directory: `/srv/storage/data`, mounted at `/app/data`
-- Required runtime configuration is supplied through `/etc/storage/storage.env`, especially `IdentityBridge__BaseUrl`, `Smtp__Host`, `Smtp__Port`, `Smtp__UserName`, `Smtp__Password`, and `Smtp__DefaultFrom`.
-- `CERTBOT_EMAIL` is supplied as a repository/environment secret or variable for the shared deployment script.
+To authenticate Seafile users via `identity.eldervibe.dev`:
 
-The production JSON intentionally contains no credentials. The workflow requires the existing `VPS_HOST`, `VPS_PORT`, `VPS_USER`, `VPS_SSH_KEY`, and `VPS_KNOWN_HOSTS` secrets.
+1. **Register Seafile client in Fences (`sub/identity`)**:
+   - Client ID: `seafile`
+   - Client Secret: `<generated-secret>`
+   - Redirect URI: `https://storage.eldervibe.dev/oauth/callback/`
+   - Scopes: `openid`, `profile`, `email`
+
+2. **Configure Seahub** (reads from environment variables via container):
+   Pass environment variables in `/srv/storage/.env` or docker-compose:
+   ```bash
+   OAUTH_CLIENT_ID=seafile
+   OAUTH_CLIENT_SECRET=<generated-secret>
+   OAUTH_REDIRECT_URL=https://storage.eldervibe.dev/oauth/callback/
+   OAUTH_AUTHORIZATION_URL=https://identity.eldervibe.dev/connect/authorize
+   OAUTH_TOKEN_URL=https://identity.eldervibe.dev/connect/token
+   OAUTH_USER_INFO_URL=https://identity.eldervibe.dev/connect/userinfo
+   ```
+
+   Place [Shed/conf/seahub_settings_template.py](Shed/conf/seahub_settings_template.py) into `/srv/storage/data/seafile/conf/seahub_settings.py`:
+   ```python
+   import os
+
+   ENABLE_OAUTH = os.environ.get('ENABLE_OAUTH', 'True').lower() in ('true', '1', 't')
+   OAUTH_CLIENT_ID = os.environ.get('OAUTH_CLIENT_ID', 'seafile')
+   OAUTH_CLIENT_SECRET = os.environ.get('OAUTH_CLIENT_SECRET', '')
+   OAUTH_REDIRECT_URL = os.environ.get('OAUTH_REDIRECT_URL', 'https://storage.eldervibe.dev/oauth/callback/')
+   OAUTH_AUTHORIZATION_URL = os.environ.get('OAUTH_AUTHORIZATION_URL', 'https://identity.eldervibe.dev/connect/authorize')
+   OAUTH_TOKEN_URL = os.environ.get('OAUTH_TOKEN_URL', 'https://identity.eldervibe.dev/connect/token')
+   OAUTH_USER_INFO_URL = os.environ.get('OAUTH_USER_INFO_URL', 'https://identity.eldervibe.dev/connect/userinfo')
+   OAUTH_SCOPE = os.environ.get('OAUTH_SCOPE', 'openid profile email').split()
+   OAUTH_ATTRIBUTE_MAP = {
+       "id": (True, "email"),
+       "name": (False, "name"),
+       "email": (True, "email"),
+   }
+   OAUTH_ACTIVATE_USER_AFTER_CREATION = True
+   OAUTH_CREATE_UNKNOWN_USER = True
+   ```
+
+3. **Restart Seahub**:
+   ```bash
+   docker exec -it seafile-server /opt/seafile/seafile-server-latest/seahub.sh restart
+   ```
