@@ -60,44 +60,90 @@ The Dockerfile expects the Docker build context to be `internet-facing`, publish
 dotnet run --project Fences/Fences.csproj
 ```
 
+The default project launch profile selects the `Development` environment and HTTP on `http://localhost:5188`, so local runs do not require a trusted HTTPS certificate. Development also uses OpenIddict development certificates. Production mode still requires both configured PFX files. To run without the launch profile, set `ASPNETCORE_ENVIRONMENT=Development` explicitly.
+
+Use the optional HTTPS profile when testing HTTPS-specific behavior:
+
+```text
+dotnet run --project Fences/Fences.csproj --launch-profile FencesHttps
+```
+
+On Linux, trust the HTTPS developer certificate for Kestrel and system clients. If `dotnet dev-certs https --trust` reports that the certificate is trusted only by some clients, install the generated PEM in the system CA store:
+
+```text
+dotnet dev-certs https --trust
+certificate=$(find "$HOME/.aspnet/dev-certs/trust" -name '*.pem' -print -quit)
+sudo install -m 0644 "$certificate" /usr/local/share/ca-certificates/aspnetcore-localhost.crt
+sudo update-ca-certificates
+```
+
+Restart the terminal and browser after updating the trust store, then run the app again.
+
+For GitHub login, set these user secrets or environment variables locally:
+
+```text
+Authentication__GitHub__ClientId=<github-client-id>
+Authentication__GitHub__ClientSecret=<github-client-secret>
+```
+
 The GitHub OAuth callback must match the public host: `<public-host>/signin-github`.
 
 ## VPS deployment
 
-Run the Docker build from the `internet-facing` directory so the Dockerfile can copy the shared Farm assets:
+The active deployment uses Caddy for HTTPS and runs the container on loopback port `5188`. Run the Docker build from the `internet-facing` directory so the Dockerfile can copy the shared Farm assets:
 
 ```text
 docker build -f Fences/Dockerfile -t shuneo-fences .
-docker run -d --name shuneo-fences --restart unless-stopped \
-	-p 127.0.0.1:5188:80 \
-	-e Authentication__GitHub__ClientId="<github-client-id>" \
-	-e Authentication__GitHub__ClientSecret="<github-client-secret>" \
-	shuneo-fences
 ```
 
 If the image restore needs the private GitHub package feed, pass `--build-arg GH_NUGET_TOKEN=<github-packages-token>` to `docker build`. Keep all tokens and secrets in the VPS operator's secret store or shell environment; do not commit them.
 
-`deployment/deploy-nginx-service.sh` contains the shared VPS deployment logic. `Fences/scripts/deploy-fences.sh` is its service-specific wrapper. Run the wrapper as the SSH user after loading the image, for example:
+Create the runtime environment file and two certificate files on the VPS. The files must be readable by the Docker daemon and should be restricted to the deployment operator:
 
 ```text
-FENCES_IMAGE=shuneo-fences:<image-tag> CERTBOT_EMAIL=ops@example.com \
+install -d -m 700 /etc/shuneo/fences-secrets /var/lib/fences
+install -m 600 /dev/null /etc/shuneo/fences.env
+install -m 600 /dev/null /etc/shuneo/fences-secrets/oidc-signing.pfx
+install -m 600 /dev/null /etc/shuneo/fences-secrets/oidc-encryption.pfx
+```
+
+Generate or provision separate private-key PFX files for signing and encryption. Do not reuse the same certificate for both purposes. Put their passwords in `/etc/shuneo/fences.env`:
+
+```text
+ASPNETCORE_ENVIRONMENT=Production
+Authentication__GitHub__ClientId=<github-client-id>
+Authentication__GitHub__ClientSecret=<github-client-secret>
+IdentityApp__OidcIssuer=https://identity.eldervibe.dev
+IdentityApp__OidcSigningCertificatePath=/run/secrets/oidc-signing.pfx
+IdentityApp__OidcSigningCertificatePassword=<signing-pfx-password>
+IdentityApp__OidcEncryptionCertificatePath=/run/secrets/oidc-encryption.pfx
+IdentityApp__OidcEncryptionCertificatePassword=<encryption-pfx-password>
+IdentityApp__IdentityDatabasePath=/var/lib/fences/identity.db
+IdentityApp__DataProtectionKeysPath=/var/lib/fences/keys
+IdentityApp__OidcClients__0__ClientId=<client-id>
+IdentityApp__OidcClients__0__DisplayName=<client-name>
+IdentityApp__OidcClients__0__RedirectUris__0=https://<app-host>/oauth/callback
+IdentityApp__OidcClients__0__PostLogoutRedirectUris__0=https://<app-host>/
+```
+
+`Fences/scripts/deploy-fences.sh` is the service-specific wrapper for `deployment/deploy-caddy-service.sh`. It mounts `/etc/shuneo/fences-secrets` read-only inside the container at `/run/secrets`, mounts `/var/lib/fences` for persistent state, and creates the Caddy site for `identity.eldervibe.dev`.
+
+After loading the image on the VPS, run:
+
+```text
+FENCES_IMAGE=shuneo-fences:<image-tag> \
 	bash Fences/scripts/deploy-fences.sh
 ```
 
-It manages `identity.shuneo.com`, `identity.eldervibe.dev`, and `127.0.0.1:5188`. It takes an exclusive lock, stages the HTTP ACME site, runs `nginx -t` and reloads nginx before Certbot, then verifies the certificate files and SAN before staging HTTPS. A matching existing Certbot renewal lineage is discovered from its renewal configuration and certificate SANs, including suffixed lineage names; otherwise a new lineage covering both identity names is created. Failed nginx validation restores the previous managed site and does not touch unrelated enabled sites.
+The shared deployment script validates the Caddy configuration, reloads Caddy, replaces the container, and passes `/etc/shuneo/fences.env` to Docker. It does not create application secrets, certificates, DNS records, or persistent directories.
 
-The common script accepts `SERVICE_NAME`, `SERVICE_DOMAIN`, `SERVICE_UPSTREAM_PORT`, `SERVICE_CONTAINER`, `SERVICE_IMAGE`, and `SERVICE_ENV_FILE`, plus VPS path/tool overrides for `NGINX_SITES_AVAILABLE`, `NGINX_SITES_ENABLED`, `CERTBOT_WEBROOT`, `CERTBOT_CONFIG_DIR`, `CERTBOT_BIN`, `OPENSSL_BIN`, `NGINX_SERVICE`, `DEPLOY_LOCK_FILE`, `DOCKER_BIN`, and `NGINX_BIN`. To add another service, create a small wrapper beside Fences that exports those six service values and `exec bash`es the common script. When a wrapper is streamed over SSH, transfer the common script first and set `DEPLOY_NGINX_COMMON_SCRIPT` to its remote path.
+The deployment lock is service-specific by default. The managed Caddy fragment is named from the service domain. The script never enumerates, rewrites, disables, or prunes unrelated Caddy sites or Docker images.
 
-The deployment lock is service-specific by default. The managed nginx link and temporary configs are named from the service domain. The script never enumerates, rewrites, disables, or prunes unrelated nginx sites or Docker images.
-
-The VPS nginx configuration is operator-managed through this script; DNS remains operator-managed. The GitHub OAuth callback remains:
-`https://identity.shuneo.com/signin-github`.
-
-For the canonical host, the callback is `https://identity.eldervibe.dev/signin-github`. The canonical host uses a host-only `eldervibe.identity` cookie because browsers reject a `.shuneo.com` cookie set by `eldervibe.dev`; legacy hosts continue using the existing shared `shuneo.identity` cookie.
+The VPS Caddy configuration and DNS remain operator-managed. The GitHub OAuth callback is `https://identity.eldervibe.dev/signin-github`.
 
 ## GitHub Actions deployment
 
-`.github/workflows/deploy-fences.yml` builds the image on pushes to `sub/identity` and can also be started with **Run workflow**. It is a thin caller of `.github/workflows/reusable-deploy-service.yml`, which checks out the repository, builds and transfers the image over SSH, then streams the common deployment script and the Fences wrapper. The wrapper configures only the Fences nginx mapping, renews or issues its independent certificate lineage, and replaces the `shuneo-fences` container. The workflow does not configure DNS or application secrets.
+`.github/workflows/deploy-fences.yml` can be started with **Run workflow**. It calls `.github/workflows/reusable-deploy-service.yml`, which checks out the repository, builds and transfers the image over SSH, then streams the common deployment script and the Fences wrapper. The workflow does not configure DNS, Caddy, application secrets, or certificates.
 
 Configure a GitHub `production` environment with these secrets:
 
@@ -106,10 +152,9 @@ Configure a GitHub `production` environment with these secrets:
 - `VPS_USER`: SSH user with permission to run Docker
 - `VPS_SSH_KEY`: private key for that user
 - `VPS_KNOWN_HOSTS`: pinned `ssh-keyscan` output for the VPS host and port
-- `CERTBOT_EMAIL`: optional production environment variable or secret, used only when a new Fences lineage is required; a secret takes precedence when both are configured
 
-Before the first deployment, install Docker on the VPS, grant the SSH user Docker access, and create `/etc/shuneo/fences.env` with the required `Authentication__GitHub__ClientId`, `Authentication__GitHub__ClientSecret`, OIDC certificate variables, client redirect URI variables, and intended `IdentityApp` settings. The SSH user must be able to bind the loopback port `5188`, nginx must proxy both identity names to that port, and `/var/lib/fences` must be a durable mounted directory writable by the container. Keep the environment file and certificate files readable only by the deployment user or its Docker access group.
+Before the first workflow deployment, install Docker and Caddy on the VPS, grant the SSH user Docker access, create `/etc/shuneo/fences.env`, create `/etc/shuneo/fences-secrets` with both PFX files, and create durable writable `/var/lib/fences` storage. Caddy must import `/etc/caddy/sites/*.caddy`; DNS for `identity.eldervibe.dev` must point to the VPS and ports 80/443 must be available. Keep the environment file and certificate files readable only by the deployment operator or its Docker access group.
 
-Before the first workflow deployment, ensure nginx includes `sites-enabled`, `/var/www/certbot` is writable by the SSH user, `certbot`, `openssl`, `flock`, Docker, and `systemctl` are available, and the SSH user can reload the nginx service. The script uses a dedicated nginx site entry for `identity.shuneo.com`; it does not enumerate, rewrite, disable, or reload any unrelated domain configuration.
+The SSH user must be able to reload Caddy and use Docker. The deploy script requires `flock`, `systemctl`, and the configured Caddy and Docker binaries.
 
 Future services only need a caller workflow and a service wrapper. The caller should invoke `reusable-deploy-service.yml` with the service image name and tag, Docker context and Dockerfile, wrapper path, common script path, and the wrapper's runtime image environment variable name. The wrapper should export the service-specific deployment values and execute the transferred common script, following `Fences/scripts/deploy-fences.sh` as the template.
