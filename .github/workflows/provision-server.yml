@@ -41,17 +41,17 @@ on:
         required: true
       VPS_KNOWN_HOSTS:
         required: false
-
-  push:
-    paths:
-      - 'deployment/setup-server.sh'
-      - '.github/workflows/provision-server.yml'
-    branches:
-      - main
-  pull_request:
-    paths:
-      - 'deployment/setup-server.sh'
-      - '.github/workflows/provision-server.yml'
+## no run on push
+  # push:
+  #   paths:
+  #     - 'deployment/setup-server.sh'
+  #     - '.github/workflows/provision-server.yml'
+  #   branches:
+  #     - main
+  # pull_request:
+  #   paths:
+  #     - 'deployment/setup-server.sh'
+  #     - '.github/workflows/provision-server.yml'
 
 permissions:
   contents: read
