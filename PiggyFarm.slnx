@@ -5,4 +5,5 @@
     <Project Path="Farm.Mind/Farm.Mind.csproj" />
     <Project Path="Farm.Mind.Tests/Farm.Mind.Tests.csproj" />
     <Project Path="Farm.Tests/Farm.Tests.csproj" />
+    <Project Path="Fences/Fences.csproj" />
 </Solution>
