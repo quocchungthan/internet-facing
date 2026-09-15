@@ -1,0 +1,163 @@
+name: Provision Server Requirements
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Target environment'
+        type: choice
+        required: true
+        default: 'vps (Deploy to remote VPS over SSH)'
+        options:
+          - 'vps (Deploy to remote VPS over SSH)'
+          - 'test-runner (Test install on GitHub Actions Ubuntu 24.04 runner)'
+      acme_email:
+        description: 'ACME Email for Caddy SSL (optional)'
+        required: false
+        type: string
+      create_swap:
+        description: 'Create 4GB emergency swapfile on VPS'
+        type: boolean
+        default: true
+      configure_ufw:
+        description: 'Configure UFW firewall (22/SSH, 80/HTTP, 443/HTTPS)'
+        type: boolean
+        default: true
+
+  workflow_call:
+    inputs:
+      acme_email:
+        description: 'ACME Email for Caddy SSL (optional)'
+        required: false
+        type: string
+    secrets:
+      VPS_HOST:
+        required: true
+      VPS_PORT:
+        required: false
+      VPS_USER:
+        required: false
+      VPS_SSH_KEY:
+        required: true
+      VPS_KNOWN_HOSTS:
+        required: false
+
+  push:
+    paths:
+      - 'deployment/setup-server.sh'
+      - '.github/workflows/provision-server.yml'
+    branches:
+      - main
+  pull_request:
+    paths:
+      - 'deployment/setup-server.sh'
+      - '.github/workflows/provision-server.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  # ────────────────────────────────────────────────────────────────────────────
+  # Job 1: Test & Validate Script on a clean Ubuntu 24.04 GitHub Actions Runner
+  # ────────────────────────────────────────────────────────────────────────────
+  test-installer:
+    name: Test Installer on Ubuntu 24.04 Runner
+    runs-on: ubuntu-24.04
+    if: >-
+      github.event_name == 'push' ||
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'workflow_dispatch' && contains(inputs.target, 'test-runner'))
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate bash syntax
+        run: bash -n deployment/setup-server.sh
+
+      - name: Execute Server Provisioning Script (Test Mode)
+        env:
+          CREATE_SWAP: 'false'
+          CONFIGURE_UFW: 'false'
+          APPLY_SYSCTL: 'false'
+        run: |
+          sudo -E bash deployment/setup-server.sh --no-swap --no-ufw --no-sysctl
+
+      - name: Verify Installed Toolchains
+        run: |
+          set -x
+          docker --version
+          docker compose version
+          caddy version
+          dotnet --version
+          node --version
+          npm --version
+          pnpm --version
+          gh --version
+          python3 --version
+          git --version
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Job 2: Deploy & Execute Provisioning Script on Remote VPS over SSH
+  # ────────────────────────────────────────────────────────────────────────────
+  provision-vps:
+    name: Provision Remote VPS over SSH
+    runs-on: ubuntu-latest
+    if: >-
+      (github.event_name == 'workflow_dispatch' && contains(inputs.target, 'vps')) ||
+      github.event_name == 'workflow_call'
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Configure SSH Key & Host Verification
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT || '22' }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$VPS_HOST" || { echo "::error::Missing secret VPS_HOST" >&2; exit 1; }
+          test -n "$VPS_SSH_KEY" || { echo "::error::Missing secret VPS_SSH_KEY" >&2; exit 1; }
+
+          mkdir -p "$HOME/.ssh"
+          chmod 700 "$HOME/.ssh"
+
+          if [[ -n "$VPS_KNOWN_HOSTS" ]]; then
+            printf '%s\n' "$VPS_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          else
+            echo "Auto-scanning host key for $VPS_HOST:$VPS_PORT..."
+            ssh-keyscan -p "$VPS_PORT" -H "$VPS_HOST" >> "$HOME/.ssh/known_hosts" 2>/dev/null
+          fi
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+          eval "$(ssh-agent -s)"
+          ssh-add - <<< "$VPS_SSH_KEY"
+          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
+          echo "SSH_AGENT_PID=$SSH_AGENT_PID" >> "$GITHUB_ENV"
+
+      - name: Transfer & Execute Provisioning Script on Remote Server
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT || '22' }}
+          VPS_USER: ${{ secrets.VPS_USER || 'root' }}
+          ACME_EMAIL: ${{ inputs.acme_email || secrets.ACME_EMAIL || vars.ACME_EMAIL }}
+          CREATE_SWAP: ${{ inputs.create_swap != false }}
+          CONFIGURE_UFW: ${{ inputs.configure_ufw != false }}
+        run: |
+          set -euo pipefail
+          target_script="/tmp/setup-server-$$.sh"
+
+          echo "Transferring provisioning script to $VPS_USER@$VPS_HOST..."
+          scp -P "$VPS_PORT" -o BatchMode=yes deployment/setup-server.sh "$VPS_USER@$VPS_HOST:$target_script"
+
+          echo "Executing provisioning script on remote VPS..."
+          ssh -p "$VPS_PORT" -o BatchMode=yes "$VPS_USER@$VPS_HOST" \
+            "sudo \
+              ACME_EMAIL='$ACME_EMAIL' \
+              CREATE_SWAP='$CREATE_SWAP' \
+              CONFIGURE_UFW='$CONFIGURE_UFW' \
+              bash '$target_script'; \
+              rm -f '$target_script'"
