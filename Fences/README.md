@@ -96,8 +96,6 @@ The active deployment uses Caddy for HTTPS and runs the container on loopback po
 docker build -f Fences/Dockerfile -t shuneo-fences .
 ```
 
-If the image restore needs the private GitHub package feed, pass `--build-arg GH_NUGET_TOKEN=<github-packages-token>` to `docker build`. Keep all tokens and secrets in the VPS operator's secret store or shell environment; do not commit them.
-
 Create the runtime environment file and two certificate files on the VPS. The files must be readable by the Docker daemon and should be restricted to the deployment operator:
 
 ```text

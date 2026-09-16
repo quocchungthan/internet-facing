@@ -1,11 +1,11 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
-ARG GH_NUGET_TOKEN
-RUN if [ -n "$GH_NUGET_TOKEN" ]; then \
-      dotnet nuget add source "https://nuget.pkg.github.com/quocchungthan/index.json" \
-      --name github --username "quocchungthan" --password "$GH_NUGET_TOKEN" --store-password-in-clear-text; \
-    fi
+# ARG GH_NUGET_TOKEN
+# RUN if [ -n "$GH_NUGET_TOKEN" ]; then \
+#       dotnet nuget add source "https://nuget.pkg.github.com/quocchungthan/index.json" \
+#       --name github --username "quocchungthan" --password "$GH_NUGET_TOKEN" --store-password-in-clear-text; \
+#     fi
 
 COPY Fences/Fences.csproj Fences/
 RUN dotnet restore Fences/Fences.csproj
