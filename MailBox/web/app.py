@@ -73,7 +73,7 @@ def csrf():
     return session['csrf']
 
 
-app.jinja_env.globals.update(csrf=csrf)
+app.jinja_env.globals.update(csrf=csrf, domain=DOMAIN)
 
 
 @app.before_request
