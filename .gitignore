@@ -1,7 +1,10 @@
 **/bin/
 **/obj/
 appsettings.*.json
+.env
 
 # Staged from Farm/wwwroot at build time - never commit these copies.
 MailBox/web/static/shared/
 MailBox/web/static/favicon.ico
+MailBox/runtime/
+MailBox/secrets/
