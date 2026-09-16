@@ -173,9 +173,16 @@ Port 80 cần tiếp tục mở cho HTTP challenge. Script dừng/khởi động
 
 ## 10. Backup và khôi phục
 
+Trên VPS, dùng `scripts/backup.sh` (bọc `manage.py backup`, thêm checksum, mã hóa GPG tùy chọn và dọn archive cũ):
+
 ```bash
-python3 scripts/manage.py backup
+cd /opt/shuneo-mail-mvp
+BACKUP_KEEP=7 BACKUP_PASSPHRASE='<passphrase>' bash scripts/backup.sh
 ```
+
+`BACKUP_KEEP` (mặc định 7) là số archive giữ lại trong `backups/`. Nếu đặt `BACKUP_PASSPHRASE`, archive được mã hóa `gpg --symmetric --cipher-algo AES256` thành `.tar.gz.gpg` và bản thường bị xóa; thiếu `gpg` thì script báo lỗi chứ không để lại file chưa mã hóa. Chạy định kỳ bằng root crontab (xem comment đầu script). Vẫn có thể gọi trực tiếp `python3 scripts/manage.py backup` nếu chỉ cần archive thô.
+
+Chạy từ xa: workflow **Backup MailBox** (`.github/workflows/backup-mailbox.yml`, chỉ `workflow_dispatch`) với input `keep`, `download`, `dry_run`. Workflow kiểm tra dung lượng trống, chạy `scripts/backup.sh` qua SSH, xác nhận `maddy` và `web` chạy lại, và chỉ tải archive về làm artifact khi `download=true` **và** có secret `MAILBOX_BACKUP_PASSPHRASE` (dùng chung các secret/vars `MAILBOX_SSH_*`, `MAILBOX_DEPLOY_DIR` như workflow deploy). Không bao giờ upload archive chưa mã hóa. Mất passphrase là mất toàn bộ archive `.gpg`.
 
 Script dừng ba dịch vụ để backup SQLite/thư nhất quán rồi bật lại. Có gián đoạn ngắn. Archive ở `backups/` chứa dữ liệu mail, cấu hình, mật khẩu và khóa: phải bảo vệ, mã hóa khi lưu nơi khác. Copy backup ra ngoài VPS, đừng chỉ giữ cùng ổ đĩa. Không chạy cùng lúc với renewal hoặc cập nhật.
 
@@ -184,6 +191,7 @@ Khôi phục vào một thư mục triển khai **mới/trống**, dùng đúng 
 ```bash
 cd /opt/shuneo-mail-mvp-restored
 # Thư mục này phải có mã nguồn đã giải nén từ gói ZIP và chưa chạy init/up.
+gpg --batch --decrypt --output backup.tar.gz /duong-dan/backup.tar.gz.gpg   # chỉ khi archive .gpg
 tar -xzf /duong-dan/backup.tar.gz
 docker compose up -d --build
 ```
