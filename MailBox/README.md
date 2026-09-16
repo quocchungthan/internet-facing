@@ -239,6 +239,57 @@ Mở `https://localhost:8443`. Chứng chỉ thử tự ký nên trình duyệt 
 
 Các bài test chỉ gửi giữa hai tài khoản local, kiểm tra Sent, tiếng Việt, escaping HTML, CSRF, injection, SMTP authentication, sender impersonation và open relay. Không dùng test này trên production.
 
+### Vì sao `.env` viết tay là chưa đủ
+
+Chạy `docker compose up` với một `.env` tự viết tay (bỏ qua `init --local`) sẽ làm Maddy crash-loop:
+
+```text
+Error: failed to load /etc/letsencrypt/live/mail.localhost/fullchain.pem and /etc/letsencrypt/live/mail.localhost/privkey.pem: open .../fullchain.pem: no such file or directory
+```
+
+`maddy/maddy.conf` khai báo cứng đường dẫn chứng chỉ:
+
+```text
+tls file /etc/letsencrypt/live/$(hostname)/fullchain.pem /etc/letsencrypt/live/$(hostname)/privkey.pem
+```
+
+`$(hostname)` chính là `MAIL_HOSTNAME`. Maddy không tự sinh chứng chỉ: hai file phải tồn tại trong `runtime/letsencrypt/live/<MAIL_HOSTNAME>/` **trước khi** container khởi động. `init --domain ... --local` là bước sinh ra chúng (self-signed 14 ngày, SAN `<host>` + `localhost`), đồng thời ghi `runtime/ca/test-ca.pem`, đặt `SSL_CERT_FILE=/extra-ca/test-ca.pem` để web tin chứng chỉ đó, và remap cổng về loopback (`BIND_IP=127.0.0.1`, SMTP 2525, submission 1587, IMAP 1993, HTTP 8080, HTTPS 8443). Bản production dùng `manage.py certificate` thay cho bước này. Không có `.env` viết tay nào thay thế được việc sinh chứng chỉ.
+
+### Windows + Docker Desktop
+
+Chạy tất cả lệnh **từ trong thư mục `MailBox/`**:
+
+```powershell
+cd C:\duong-dan\internet-facing\MailBox
+py -3 scripts\manage.py init --domain example.test --local
+docker compose up -d --build
+py -3 scripts\manage.py accounts
+```
+
+Lưu ý riêng cho Windows:
+
+- `python3` trên PATH thường là stub Microsoft Store và báo "Python was not found". Dùng `py -3` (hoặc `python`) thay cho `python3` trong mọi lệnh của README này.
+- Trước khi `--build`, phải stage asset dùng chung, nếu không `web/Dockerfile` chặn build: `py -3 MailBox\scripts\stage-shared-assets.py` (chạy từ repo root).
+- Nếu gọi từ repo root bằng `docker compose -f MailBox\compose.yaml ...`, project directory vẫn là `MailBox\`, nên các bind mount `./runtime/...`, `./maddy/maddy.conf` resolve theo `MailBox\` và `.env` được nạp mặc định là `MailBox\.env`. Thêm `--env-file .env` ở repo root sẽ **ghi đè** file đó bằng một `.env` khác domain/cổng — đây đúng là cách tái tạo lỗi chứng chỉ ở trên. Đừng đặt `.env` ở repo root cho stack này.
+- `compose.yaml` chỉ publish web ở `127.0.0.1:${WEB_PORT:-8000}`; `HTTP_PORT`/`HTTPS_PORT` dành cho Caddy trên host. Trên máy local không có Caddy thì mở `http://127.0.0.1:8000`, còn `https://localhost:8443` và `tests/integration.py` (vốn gọi `https://localhost:$HTTPS_PORT`) sẽ không chạy được nếu chưa dựng reverse proxy TLS.
+- File rỗng `runtime/mail/maddy.conf` xuất hiện trên host là artifact của bind mount Docker Desktop; không xóa, không sửa.
+
+### Lưu ý khi chạy local
+
+- `init` từ chối ghi đè `.env` đã có (`.env already exists; refusing to overwrite domain or credentials.`). Muốn đổi domain thì dùng thư mục giải nén mới/sạch.
+- `certificate` và `renew` từ chối chạy khi `LOCAL_TEST=1`. Muốn lên production phải tạo thư mục triển khai riêng, không tái dùng `runtime/` của bản local.
+- Chứng chỉ thử hết hạn sau 14 ngày; trình duyệt và mail client sẽ cảnh báo vì nó tự ký.
+- Domain `.test` không gửi/nhận Internet. SPF/DKIM/DMARC và khả năng vào Inbox Gmail **không** kiểm chứng được ở local.
+
+### Dọn dẹp
+
+```powershell
+cd C:\duong-dan\internet-facing\MailBox
+docker compose down
+```
+
+`down` không xóa `runtime/`. Với bản local, xóa được `runtime/`, `.env` và `secrets/accounts.json` để làm lại từ đầu (mất thư và mật khẩu thử). Với bản production, **không** xóa `runtime/` — đó là mail, database và khóa TLS thật.
+
 ## Đóng gói lại
 
 ```bash
