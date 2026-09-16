@@ -96,40 +96,37 @@ The active deployment uses Caddy for HTTPS and runs the container on loopback po
 docker build -f Fences/Dockerfile -t shuneo-fences .
 ```
 
-Create the runtime environment file and two certificate files on the VPS. The files must be readable by the Docker daemon and should be restricted to the deployment operator:
+Before the first deployment, configure the GitHub `production` environment secrets `VPS_HOST`, `VPS_PORT`, `VPS_USER`, `VPS_SSH_KEY`, `VPS_KNOWN_HOSTS`, and `FENCES_BOOTSTRAP_DOTENV`. In the GitHub Environment UI, require reviewers, restrict deployments to the protected deployment branch, and run this workflow only from that branch; these controls are Environment and branch-protection configuration, not something the YAML can fully enforce. `VPS_USER` must be the root SSH account. `FENCES_BOOTSTRAP_DOTENV` is the complete operator-filled content of [`Fences/fences.env.example`](fences.env.example), including GitHub OAuth credentials and OIDC client entries. It must not contain certificate paths, certificate passwords, or persistent-storage paths; those values are provisioner-managed. It is a bootstrap input, not a deployment secret, and never contains generated PFX passwords.
+
+Run **Bootstrap Fences OIDC certificates** manually from GitHub Actions and type the exact confirmation `BOOTSTRAP_FENCES`. The workflow pins SSH host verification with `VPS_KNOWN_HOSTS`, transfers the bootstrap input in a mode `600` temporary file, and never logs or exports its contents. It first refuses when either final Fences output exists. It creates `/etc/shuneo` and `/var/lib/fences` only when absent; existing directories are not changed and must already be root-owned, non-symlink directories. `/etc/shuneo` must not be group- or other-writable, and `/var/lib/fences` must be mode `700`. It then transfers the provisioner into a root-only temporary directory on the VPS.
+
+For an offline root-session alternative, create a runtime environment input from [`Fences/fences.env.example`](fences.env.example). The same template rules apply.
 
 ```text
-install -d -m 700 /etc/shuneo/fences-secrets /var/lib/fences
-install -m 600 /dev/null /etc/shuneo/fences.env
-install -m 600 /dev/null /etc/shuneo/fences-secrets/oidc-signing.pfx
-install -m 600 /dev/null /etc/shuneo/fences-secrets/oidc-encryption.pfx
+sudo install -o root -g root -m 600 Fences/fences.env.example /root/fences.bootstrap.env
+sudoedit /root/fences.bootstrap.env
+sudo bash Fences/scripts/provision-oidc-certificates.sh --runtime-env-file /root/fences.bootstrap.env
 ```
 
-Generate or provision separate private-key PFX files for signing and encryption. Do not reuse the same certificate for both purposes. Put their passwords in `/etc/shuneo/fences.env`:
+The provisioner requires a regular root-owned input file with mode `600`; it reads it as data and never sources it. It preserves comments and dotenv values, rejects malformed or duplicate assignments, blank required values, certificate password overrides, and managed-value conflicts. At least one OIDC client must provide a nonblank `ClientId` and matching exact `RedirectUris__0`. It uses only `/etc/shuneo/fences-secrets` and requires `/etc/shuneo` to be root-owned, non-symlinked, and not group- or other-writable before staging the complete secret set in a root-owned temporary sibling directory.
+
+On success, `/etc/shuneo/fences-secrets` is root-owned mode `700`, both PFX files are root-owned mode `600`, and `/etc/shuneo/fences.env` is root-owned mode `600`. The final environment includes the operator configuration plus authoritative certificate paths, generated certificate passwords, and persistent-storage paths. Runtime values remain on the VPS.
 
 ```text
-ASPNETCORE_ENVIRONMENT=Production
-Authentication__GitHub__ClientId=<github-client-id>
-Authentication__GitHub__ClientSecret=<github-client-secret>
-IdentityApp__OidcIssuer=https://identity.eldervibe.dev
-IdentityApp__OidcSigningCertificatePath=/run/secrets/oidc-signing.pfx
-IdentityApp__OidcSigningCertificatePassword=<signing-pfx-password>
-IdentityApp__OidcEncryptionCertificatePath=/run/secrets/oidc-encryption.pfx
-IdentityApp__OidcEncryptionCertificatePassword=<encryption-pfx-password>
-IdentityApp__IdentityDatabasePath=/var/lib/fences/identity.db
-IdentityApp__DataProtectionKeysPath=/var/lib/fences/keys
-IdentityApp__OidcClients__0__ClientId=<client-id>
-IdentityApp__OidcClients__0__DisplayName=<client-name>
-IdentityApp__OidcClients__0__RedirectUris__0=https://<app-host>/oauth/callback
-IdentityApp__OidcClients__0__PostLogoutRedirectUris__0=https://<app-host>/
+sudo stat -c '%a %U:%G %n' /etc/shuneo/fences.env /etc/shuneo/fences-secrets /etc/shuneo/fences-secrets/oidc-*.pfx
+sudo test -s /etc/shuneo/fences.env
+sudo test -s /etc/shuneo/fences-secrets/oidc-signing.pfx
+sudo test -s /etc/shuneo/fences-secrets/oidc-encryption.pfx
 ```
+
+The bootstrap is intentionally first-time-only and refuses to run if either final destination exists. If an installation failure leaves a destination behind, inspect it in a private root session, remove only the incomplete Fences material after confirming it contains nothing needed, then rerun the complete bootstrap. Certificate rotation requires a separate planned replacement procedure.
 
 `Fences/scripts/deploy-fences.sh` is the service-specific wrapper for `deployment/deploy-caddy-service.sh`. It mounts `/etc/shuneo/fences-secrets` read-only inside the container at `/run/secrets`, mounts `/var/lib/fences` for persistent state, and creates the Caddy site for `identity.eldervibe.dev`.
 
-After loading the image on the VPS, run:
+For a manual deployment after bootstrap, run the root-only wrapper as root:
 
 ```text
-FENCES_IMAGE=shuneo-fences:<image-tag> \
+sudo env FENCES_IMAGE=shuneo-fences:<image-tag> \
 	bash Fences/scripts/deploy-fences.sh
 ```
 
@@ -139,20 +136,6 @@ The deployment lock is service-specific by default. The managed Caddy fragment i
 
 The VPS Caddy configuration and DNS remain operator-managed. The GitHub OAuth callback is `https://identity.eldervibe.dev/signin-github`.
 
-## GitHub Actions deployment
+## Automated image deployment
 
-`.github/workflows/deploy-fences.yml` can be started with **Run workflow**. It calls `.github/workflows/reusable-deploy-service.yml`, which checks out the repository, builds and transfers the image over SSH, then streams the common deployment script and the Fences wrapper. The workflow does not configure DNS, Caddy, application secrets, or certificates.
-
-Configure a GitHub `production` environment with these secrets:
-
-- `VPS_HOST`: VPS hostname or IP address
-- `VPS_PORT`: SSH port
-- `VPS_USER`: SSH user with permission to run Docker
-- `VPS_SSH_KEY`: private key for that user
-- `VPS_KNOWN_HOSTS`: pinned `ssh-keyscan` output for the VPS host and port
-
-Before the first workflow deployment, install Docker and Caddy on the VPS, grant the SSH user Docker access, create `/etc/shuneo/fences.env`, create `/etc/shuneo/fences-secrets` with both PFX files, and create durable writable `/var/lib/fences` storage. Caddy must import `/etc/caddy/sites/*.caddy`; DNS for `identity.eldervibe.dev` must point to the VPS and ports 80/443 must be available. Keep the environment file and certificate files readable only by the deployment operator or its Docker access group.
-
-The SSH user must be able to reload Caddy and use Docker. The deploy script requires `flock`, `systemctl`, and the configured Caddy and Docker binaries.
-
-Future services only need a caller workflow and a service wrapper. The caller should invoke `reusable-deploy-service.yml` with the service image name and tag, Docker context and Dockerfile, wrapper path, common script path, and the wrapper's runtime image environment variable name. The wrapper should export the service-specific deployment values and execute the transferred common script, following `Fences/scripts/deploy-fences.sh` as the template.
+The automated deployment transfers and starts the image only; it does not configure DNS, application runtime values, or certificates. Configure `VPS_USER` as the root SSH account: the shared deployment script performs Caddy and Docker operations that require root, and the Fences wrapper rejects non-root execution before it reads root-only runtime files. There is no GitHub runtime dotenv secret or runtime-configuration transport. The deploy preflight requires `/etc/shuneo` to be root-owned, non-symlinked, and not group- or other-writable; `/etc/shuneo/fences-secrets` must be root-owned mode `700`; and the environment/PFX files must be root-owned mode `600`, all regular non-symlink paths. The deploy script requires `flock`, `systemctl`, and the configured Caddy and Docker binaries.
