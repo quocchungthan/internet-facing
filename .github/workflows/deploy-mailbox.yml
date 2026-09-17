@@ -316,23 +316,19 @@ jobs:
           SSH_PORT: ${{ secrets.VPS_PORT || '22' }}
           DEPLOY_DIR: ${{ steps.derive.outputs.deploy_dir }}
           MAIL_HOSTNAME: ${{ steps.derive.outputs.mail_hostname }}
-          ACME_EMAIL: ${{ secrets.ACME_EMAIL || vars.ACME_EMAIL }}
-          ALLOW_CERT_GENERATION: ${{ !inputs.dry_run }}
         run: |
           set -euo pipefail
 
           port="${SSH_PORT:-22}"
           ssh_opts=(-i ~/.ssh/id_deploy -p "$port" -o BatchMode=yes -o ConnectTimeout=15)
-          acme_email_b64="$(printf '%s' "$ACME_EMAIL" | base64 -w0)"
 
           summary() { echo "$1" >> "$GITHUB_STEP_SUMMARY"; }
           summary "### 4. VPS state"
           summary ""
 
           if ! report="$(ssh "${ssh_opts[@]}" "$SSH_USER@$SSH_HOST" \
-          "DEPLOY_DIR='$DEPLOY_DIR' MAIL_HOSTNAME='$MAIL_HOSTNAME' ACME_EMAIL_B64='$acme_email_b64' ALLOW_CERT_GENERATION='$ALLOW_CERT_GENERATION' bash -s" <<'REMOTE'
+          "DEPLOY_DIR='$DEPLOY_DIR' MAIL_HOSTNAME='$MAIL_HOSTNAME' bash -s" <<'REMOTE'
           set -uo pipefail
-          ACME_EMAIL="$(printf '%s' "$ACME_EMAIL_B64" | base64 -d 2>/dev/null || true)"
           echo "ssh=OK"
           docker_state=MISSING
           compose_state=MISSING
@@ -361,30 +357,11 @@ jobs:
             fi
             [ "${1:-}" = quiet ] && return 1
             echo "cert=MISSING"
+            echo "cert_note=will be generated after source upload in deploy job"
             return 1
           }
 
-          if ! cert_status quiet; then
-            if [ "$ALLOW_CERT_GENERATION" = true ] && [ "$deploy_dir_state" = OK ] && [ "$env_file_state" = OK ] && [ "$accounts_state" = OK ] && [[ "$docker_state" == OK* ]] && [[ "$compose_state" == OK* ]] && [ -n "$ACME_EMAIL" ]; then
-              echo "cert_attempt=STARTED (automatic generation via scripts/manage.py certificate)"
-              cert_log="$(mktemp)"
-              if (cd "$DEPLOY_DIR" && python3 scripts/manage.py certificate --email "$ACME_EMAIL") >"$cert_log" 2>&1; then
-                echo "cert_attempt=OK"
-              else
-                exit_code=$?
-                echo "cert_attempt=FAILED (exit $exit_code)"
-                sed -E 's/[[:alnum:]._%+-]+@[[:alnum:].-]+\.[[:alpha:]]{2,}/<redacted-email>/g' "$cert_log" | tail -n 40
-              fi
-              rm -f "$cert_log"
-              cert_status
-            elif [ "$ALLOW_CERT_GENERATION" != true ]; then
-              echo "cert_attempt=SKIPPED (dry_run=true; real deploy preflight will generate it when DNS and port 80 are ready)"
-              cert_status
-            else
-              echo "cert_attempt=SKIPPED (requires deploy_dir, .env, accounts, Docker, Compose, and ACME_EMAIL)"
-              cert_status
-            fi
-          fi
+          cert_status || true
           exit 0
           REMOTE
           )"; then
@@ -408,8 +385,7 @@ jobs:
           grep -q '^env_file=OK' <<<"$report"   || { summary "- FAIL — \`.env\` is missing: run \`manage.py init\` manually (README section 3)."; blocking=1; }
           grep -q '^accounts=OK' <<<"$report"   || { summary "- FAIL — \`secrets/accounts.json\` is missing: run \`manage.py init\` manually (README section 3)."; blocking=1; }
           if grep -q '^cert=MISSING' <<<"$report"; then
-            summary "- FAIL — no TLS certificate for \`$MAIL_HOSTNAME\`; automatic generation did not complete. Verify DNS, port 80 reachability, and Caddy/Certbot output above. Manual fallback: \`python3 scripts/manage.py certificate --email <existing-email>\`."
-            blocking=1
+            summary "- NOTE — no TLS certificate for \`$MAIL_HOSTNAME\` yet. This is not a blocking preflight failure; the deploy job generates it after uploading MailBox source."
           fi
 
           summary ""
@@ -456,7 +432,8 @@ jobs:
           **C. One-time bootstrap on the VPS (README sections 3-7)**
           Run these yourself in \`$DEPLOY_DIR\`. The deploy job refuses to run init/accounts because
           re-running them can overwrite existing credentials and mail data. Certificate generation is automated when
-          DNS and port 80 are ready; manual fallback is shown below if Let's Encrypt fails.
+          MailBox source has been uploaded, so \`cert=MISSING\` in preflight is not fatal. DNS and port 80 must be
+          ready before the deploy job can issue the certificate; manual fallback is shown below if Let's Encrypt fails.
           \`\`\`bash
           cd $DEPLOY_DIR
           python3 scripts/manage.py init --domain $BASE_DOMAIN --hostname $MAIL_HOSTNAME
@@ -572,6 +549,56 @@ jobs:
             --exclude '.pytest_cache/' \
             -e "ssh -i $HOME/.ssh/id_deploy -p $port -o BatchMode=yes -o ConnectTimeout=15" \
             MailBox/ "$SSH_USER@$SSH_HOST:$DEPLOY_DIR/"
+
+      - name: Ensure TLS certificate exists
+        shell: bash
+        env:
+          SSH_HOST: ${{ secrets.VPS_HOST }}
+          SSH_USER: ${{ secrets.VPS_USER }}
+          SSH_PORT: ${{ secrets.VPS_PORT || '22' }}
+          DEPLOY_DIR: ${{ needs.preflight.outputs.deploy_dir }}
+          MAIL_HOSTNAME: ${{ needs.preflight.outputs.mail_hostname }}
+          ACME_EMAIL: ${{ secrets.ACME_EMAIL || vars.ACME_EMAIL }}
+        run: |
+          set -euo pipefail
+          port="${SSH_PORT:-22}"
+          acme_email_b64="$(printf '%s' "$ACME_EMAIL" | base64 -w0)"
+          ssh -i ~/.ssh/id_deploy -p "$port" -o BatchMode=yes -o ConnectTimeout=15 \
+            "$SSH_USER@$SSH_HOST" "DEPLOY_DIR='$DEPLOY_DIR' MAIL_HOSTNAME='$MAIL_HOSTNAME' ACME_EMAIL_B64='$acme_email_b64' bash -s" <<'REMOTE'
+          set -euo pipefail
+          ACME_EMAIL="$(printf '%s' "$ACME_EMAIL_B64" | base64 -d 2>/dev/null || true)"
+          cert_dir="$DEPLOY_DIR/runtime/letsencrypt/live/$MAIL_HOSTNAME"
+          cert="$cert_dir/fullchain.pem"
+          key="$cert_dir/privkey.pem"
+
+          if [ -s "$cert" ] && [ -s "$key" ]; then
+            echo "TLS certificate already exists for $MAIL_HOSTNAME."
+            exit 0
+          fi
+
+          if [ -z "$ACME_EMAIL" ]; then
+            echo "ACME_EMAIL is required to issue the TLS certificate."
+            exit 1
+          fi
+
+          cd "$DEPLOY_DIR"
+          echo "TLS certificate missing for $MAIL_HOSTNAME; starting Let's Encrypt issuance."
+          cert_log="$(mktemp)"
+          if python3 scripts/manage.py certificate --email "$ACME_EMAIL" >"$cert_log" 2>&1; then
+            rm -f "$cert_log"
+          else
+            exit_code=$?
+            sed -E 's/[[:alnum:]._%+-]+@[[:alnum:].-]+\.[[:alpha:]]{2,}/<redacted-email>/g' "$cert_log" | tail -n 40
+            rm -f "$cert_log"
+            exit "$exit_code"
+          fi
+
+          if [ ! -s "$cert" ] || [ ! -s "$key" ]; then
+            echo "Certificate command completed but expected certificate files are still missing."
+            exit 1
+          fi
+          echo "TLS certificate ready for $MAIL_HOSTNAME."
+          REMOTE
 
       - name: Build and start services
         shell: bash
