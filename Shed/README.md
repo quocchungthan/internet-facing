@@ -78,6 +78,8 @@ To authenticate Seafile users via `identity.eldervibe.dev`:
    OAUTH_CREATE_UNKNOWN_USER = True
    ```
 
+   The template also sets `CSRF_TRUSTED_ORIGINS` and `SECURE_PROXY_SSL_HEADER` for HTTPS behind Caddy. If the stack was already deployed, copy the updated template to `$STORAGE_DEPLOY_DIR/data/seafile/conf/seahub_settings.py` only after reviewing any local changes, then restart `seafile-server`.
+
 3. **Restart Seahub**:
    ```bash
    docker exec -it seafile-server /opt/seafile/seafile-server-latest/seahub.sh restart

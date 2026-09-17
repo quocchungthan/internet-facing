@@ -8,6 +8,8 @@ import os
 # ==========================================
 SERVICE_URL = os.environ.get('SEAFILE_SERVICE_URL', 'https://storage.eldervibe.dev')
 FILE_SERVER_ROOT = os.environ.get('SEAFILE_FILE_SERVER_ROOT', 'https://storage.eldervibe.dev/seafhttp')
+CSRF_TRUSTED_ORIGINS = [SERVICE_URL.rstrip('/')]
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # ==========================================
 # OpenID Connect / OAuth2 SSO with Fences (sub/identity)

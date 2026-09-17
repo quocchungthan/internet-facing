@@ -22,6 +22,14 @@ install -d -m 0755 "$CADDY_SITES_DIR"
 if [[ -n "${STORAGE_SOURCE_DIR:-}" ]] && [[ -f "$STORAGE_SOURCE_DIR/docker-compose.yml" ]]; then
     cp "$STORAGE_SOURCE_DIR/docker-compose.yml" "$STORAGE_DEPLOY_DIR/docker-compose.yml"
 fi
+if [[ -n "${STORAGE_SOURCE_DIR:-}" ]] && [[ -f "$STORAGE_SOURCE_DIR/conf/seahub_settings_template.py" ]]; then
+    seahub_config_dir="$STORAGE_DEPLOY_DIR/data/seafile/conf"
+    seahub_config="$seahub_config_dir/seahub_settings.py"
+    install -d -m 0750 "$seahub_config_dir"
+    if [[ ! -e "$seahub_config" ]]; then
+        install -m 0640 "$STORAGE_SOURCE_DIR/conf/seahub_settings_template.py" "$seahub_config"
+    fi
+fi
 
 # 1. Update Caddy site configuration
 fragment="$CADDY_SITES_DIR/$SERVICE_DOMAIN.caddy"
