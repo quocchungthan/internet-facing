@@ -4,6 +4,18 @@ Open-source cloud storage powered by [Seafile Community Edition](https://github.
 
 Replaces previous custom-built storage implementation (`Shed`) with official, production-grade Seafile server components while keeping the repository folder name `Shed/`.
 
+## GitHub workflows
+
+The storage deploy and backup workflows use the `hostkey-server` environment. Configure these environment secrets:
+
+- `VPS_HOST`, `VPS_PORT`, `VPS_USER`, `VPS_SSH_KEY`, `VPS_KNOWN_HOSTS`
+
+Configure this environment variable:
+
+- `STORAGE_DEPLOY_DIR`, an absolute VPS path such as `/srv/storage`
+
+The backup workflow leaves the archive on the VPS and prints an `scp` command for manual copy-out. It does not upload a GitHub artifact.
+
 ---
 
 ## Architecture
@@ -17,10 +29,10 @@ Replaces previous custom-built storage implementation (`Shed`) with official, pr
 
 ## Directory Structure on VPS
 
-- Compose & root config: `/srv/storage/docker-compose.yml`
-- MariaDB data: `/srv/storage/mysql`
-- Seafile & Seahub data / configs: `/srv/storage/data`
-  - Seahub settings: `/srv/storage/data/seafile/conf/seahub_settings.py`
+- Compose & root config: `$STORAGE_DEPLOY_DIR/docker-compose.yml`
+- MariaDB data: `$STORAGE_DEPLOY_DIR/mysql`
+- Seafile & Seahub data / configs: `$STORAGE_DEPLOY_DIR/data`
+   - Seahub settings: `$STORAGE_DEPLOY_DIR/data/seafile/conf/seahub_settings.py`
 
 ---
 
