@@ -316,35 +316,76 @@ jobs:
           SSH_PORT: ${{ secrets.VPS_PORT || '22' }}
           DEPLOY_DIR: ${{ steps.derive.outputs.deploy_dir }}
           MAIL_HOSTNAME: ${{ steps.derive.outputs.mail_hostname }}
+          ACME_EMAIL: ${{ secrets.ACME_EMAIL || vars.ACME_EMAIL }}
+          ALLOW_CERT_GENERATION: ${{ !inputs.dry_run }}
         run: |
           set -euo pipefail
 
           port="${SSH_PORT:-22}"
           ssh_opts=(-i ~/.ssh/id_deploy -p "$port" -o BatchMode=yes -o ConnectTimeout=15)
+          acme_email_b64="$(printf '%s' "$ACME_EMAIL" | base64 -w0)"
 
           summary() { echo "$1" >> "$GITHUB_STEP_SUMMARY"; }
           summary "### 4. VPS state"
           summary ""
 
           if ! report="$(ssh "${ssh_opts[@]}" "$SSH_USER@$SSH_HOST" \
-              "DEPLOY_DIR='$DEPLOY_DIR' MAIL_HOSTNAME='$MAIL_HOSTNAME' bash -s" <<'REMOTE'
+        "DEPLOY_DIR='$DEPLOY_DIR' MAIL_HOSTNAME='$MAIL_HOSTNAME' ACME_EMAIL_B64='$acme_email_b64' ALLOW_CERT_GENERATION='$ALLOW_CERT_GENERATION' bash -s" <<'REMOTE'
           set -uo pipefail
+          ACME_EMAIL="$(printf '%s' "$ACME_EMAIL_B64" | base64 -d 2>/dev/null || true)"
           echo "ssh=OK"
-          command -v docker >/dev/null 2>&1 && echo "docker=OK ($(docker --version 2>/dev/null))" || echo "docker=MISSING"
-          docker compose version >/dev/null 2>&1 && echo "compose=OK ($(docker compose version --short 2>/dev/null))" || echo "compose=MISSING"
-          [ -d "$DEPLOY_DIR" ] && echo "deploy_dir=OK" || echo "deploy_dir=MISSING"
-          [ -f "$DEPLOY_DIR/.env" ] && echo "env_file=OK" || echo "env_file=MISSING"
-          [ -f "$DEPLOY_DIR/secrets/accounts.json" ] && echo "accounts=OK" || echo "accounts=MISSING"
-          cert="$DEPLOY_DIR/runtime/letsencrypt/live/$MAIL_HOSTNAME/fullchain.pem"
-          if [ -f "$cert" ]; then
-            expiry=$(openssl x509 -enddate -noout -in "$cert" 2>/dev/null | cut -d= -f2)
-            echo "cert=OK (expires ${expiry:-unknown})"
-          elif [ -f "/etc/letsencrypt/live/$MAIL_HOSTNAME/fullchain.pem" ]; then
-            expiry=$(sudo -n openssl x509 -enddate -noout -in "/etc/letsencrypt/live/$MAIL_HOSTNAME/fullchain.pem" 2>/dev/null | cut -d= -f2)
-            echo "cert=OK-host (expires ${expiry:-unknown})"
-          else
+          docker_state=MISSING
+          compose_state=MISSING
+          deploy_dir_state=MISSING
+          env_file_state=MISSING
+          accounts_state=MISSING
+          command -v docker >/dev/null 2>&1 && docker_state="OK ($(docker --version 2>/dev/null))"
+          docker compose version >/dev/null 2>&1 && compose_state="OK ($(docker compose version --short 2>/dev/null))"
+          [ -d "$DEPLOY_DIR" ] && deploy_dir_state=OK
+          [ -f "$DEPLOY_DIR/.env" ] && env_file_state=OK
+          [ -f "$DEPLOY_DIR/secrets/accounts.json" ] && accounts_state=OK
+          echo "docker=$docker_state"
+          echo "compose=$compose_state"
+          echo "deploy_dir=$deploy_dir_state"
+          echo "env_file=$env_file_state"
+          echo "accounts=$accounts_state"
+
+          cert_dir="$DEPLOY_DIR/runtime/letsencrypt/live/$MAIL_HOSTNAME"
+          cert="$cert_dir/fullchain.pem"
+          key="$cert_dir/privkey.pem"
+          cert_status() {
+            if [ -s "$cert" ] && [ -s "$key" ]; then
+              expiry=$(openssl x509 -enddate -noout -in "$cert" 2>/dev/null | cut -d= -f2)
+              echo "cert=OK (expires ${expiry:-unknown})"
+              return 0
+            fi
+            [ "${1:-}" = quiet ] && return 1
             echo "cert=MISSING"
+            return 1
+          }
+
+          if ! cert_status quiet; then
+            if [ "$ALLOW_CERT_GENERATION" = true ] && [ "$deploy_dir_state" = OK ] && [ "$env_file_state" = OK ] && [ "$accounts_state" = OK ] && [[ "$docker_state" == OK* ]] && [[ "$compose_state" == OK* ]] && [ -n "$ACME_EMAIL" ]; then
+              echo "cert_attempt=STARTED (automatic generation via scripts/manage.py certificate)"
+              cert_log="$(mktemp)"
+              if (cd "$DEPLOY_DIR" && python3 scripts/manage.py certificate --email "$ACME_EMAIL") >"$cert_log" 2>&1; then
+                echo "cert_attempt=OK"
+              else
+                exit_code=$?
+                echo "cert_attempt=FAILED (exit $exit_code)"
+                sed -E 's/[[:alnum:]._%+-]+@[[:alnum:].-]+\.[[:alpha:]]{2,}/<redacted-email>/g' "$cert_log" | tail -n 40
+              fi
+              rm -f "$cert_log"
+              cert_status
+            elif [ "$ALLOW_CERT_GENERATION" != true ]; then
+              echo "cert_attempt=SKIPPED (dry_run=true; real deploy preflight will generate it when DNS and port 80 are ready)"
+              cert_status
+            else
+              echo "cert_attempt=SKIPPED (requires deploy_dir, .env, accounts, Docker, Compose, and ACME_EMAIL)"
+              cert_status
+            fi
           fi
+          exit 0
           REMOTE
           )"; then
             echo "ssh_ready=false" >> "$GITHUB_OUTPUT"
@@ -367,7 +408,7 @@ jobs:
           grep -q '^env_file=OK' <<<"$report"   || { summary "- FAIL — \`.env\` is missing: run \`manage.py init\` manually (README section 3)."; blocking=1; }
           grep -q '^accounts=OK' <<<"$report"   || { summary "- FAIL — \`secrets/accounts.json\` is missing: run \`manage.py init\` manually (README section 3)."; blocking=1; }
           if grep -q '^cert=MISSING' <<<"$report"; then
-            summary "- FAIL — no TLS certificate for \`$MAIL_HOSTNAME\`: run \`manage.py certificate --email ...\` (README section 5)."
+            summary "- FAIL — no TLS certificate for \`$MAIL_HOSTNAME\`; automatic generation did not complete. Verify DNS, port 80 reachability, and Caddy/Certbot output above. Manual fallback: \`python3 scripts/manage.py certificate --email <existing-email>\`."
             blocking=1
           fi
 
@@ -413,12 +454,13 @@ jobs:
           | TXT | \`default._domainkey\` | value printed by Maddy — see step C4 |
 
           **C. One-time bootstrap on the VPS (README sections 3-7)**
-          Run these yourself in \`$DEPLOY_DIR\`. The deploy job refuses to run them because
-          re-running them can overwrite existing credentials and mail data.
+          Run these yourself in \`$DEPLOY_DIR\`. The deploy job refuses to run init/accounts because
+          re-running them can overwrite existing credentials and mail data. Certificate generation is automated when
+          DNS and port 80 are ready; manual fallback is shown below if Let's Encrypt fails.
           \`\`\`bash
           cd $DEPLOY_DIR
           python3 scripts/manage.py init --domain $BASE_DOMAIN --hostname $MAIL_HOSTNAME
-          python3 scripts/manage.py certificate --email <an-existing-mailbox>
+          # Optional fallback only: python3 scripts/manage.py certificate --email <an-existing-mailbox>
           docker compose up -d --build
           python3 scripts/manage.py accounts
           docker compose exec maddy sh -c 'cat /data/dkim_keys/*.dns'   # C4: copy the TXT record into DNS
@@ -491,8 +533,8 @@ jobs:
               "$SSH_USER@$SSH_HOST" \
               "test -f '$DEPLOY_DIR/.env' && test -f '$DEPLOY_DIR/secrets/accounts.json'"; then
             echo "::error::'$DEPLOY_DIR/.env' or '$DEPLOY_DIR/secrets/accounts.json' is missing on the VPS."
-            echo "::error::Stopping before any upload. Run 'manage.py init', 'certificate' and 'accounts' manually"
-            echo "::error::on the VPS first (README sections 3-6). This workflow never creates or resets credentials."
+            echo "::error::Stopping before any upload. Run 'manage.py init' manually on the VPS first (README section 3)."
+            echo "::error::This workflow can create a missing certificate, but never creates or resets credentials."
             exit 1
           fi
 
