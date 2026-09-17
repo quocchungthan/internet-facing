@@ -22,7 +22,7 @@ concurrency:
 jobs:
   bootstrap:
     runs-on: ubuntu-latest
-    environment: production
+    environment: hostkey-server
 
     steps:
       - name: Confirm destructive first-run bootstrap
@@ -48,7 +48,18 @@ jobs:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
           VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
-          FENCES_BOOTSTRAP_DOTENV: ${{ secrets.FENCES_BOOTSTRAP_DOTENV }}
+          FENCES_GITHUB_CLIENT_ID: ${{ secrets.FENCES_GITHUB_CLIENT_ID }}
+          FENCES_GITHUB_CLIENT_SECRET: ${{ secrets.FENCES_GITHUB_CLIENT_SECRET }}
+          FENCES_OIDC_CLIENT_ID: ${{ secrets.FENCES_OIDC_CLIENT_ID }}
+          FENCES_BRAND_NAME: ${{ vars.FENCES_BRAND_NAME }}
+          FENCES_COOKIE_DOMAIN: ${{ vars.FENCES_COOKIE_DOMAIN }}
+          FENCES_OIDC_ISSUER: ${{ vars.FENCES_OIDC_ISSUER }}
+          FENCES_PERSISTENT_LOGIN_DAYS: ${{ vars.FENCES_PERSISTENT_LOGIN_DAYS }}
+          FENCES_ALLOWED_RETURN_HOST: ${{ vars.FENCES_ALLOWED_RETURN_HOST }}
+          FENCES_ALLOWED_CORS_ORIGIN: ${{ vars.FENCES_ALLOWED_CORS_ORIGIN }}
+          FENCES_OIDC_CLIENT_NAME: ${{ vars.FENCES_OIDC_CLIENT_NAME }}
+          FENCES_OIDC_REDIRECT_URI: ${{ vars.FENCES_OIDC_REDIRECT_URI }}
+          FENCES_OIDC_POST_LOGOUT_REDIRECT_URI: ${{ vars.FENCES_OIDC_POST_LOGOUT_REDIRECT_URI }}
         run: |
           set -euo pipefail
           umask 077
@@ -64,9 +75,13 @@ jobs:
             rm -f -- "$runtime_env_file" "$ssh_key_file" "$known_hosts_file"
           }
 
-          for required_secret in VPS_HOST VPS_PORT VPS_USER VPS_SSH_KEY VPS_KNOWN_HOSTS FENCES_BOOTSTRAP_DOTENV; do
+          for required_secret in VPS_HOST VPS_PORT VPS_USER VPS_SSH_KEY VPS_KNOWN_HOSTS \
+              FENCES_GITHUB_CLIENT_ID FENCES_GITHUB_CLIENT_SECRET FENCES_OIDC_CLIENT_ID \
+              FENCES_BRAND_NAME FENCES_COOKIE_DOMAIN FENCES_OIDC_ISSUER \
+              FENCES_PERSISTENT_LOGIN_DAYS FENCES_ALLOWED_RETURN_HOST \
+              FENCES_ALLOWED_CORS_ORIGIN FENCES_OIDC_CLIENT_NAME FENCES_OIDC_REDIRECT_URI; do
             if [[ -z "${!required_secret}" ]]; then
-              echo "::error::Missing required production environment secret: $required_secret" >&2
+              echo "::error::Missing required hostkey-server environment value: $required_secret" >&2
               exit 1
             fi
           done
@@ -74,7 +89,34 @@ jobs:
           [[ "$VPS_PORT" =~ ^[0-9]+$ ]] || { echo "::error::VPS_PORT must be numeric." >&2; exit 1; }
           [[ "$VPS_USER" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "::error::VPS_USER has an invalid format." >&2; exit 1; }
 
-          printf '%s' "$FENCES_BOOTSTRAP_DOTENV" > "$runtime_env_file"
+          for dotenv_value in \
+              FENCES_GITHUB_CLIENT_ID FENCES_GITHUB_CLIENT_SECRET FENCES_OIDC_CLIENT_ID \
+              FENCES_BRAND_NAME FENCES_COOKIE_DOMAIN FENCES_OIDC_ISSUER \
+              FENCES_PERSISTENT_LOGIN_DAYS FENCES_ALLOWED_RETURN_HOST \
+              FENCES_ALLOWED_CORS_ORIGIN FENCES_OIDC_CLIENT_NAME \
+              FENCES_OIDC_REDIRECT_URI FENCES_OIDC_POST_LOGOUT_REDIRECT_URI; do
+            if [[ "${!dotenv_value:-}" == *$'\n'* || "${!dotenv_value:-}" == *$'\r'* ]]; then
+              echo "::error::$dotenv_value must be a single-line value." >&2
+              exit 1
+            fi
+          done
+          {
+            printf '%s\n' 'ASPNETCORE_ENVIRONMENT=Production'
+            printf 'Authentication__GitHub__ClientId=%s\n' "$FENCES_GITHUB_CLIENT_ID"
+            printf 'Authentication__GitHub__ClientSecret=%s\n' "$FENCES_GITHUB_CLIENT_SECRET"
+            printf 'IdentityApp__BrandName=%s\n' "$FENCES_BRAND_NAME"
+            printf 'IdentityApp__CookieDomain=%s\n' "$FENCES_COOKIE_DOMAIN"
+            printf 'IdentityApp__OidcIssuer=%s\n' "$FENCES_OIDC_ISSUER"
+            printf 'IdentityApp__PersistentLoginDays=%s\n' "$FENCES_PERSISTENT_LOGIN_DAYS"
+            printf 'IdentityApp__AllowedReturnHosts__0=%s\n' "$FENCES_ALLOWED_RETURN_HOST"
+            printf 'IdentityApp__AllowedCorsOrigins__0=%s\n' "$FENCES_ALLOWED_CORS_ORIGIN"
+            printf 'IdentityApp__OidcClients__0__ClientId=%s\n' "$FENCES_OIDC_CLIENT_ID"
+            printf 'IdentityApp__OidcClients__0__DisplayName=%s\n' "$FENCES_OIDC_CLIENT_NAME"
+            printf 'IdentityApp__OidcClients__0__RedirectUris__0=%s\n' "$FENCES_OIDC_REDIRECT_URI"
+            if [[ -n "${FENCES_OIDC_POST_LOGOUT_REDIRECT_URI:-}" ]]; then
+              printf 'IdentityApp__OidcClients__0__PostLogoutRedirectUris__0=%s\n' "$FENCES_OIDC_POST_LOGOUT_REDIRECT_URI"
+            fi
+          } > "$runtime_env_file"
           printf '%s\n' "$VPS_SSH_KEY" > "$ssh_key_file"
           printf '%s\n' "$VPS_KNOWN_HOSTS" > "$known_hosts_file"
           chmod 600 "$runtime_env_file" "$ssh_key_file" "$known_hosts_file"

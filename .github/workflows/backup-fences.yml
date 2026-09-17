@@ -1,0 +1,62 @@
+name: Backup Fences Identity
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup-fences-production
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: Backup Fences identity state on the VPS
+    runs-on: ubuntu-latest
+    environment: hostkey-server
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          for name in VPS_HOST VPS_PORT VPS_USER VPS_SSH_KEY VPS_KNOWN_HOSTS; do
+            [[ -n "${!name:-}" ]] || { echo "::error::Missing secret $name"; exit 1; }
+          done
+          mkdir -p "$HOME/.ssh"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+          printf '%s\n' "$VPS_SSH_KEY" > "$HOME/.ssh/id_deploy"
+          chmod 600 "$HOME/.ssh/id_deploy"
+
+      - name: Run backup on VPS
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          set -euo pipefail
+          ssh -i "$HOME/.ssh/id_deploy" \
+            -p "$VPS_PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            "$VPS_USER@$VPS_HOST" 'bash -s' \
+            < Fences/scripts/backup-fences.sh | tee backup_output.log
+
+          archive_path="$(grep '^FENCES_BACKUP_ARCHIVE=' backup_output.log | cut -d= -f2-)"
+          [[ "$archive_path" == /var/backups/fences/fences-*.tar.gz ]] || {
+            echo "::error::Backup script returned an invalid archive path." >&2
+            exit 1
+          }
+          echo "Backup archive stays on VPS: $archive_path"
+          ssh -i "$HOME/.ssh/id_deploy" \
+            -p "$VPS_PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            "$VPS_USER@$VPS_HOST" "du -h -- '$archive_path'"
+          echo "Copy manually with: scp -i ~/.ssh/id_deploy -P $VPS_PORT $VPS_USER@$VPS_HOST:$archive_path ./"
