@@ -367,7 +367,7 @@ jobs:
           )"; then
             echo "ssh_ready=false" >> "$GITHUB_OUTPUT"
             summary "- FAIL — cannot reach the VPS over SSH."
-            summary "  - Verify \`VPS_HOST\`, \`VPS_USER\`, \`VPS_SSH_KEY\` and \`VPS_KNOWN_HOSTS\` in the \`production\` environment."
+            summary "  - Verify \`VPS_HOST\`, \`VPS_USER\`, \`VPS_SSH_KEY\` and \`VPS_KNOWN_HOSTS\` in the \`hostkey-server\` environment."
             summary "  - Regenerate known_hosts with \`ssh-keyscan -p <port> <host>\` and paste the output into the secret."
             summary ""
             exit 0
@@ -474,7 +474,7 @@ jobs:
     if: ${{ !inputs.dry_run && needs.preflight.outputs.ssh_ready == 'true' }}
     runs-on: ubuntu-latest
     environment:
-      name: production
+      name: hostkey-server
       url: https://${{ needs.preflight.outputs.mail_hostname }}
 
     steps:
@@ -548,7 +548,7 @@ jobs:
             for path in "${missing[@]}"; do
               echo "::error::Missing required runtime file on the VPS: $path" >&2
             done
-            echo "::error::Stopping before any upload. MAILBOX_DEPLOY_DIR in the production environment must match the directory where init was run." >&2
+            echo "::error::Stopping before any upload. MAILBOX_DEPLOY_DIR in the hostkey-server environment must match the directory where init was run." >&2
             echo "::error::This workflow excludes .env and secrets/ from uploads and never creates or resets credentials." >&2
             exit 1
           fi
