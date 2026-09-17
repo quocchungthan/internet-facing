@@ -17,7 +17,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: production
+    environment: hostkey-server
 
     steps:
       - name: Check out source
@@ -38,11 +38,27 @@ jobs:
           ssh-add - <<< "$VPS_SSH_KEY"
           echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
 
+      - name: Resolve storage deploy directory
+        env:
+          VAR_DEPLOY_DIR: ${{ vars.STORAGE_DEPLOY_DIR }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${VAR_DEPLOY_DIR:-}" ]]; then
+            echo "::error::Repository variable STORAGE_DEPLOY_DIR is required in hostkey-server."
+            exit 1
+          fi
+          if [[ "$VAR_DEPLOY_DIR" != /* ]] || [[ "$VAR_DEPLOY_DIR" == "/" ]]; then
+            echo "::error::STORAGE_DEPLOY_DIR must be an absolute path and cannot be '/'."
+            exit 1
+          fi
+          echo "STORAGE_DEPLOY_DIR=$VAR_DEPLOY_DIR" >> "$GITHUB_ENV"
+
       - name: Transfer Seafile Storage files
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_PORT: ${{ secrets.VPS_PORT }}
           VPS_USER: ${{ secrets.VPS_USER }}
+          STORAGE_DEPLOY_DIR: ${{ vars.STORAGE_DEPLOY_DIR }}
         run: |
           set -euo pipefail
           tar -C Shed -czf - . | ssh \
@@ -55,10 +71,11 @@ jobs:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_PORT: ${{ secrets.VPS_PORT }}
           VPS_USER: ${{ secrets.VPS_USER }}
+          STORAGE_DEPLOY_DIR: ${{ vars.STORAGE_DEPLOY_DIR }}
         run: |
           set -euo pipefail
           ssh \
             -p "$VPS_PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes \
             "$VPS_USER@$VPS_HOST" \
-            'STORAGE_SOURCE_DIR=/tmp/storage-deploy bash -s' \
+            "STORAGE_SOURCE_DIR=/tmp/storage-deploy STORAGE_DEPLOY_DIR='$STORAGE_DEPLOY_DIR' bash -s" \
             < Shed/deployment/deploy-storage.sh

@@ -10,11 +10,6 @@ on:
         description: 'Backup retention in days (older archives pruned)'
         required: false
         default: '14'
-      download_archive:
-        description: 'Download the created backup archive as a GitHub artifact (true/false)'
-        type: boolean
-        required: false
-        default: false
 
 permissions:
   contents: read
@@ -26,7 +21,7 @@ concurrency:
 jobs:
   backup:
     runs-on: ubuntu-latest
-    environment: production
+    environment: hostkey-server
 
     steps:
       - name: Check out source
@@ -47,41 +42,41 @@ jobs:
           ssh-add - <<< "$VPS_SSH_KEY"
           echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
 
+      - name: Resolve storage deploy directory
+        env:
+          VAR_DEPLOY_DIR: ${{ vars.STORAGE_DEPLOY_DIR }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${VAR_DEPLOY_DIR:-}" ]]; then
+            echo "::error::Repository variable STORAGE_DEPLOY_DIR is required in hostkey-server."
+            exit 1
+          fi
+          if [[ "$VAR_DEPLOY_DIR" != /* ]] || [[ "$VAR_DEPLOY_DIR" == "/" ]]; then
+            echo "::error::STORAGE_DEPLOY_DIR must be an absolute path and cannot be '/'."
+            exit 1
+          fi
+          echo "STORAGE_DEPLOY_DIR=$VAR_DEPLOY_DIR" >> "$GITHUB_ENV"
+
       - name: Trigger Remote Seafile Backup
         id: run_backup
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_PORT: ${{ secrets.VPS_PORT }}
           VPS_USER: ${{ secrets.VPS_USER }}
+          STORAGE_DEPLOY_DIR: ${{ vars.STORAGE_DEPLOY_DIR }}
           RETENTION_DAYS: ${{ github.event.inputs.retention_days || '14' }}
         run: |
           set -euo pipefail
           ssh \
             -p "$VPS_PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes \
             "$VPS_USER@$VPS_HOST" \
-            "RETENTION_DAYS='$RETENTION_DAYS' bash -s" \
+            "STORAGE_BASE_DIR='$STORAGE_DEPLOY_DIR' RETENTION_DAYS='$RETENTION_DAYS' bash -s" \
             < Shed/deployment/backup-storage.sh | tee backup_output.log
 
-          BACKUP_FILE=$(grep '^BACKUP_FILE=' backup_output.log | cut -d'=' -f2)
-          echo "backup_file=$BACKUP_FILE" >> "$GITHUB_OUTPUT"
-
-      - name: Download Backup Archive as Artifact (Optional)
-        if: ${{ github.event.inputs.download_archive == true || github.event.inputs.download_archive == 'true' }}
-        env:
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_PORT: ${{ secrets.VPS_PORT }}
-          VPS_USER: ${{ secrets.VPS_USER }}
-          BACKUP_FILE: ${{ steps.run_backup.outputs.backup_file }}
-        run: |
-          set -euo pipefail
-          mkdir -p ./downloaded-backup
-          scp -P "$VPS_PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes \
-            "$VPS_USER@$VPS_HOST:$BACKUP_FILE" ./downloaded-backup/
-
-      - name: Upload Artifact
-        if: ${{ github.event.inputs.download_archive == true || github.event.inputs.download_archive == 'true' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: seafile-backup-${{ github.run_id }}
-          path: ./downloaded-backup/*
-          retention-days: 7
+          backup_file="$(grep '^BACKUP_FILE=' backup_output.log | cut -d'=' -f2-)"
+          [[ "$backup_file" == "$STORAGE_DEPLOY_DIR/backups/"* ]] || {
+            echo "::error::Backup script returned an invalid archive path." >&2
+            exit 1
+          }
+          echo "Backup archive stays on VPS: $backup_file"
+          echo "Copy manually with: scp -P $VPS_PORT $VPS_USER@$VPS_HOST:$backup_file ./"
