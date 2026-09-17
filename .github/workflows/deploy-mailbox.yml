@@ -506,14 +506,53 @@ jobs:
         run: |
           set -euo pipefail
           port="${SSH_PORT:-22}"
-          if ! ssh -i ~/.ssh/id_deploy -p "$port" -o BatchMode=yes -o ConnectTimeout=15 \
-              "$SSH_USER@$SSH_HOST" \
-              "test -f '$DEPLOY_DIR/.env' && test -f '$DEPLOY_DIR/secrets/accounts.json'"; then
-            echo "::error::'$DEPLOY_DIR/.env' or '$DEPLOY_DIR/secrets/accounts.json' is missing on the VPS."
-            echo "::error::Stopping before any upload. Run 'manage.py init' manually on the VPS first (README section 3)."
-            echo "::error::This workflow can create a missing certificate, but never creates or resets credentials."
+          ssh -i ~/.ssh/id_deploy -p "$port" -o BatchMode=yes -o ConnectTimeout=15 \
+            "$SSH_USER@$SSH_HOST" "DEPLOY_DIR='$DEPLOY_DIR' bash -s" <<'REMOTE'
+          set -euo pipefail
+
+          env_file="$DEPLOY_DIR/.env"
+          secrets_dir="$DEPLOY_DIR/secrets"
+          accounts_file="$secrets_dir/accounts.json"
+          missing=()
+
+          echo "deploy_dir=$DEPLOY_DIR"
+          if [ -d "$DEPLOY_DIR" ]; then
+            echo "deploy_dir_exists=yes"
+            ls -ld "$DEPLOY_DIR"
+          else
+            echo "deploy_dir_exists=no"
+          fi
+
+          if [ -f "$env_file" ]; then
+            echo "env_file_exists=yes ($env_file)"
+          else
+            echo "env_file_exists=no ($env_file)"
+            missing+=("$env_file")
+          fi
+
+          if [ -d "$secrets_dir" ]; then
+            echo "secrets_dir_exists=yes ($secrets_dir)"
+            ls -ld "$secrets_dir"
+          else
+            echo "secrets_dir_exists=no ($secrets_dir)"
+          fi
+
+          if [ -f "$accounts_file" ]; then
+            echo "accounts_file_exists=yes ($accounts_file)"
+          else
+            echo "accounts_file_exists=no ($accounts_file)"
+            missing+=("$accounts_file")
+          fi
+
+          if [ "${#missing[@]}" -gt 0 ]; then
+            for path in "${missing[@]}"; do
+              echo "::error::Missing required runtime file on the VPS: $path" >&2
+            done
+            echo "::error::Stopping before any upload. MAILBOX_DEPLOY_DIR in the production environment must match the directory where init was run." >&2
+            echo "::error::This workflow excludes .env and secrets/ from uploads and never creates or resets credentials." >&2
             exit 1
           fi
+          REMOTE
 
       - name: Stage shared design assets into the MailBox payload
         shell: bash
