@@ -40,15 +40,29 @@ mv -f -- "$tmp" "$fragment"
 
 rollback() {
 	if [[ "$had_previous" == true ]]; then mv -f -- "$backup" "$fragment"; else rm -f "$fragment"; fi
-	"$CADDY_BIN" validate --config "$CADDY_CONFIG" --adapter caddyfile >/dev/null
-	systemctl reload "$CADDY_SERVICE" || true
+	if "$CADDY_BIN" validate --config "$CADDY_CONFIG" --adapter caddyfile >/dev/null; then
+		systemctl reload "$CADDY_SERVICE" || systemctl restart "$CADDY_SERVICE" || true
+	else
+		echo "Rolled back Caddy fragment, but restored Caddy config did not validate." >&2
+	fi
+}
+
+print_caddy_diagnostics() {
+	echo "Caddy reload and restart both failed. Service diagnostics follow." >&2
+	if command -v systemctl >/dev/null 2>&1; then
+		systemctl status "$CADDY_SERVICE" --no-pager -l >&2 || true
+	fi
+	if command -v journalctl >/dev/null 2>&1; then
+		journalctl -u "$CADDY_SERVICE" --no-pager -n 80 >&2 || true
+	fi
 }
 
 if ! "$CADDY_BIN" validate --config "$CADDY_CONFIG" --adapter caddyfile; then
 	rollback
 	exit 1
 fi
-if ! systemctl reload "$CADDY_SERVICE"; then
+if ! systemctl reload "$CADDY_SERVICE" && ! systemctl restart "$CADDY_SERVICE"; then
+	print_caddy_diagnostics
 	rollback
 	exit 1
 fi
