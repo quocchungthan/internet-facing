@@ -3,14 +3,14 @@ name: Deploy MailBox
 on:
   push:
     branches:
-      - 'sub/**'
+      - 'sub/mail'
     paths:
       - '.github/workflows/deploy-mailbox.yml'
 
   workflow_dispatch:
     inputs:
       subdomain:
-        description: 'Override the subdomain (default: derived from the sub/<name> branch)'
+        description: 'Override the subdomain (only valid on the sub/mail branch)'
         required: false
         type: string
       base_domain:
@@ -44,6 +44,16 @@ jobs:
       secrets_ok: ${{ steps.secret-check.outputs.secrets_ok }}
 
     steps:
+      - name: Require sub/mail branch
+        if: github.ref_name != 'sub/mail'
+        shell: bash
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          echo "::error::MailBox deploy must run from the 'sub/mail' branch, not '$REF_NAME'."
+          echo "::error::Select 'sub/mail' when using workflow_dispatch. Push deploys are only enabled for 'sub/mail'."
+          exit 1
+
       - name: Check out source
         uses: actions/checkout@v4
 
@@ -59,23 +69,20 @@ jobs:
         run: |
           set -euo pipefail
 
-          sub="${INPUT_SUBDOMAIN:-}"
-          if [[ -z "$sub" ]]; then
-            if [[ "$REF_NAME" != sub/* ]]; then
-              echo "::error::Branch '$REF_NAME' does not match the required 'sub/<name>' convention."
-              echo "::error::This workflow derives the mail subdomain from the branch name."
-              echo "::error::Fix: run on a branch such as 'sub/mail' (=> mail.<EV_DOMAIN>), or re-run via"
-              echo "::error::workflow_dispatch and supply the 'subdomain' input explicitly."
-              exit 1
-            fi
-            sub="${REF_NAME#sub/}"
+          if [[ "$REF_NAME" != "sub/mail" ]]; then
+            echo "::error::MailBox deploy must run from the 'sub/mail' branch, not '$REF_NAME'."
+            exit 1
           fi
 
-          # A branch like sub/feature/mail would leave a slash behind — reject it.
+          sub="${INPUT_SUBDOMAIN:-}"
+          if [[ -z "$sub" ]]; then
+            sub="mail"
+          fi
+
           if [[ ! "$sub" =~ ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$ ]]; then
             echo "::error::Derived subdomain '$sub' is not a valid DNS label."
             echo "::error::Expected lowercase letters, digits and hyphens (1-63 chars, no leading/trailing hyphen)."
-            echo "::error::Fix: rename the branch to 'sub/<dns-label>' or pass a valid 'subdomain' input."
+            echo "::error::Fix: re-run from the 'sub/mail' branch and pass a valid 'subdomain' input if an override is needed."
             exit 1
           fi
 
