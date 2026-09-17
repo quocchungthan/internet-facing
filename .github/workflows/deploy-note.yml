@@ -17,13 +17,29 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: production
+    environment: hostkey-server
 
     steps:
       - name: Check out source and AFFiNE
         uses: actions/checkout@v4
         with:
           submodules: recursive
+
+      - name: Resolve AFFiNE deploy dir
+        shell: bash
+        env:
+          VAR_DEPLOY_DIR: ${{ vars.AFFINE_DEPLOY_DIR }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${VAR_DEPLOY_DIR:-}" ]]; then
+            echo "::error::Repository variable AFFINE_DEPLOY_DIR is required. Create it under Settings → Secrets and variables → Actions → Variables."
+            exit 1
+          fi
+          if [[ "$VAR_DEPLOY_DIR" != /* ]] || [[ "$VAR_DEPLOY_DIR" == "/" ]]; then
+            echo "::error::AFFINE_DEPLOY_DIR must be an absolute path and cannot be '/'."
+            exit 1
+          fi
+          echo "AFFINE_DEPLOY_DIR=$VAR_DEPLOY_DIR" >> "$GITHUB_ENV"
 
       - name: Configure SSH
         env:
@@ -57,10 +73,11 @@ jobs:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_PORT: ${{ secrets.VPS_PORT }}
           VPS_USER: ${{ secrets.VPS_USER }}
+          AFFINE_DEPLOY_DIR: ${{ vars.AFFINE_DEPLOY_DIR }}
         run: |
           set -euo pipefail
           ssh \
             -p "$VPS_PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes \
             "$VPS_USER@$VPS_HOST" \
-            'AFFINE_SOURCE_DIR=/tmp/affine-selfhost bash -s' \
+            "AFFINE_SOURCE_DIR=/tmp/affine-selfhost AFFINE_DEPLOY_DIR='$AFFINE_DEPLOY_DIR' bash -s" \
             < Streams/DaHangCustom.sh
