@@ -330,7 +330,7 @@ jobs:
           summary ""
 
           if ! report="$(ssh "${ssh_opts[@]}" "$SSH_USER@$SSH_HOST" \
-        "DEPLOY_DIR='$DEPLOY_DIR' MAIL_HOSTNAME='$MAIL_HOSTNAME' ACME_EMAIL_B64='$acme_email_b64' ALLOW_CERT_GENERATION='$ALLOW_CERT_GENERATION' bash -s" <<'REMOTE'
+          "DEPLOY_DIR='$DEPLOY_DIR' MAIL_HOSTNAME='$MAIL_HOSTNAME' ACME_EMAIL_B64='$acme_email_b64' ALLOW_CERT_GENERATION='$ALLOW_CERT_GENERATION' bash -s" <<'REMOTE'
           set -uo pipefail
           ACME_EMAIL="$(printf '%s' "$ACME_EMAIL_B64" | base64 -d 2>/dev/null || true)"
           echo "ssh=OK"
