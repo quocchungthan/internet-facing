@@ -690,10 +690,104 @@ jobs:
             fi
           done
 
-          code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "https://$MAIL_HOSTNAME/" || echo 000)"
+          public_curl_stderr="$(mktemp)"
+          public_curl_exit=0
+          code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "https://$MAIL_HOSTNAME/" 2>"$public_curl_stderr")" || public_curl_exit=$?
+          public_curl_error="$(tr '\r\n' ' ' < "$public_curl_stderr" | cut -c1-240 || true)"
+          rm -f "$public_curl_stderr"
+          if [[ "$public_curl_exit" -ne 0 ]]; then
+            code=000
+          fi
+
           echo "HTTPS https://$MAIL_HOSTNAME/ -> $code"
+          if [[ "$public_curl_exit" -ne 0 ]]; then
+            echo "Public HTTPS curl exit code: $public_curl_exit"
+            if [[ -n "$public_curl_error" ]]; then
+              echo "Public HTTPS curl error: $public_curl_error"
+            fi
+          fi
+
+          diagnostics=""
+          failure_note=""
           if [[ ! "$code" =~ ^(200|301|302|303)$ ]]; then
             echo "::error::HTTPS health check for $MAIL_HOSTNAME returned $code."
+            if diagnostics="$(ssh -i ~/.ssh/id_deploy -p "$port" -o BatchMode=yes -o ConnectTimeout=15 \
+              "$SSH_USER@$SSH_HOST" "DEPLOY_DIR='$DEPLOY_DIR' MAIL_HOSTNAME='$MAIL_HOSTNAME' bash -s" <<'REMOTE'
+          set -uo pipefail
+
+          cd "$DEPLOY_DIR" 2>/dev/null || true
+
+          curl_status() {
+            name="$1"
+            shift
+            stderr_file="$(mktemp)"
+            exit_code=0
+            status="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "$@" 2>"$stderr_file")" || exit_code=$?
+            error_text="$(tr '\r\n' ' ' < "$stderr_file" | cut -c1-240 || true)"
+            rm -f "$stderr_file"
+            if [ "$exit_code" -ne 0 ]; then
+              status=000
+            fi
+            echo "${name}_code=$status"
+            echo "${name}_exit=$exit_code"
+            if [ -n "$error_text" ]; then
+              echo "${name}_error=$error_text"
+            fi
+          }
+
+          echo "### Remote HTTP checks"
+          curl_status local_https -k --resolve "$MAIL_HOSTNAME:443:127.0.0.1" "https://$MAIL_HOSTNAME/"
+          curl_status local_web "http://127.0.0.1:8000/"
+
+          echo
+          echo "### Caddy state"
+          if command -v systemctl >/dev/null 2>&1; then
+            systemctl is-active caddy 2>&1 || true
+          else
+            echo "systemctl unavailable"
+          fi
+
+          if command -v caddy >/dev/null 2>&1; then
+            caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile 2>&1 || true
+          else
+            echo "caddy command unavailable"
+          fi
+
+          echo
+          echo "### Listening ports"
+          if command -v ss >/dev/null 2>&1; then
+            ss -lntp 2>/dev/null | awk 'NR == 1 || /:(80|443|8000)([[:space:]]|$)/' || \
+              ss -lnt 2>/dev/null | awk 'NR == 1 || /:(80|443|8000)([[:space:]]|$)/' || true
+          else
+            echo "ss unavailable"
+          fi
+
+          echo
+          echo "### Recent Caddy journal"
+          if command -v journalctl >/dev/null 2>&1; then
+            journalctl -u caddy --no-pager -n 80 2>&1 || true
+          else
+            echo "journalctl unavailable"
+          fi
+
+          echo
+          echo "### Docker compose logs: web"
+          docker compose logs --tail=120 web 2>&1 || true
+
+          echo
+          echo "### Docker compose logs: maddy"
+          docker compose logs --tail=80 maddy 2>&1 || true
+          REMOTE
+            )"; then
+              echo "$diagnostics"
+              local_https_code="$(grep -E '^local_https_code=' <<<"$diagnostics" | tail -n1 | cut -d= -f2- || true)"
+              if [[ "$local_https_code" =~ ^(200|301|302|303)$ ]]; then
+                failure_note="Local Caddy route succeeded on the VPS while public HTTPS failed; likely causes are DNS, provider firewall/security-group rules, or an external proxy path."
+                echo "::notice::$failure_note"
+              fi
+            else
+              echo "::warning::Could not collect remote HTTPS failure diagnostics over SSH."
+            fi
             failed=1
           fi
 
@@ -703,10 +797,24 @@ jobs:
             echo '```text'
             echo "$states"
             echo "https://$MAIL_HOSTNAME/ -> $code"
+            if [[ "$public_curl_exit" -ne 0 ]]; then
+              echo "public curl exit: $public_curl_exit"
+              if [[ -n "$public_curl_error" ]]; then
+                echo "public curl error: $public_curl_error"
+              fi
+            fi
+            if [[ -n "$diagnostics" ]]; then
+              echo
+              echo "$diagnostics"
+            fi
+            if [[ -n "$failure_note" ]]; then
+              echo
+              echo "$failure_note"
+            fi
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
           if [[ "$failed" -ne 0 ]]; then
-            echo "::error::Post-deploy health check failed. Inspect: docker compose logs --tail=200 maddy web"
+            echo "::error::Post-deploy health check failed. See the remote diagnostics above."
             exit 1
           fi
