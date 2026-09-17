@@ -1,0 +1,487 @@
+name: Backup MailBox
+
+on:
+  # push:
+  #   branches:
+  #     - 'sub/**'
+  #   paths:
+  #     - '.github/workflows/backup-mailbox.yml'
+
+  workflow_dispatch:
+    inputs:
+      subdomain:
+        description: 'Override the subdomain (default: derived from the sub/<name> branch)'
+        required: false
+        type: string
+      base_domain:
+        description: 'Override the base domain (default: the EV_DOMAIN repository variable)'
+        required: false
+        type: string
+      keep:
+        description: 'How many archives to keep in backups/ on the VPS'
+        required: false
+        default: '7'
+        type: string
+      download:
+        description: 'Pull the encrypted archive back as a workflow artifact (requires MAILBOX_BACKUP_PASSPHRASE)'
+        required: false
+        default: false
+        type: boolean
+      dry_run:
+        description: 'Plan only — verify prerequisites and report, take no action'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup-mailbox-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: Backup MailBox on the VPS
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Derive domain from branch name
+        id: derive
+        shell: bash
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_SUBDOMAIN: ${{ inputs.subdomain }}
+          INPUT_BASE_DOMAIN: ${{ inputs.base_domain }}
+          INPUT_KEEP: ${{ inputs.keep }}
+          VAR_BASE_DOMAIN: ${{ vars.EV_DOMAIN }}
+          VAR_DEPLOY_DIR: ${{ vars.MAILBOX_DEPLOY_DIR }}
+        run: |
+          set -euo pipefail
+
+          sub="${INPUT_SUBDOMAIN:-}"
+          if [[ -z "$sub" ]]; then
+            if [[ "$REF_NAME" != sub/* ]]; then
+              echo "::error::Branch '$REF_NAME' does not match the required 'sub/<name>' convention."
+              echo "::error::This workflow derives the mail subdomain from the branch name."
+              echo "::error::Fix: run on a branch such as 'sub/mail' (=> mail.<EV_DOMAIN>), or re-run via"
+              echo "::error::workflow_dispatch and supply the 'subdomain' input explicitly."
+              exit 1
+            fi
+            sub="${REF_NAME#sub/}"
+          fi
+
+          if [[ ! "$sub" =~ ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$ ]]; then
+            echo "::error::Derived subdomain '$sub' is not a valid DNS label."
+            echo "::error::Expected lowercase letters, digits and hyphens (1-63 chars, no leading/trailing hyphen)."
+            echo "::error::Fix: rename the branch to 'sub/<dns-label>' or pass a valid 'subdomain' input."
+            exit 1
+          fi
+
+          base="${INPUT_BASE_DOMAIN:-}"
+          base="${base:-${VAR_BASE_DOMAIN:-}}"
+          if [[ -z "$base" ]]; then
+            echo "::error::No base domain is configured — refusing to guess one."
+            echo "::error::Fix: create the repository variable EV_DOMAIN (Settings → Secrets and variables →"
+            echo "::error::Actions → Variables) with your apex domain, e.g. 'example.dev'."
+            echo "::error::Or re-run this workflow via workflow_dispatch and supply the 'base_domain' input."
+            exit 1
+          fi
+          if [[ ! "$base" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$ ]]; then
+            echo "::error::Base domain '$base' is not a valid domain name."
+            exit 1
+          fi
+
+          keep="${INPUT_KEEP:-7}"
+          if [[ ! "$keep" =~ ^[0-9]+$ ]] || [[ "$keep" -lt 1 ]]; then
+            echo "::error::Input 'keep' must be a positive integer, got '$keep'."
+            echo "::error::Fix: re-run with keep=7 (or any value >= 1)."
+            exit 1
+          fi
+
+          deploy_dir="${VAR_DEPLOY_DIR:-}"
+          if [[ -z "$deploy_dir" ]]; then
+            echo "::error::No deploy directory is configured — refusing to guess one."
+            echo "::error::Fix: create the repository variable MAILBOX_DEPLOY_DIR (Settings → Secrets and variables →"
+            echo "::error::Actions → Variables) with the absolute path on the VPS, e.g. '/opt/shuneo-mail-mvp'."
+            exit 1
+          fi
+          if [[ "$deploy_dir" != /* ]] || [[ "$deploy_dir" == "/" ]]; then
+            echo "::error::Deploy directory '$deploy_dir' must be an absolute path and cannot be '/'."
+            exit 1
+          fi
+
+          {
+            echo "subdomain=$sub"
+            echo "base_domain=$base"
+            echo "mail_hostname=${sub}.${base}"
+            echo "deploy_dir=$deploy_dir"
+            echo "keep=$keep"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "Branch          : $REF_NAME"
+          echo "Mail hostname   : ${sub}.${base}"
+          echo "Deploy directory: $deploy_dir"
+          echo "Retention       : $keep archives"
+
+      - name: Check required GitHub secrets and variables
+        id: secret-check
+        shell: bash
+        env:
+          S_SSH_HOST: ${{ secrets.MAILBOX_SSH_HOST }}
+          S_SSH_USER: ${{ secrets.MAILBOX_SSH_USER }}
+          S_SSH_KEY: ${{ secrets.MAILBOX_SSH_PRIVATE_KEY }}
+          S_KNOWN_HOSTS: ${{ secrets.MAILBOX_SSH_KNOWN_HOSTS }}
+          S_PASSPHRASE: ${{ secrets.MAILBOX_BACKUP_PASSPHRASE }}
+          V_SSH_PORT: ${{ vars.MAILBOX_SSH_PORT }}
+          WANT_DOWNLOAD: ${{ inputs.download }}
+          DEPLOY_DIR: ${{ steps.derive.outputs.deploy_dir }}
+          KEEP: ${{ steps.derive.outputs.keep }}
+        run: |
+          set -euo pipefail
+
+          missing=()
+          # Values are only tested for emptiness; never printed.
+          [[ -n "${S_SSH_HOST:-}" ]]    || missing+=("secret MAILBOX_SSH_HOST")
+          [[ -n "${S_SSH_USER:-}" ]]    || missing+=("secret MAILBOX_SSH_USER")
+          [[ -n "${S_SSH_KEY:-}" ]]     || missing+=("secret MAILBOX_SSH_PRIVATE_KEY")
+          [[ -n "${S_KNOWN_HOSTS:-}" ]] || missing+=("secret MAILBOX_SSH_KNOWN_HOSTS")
+
+          has_passphrase=false
+          [[ -n "${S_PASSPHRASE:-}" ]] && has_passphrase=true
+          echo "has_passphrase=$has_passphrase" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "## MailBox backup — $DEPLOY_DIR"
+            echo
+            echo "### 1. GitHub secrets / variables"
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ ${#missing[@]} -gt 0 ]]; then
+            echo "- FAIL — the following are MISSING and must be created in repository settings:" >> "$GITHUB_STEP_SUMMARY"
+            for item in "${missing[@]}"; do
+              echo "  - \`$item\`" >> "$GITHUB_STEP_SUMMARY"
+              echo "::error::Missing $item"
+            done
+            echo "::error::Fix: add the secrets above under Settings → Secrets and variables → Actions, then re-run."
+            exit 1
+          fi
+          echo "- PASS — all required SSH secrets are present." >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ "$has_passphrase" == "true" ]]; then
+            echo "- PASS — \`MAILBOX_BACKUP_PASSPHRASE\` is set: the archive will be GPG (AES256) encrypted." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- NOTE — \`MAILBOX_BACKUP_PASSPHRASE\` is not set: the archive stays **unencrypted on the VPS** and cannot be downloaded." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          [[ -n "${V_SSH_PORT:-}" ]] || echo "- NOTE — variable \`MAILBOX_SSH_PORT\` not set; defaulting to 22." >> "$GITHUB_STEP_SUMMARY"
+          echo "- Retention: keep the newest \`$KEEP\` archives." >> "$GITHUB_STEP_SUMMARY"
+          echo >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ "$WANT_DOWNLOAD" == "true" && "$has_passphrase" != "true" ]]; then
+            echo "::error::'download' was requested but secret MAILBOX_BACKUP_PASSPHRASE is not set."
+            echo "::error::The archive contains DKIM private keys, TLS private keys and account passwords;"
+            echo "::error::this workflow never uploads an unencrypted archive as an artifact."
+            echo "::error::Fix: create the secret MAILBOX_BACKUP_PASSPHRASE (a long random passphrase, stored in your"
+            echo "::error::password manager — losing it makes every archive unreadable), then re-run with download=true."
+            echo "- FAIL — download requested without \`MAILBOX_BACKUP_PASSPHRASE\`. Refusing to export plaintext secrets." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+      - name: Set up SSH
+        shell: bash
+        env:
+          SSH_KEY: ${{ secrets.MAILBOX_SSH_PRIVATE_KEY }}
+          KNOWN_HOSTS: ${{ secrets.MAILBOX_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Verify VPS prerequisites and free disk space
+        id: preflight
+        shell: bash
+        env:
+          SSH_HOST: ${{ secrets.MAILBOX_SSH_HOST }}
+          SSH_USER: ${{ secrets.MAILBOX_SSH_USER }}
+          SSH_PORT: ${{ vars.MAILBOX_SSH_PORT }}
+          DEPLOY_DIR: ${{ steps.derive.outputs.deploy_dir }}
+        run: |
+          set -euo pipefail
+          port="${SSH_PORT:-22}"
+
+          summary() { echo "$1" >> "$GITHUB_STEP_SUMMARY"; }
+          summary "### 2. VPS state"
+          summary ""
+
+          if ! report="$(ssh -i ~/.ssh/id_deploy -p "$port" -o BatchMode=yes -o ConnectTimeout=15 \
+              "$SSH_USER@$SSH_HOST" "DEPLOY_DIR='$DEPLOY_DIR' bash -s" <<'REMOTE'
+          set -uo pipefail
+          echo "ssh=OK"
+          command -v docker >/dev/null 2>&1 && echo "docker=OK" || echo "docker=MISSING"
+          docker compose version >/dev/null 2>&1 && echo "compose=OK" || echo "compose=MISSING"
+          command -v gpg >/dev/null 2>&1 && echo "gpg=OK" || echo "gpg=MISSING"
+          [ -d "$DEPLOY_DIR" ] && echo "deploy_dir=OK" || { echo "deploy_dir=MISSING"; exit 0; }
+          cd "$DEPLOY_DIR" || exit 0
+          [ -f .env ] && echo "env_file=OK" || echo "env_file=MISSING"
+          [ -f compose.yaml ] && echo "compose_file=OK" || echo "compose_file=MISSING"
+          [ -f secrets/accounts.json ] && echo "accounts=OK" || echo "accounts=MISSING"
+          [ -f scripts/backup.sh ] && echo "backup_script=OK" || echo "backup_script=MISSING"
+          runtime_kb=$(du -sk runtime 2>/dev/null | cut -f1)
+          free_kb=$(df -Pk . | awk 'NR==2 {print $4}')
+          echo "runtime_kb=${runtime_kb:-0}"
+          echo "free_kb=${free_kb:-0}"
+          echo "existing_archives=$(ls -1 backups/*.tar.gz backups/*.tar.gz.gpg 2>/dev/null | wc -l)"
+          REMOTE
+          )"; then
+            echo "::error::Cannot reach the VPS over SSH."
+            echo "::error::Fix: verify secrets MAILBOX_SSH_HOST / MAILBOX_SSH_USER / MAILBOX_SSH_PRIVATE_KEY and"
+            echo "::error::regenerate MAILBOX_SSH_KNOWN_HOSTS with: ssh-keyscan -p <port> <host>"
+            summary "- FAIL — cannot reach the VPS over SSH."
+            exit 1
+          fi
+
+          echo "$report"
+          summary '```text'
+          summary "$report"
+          summary '```'
+
+          get() { grep -m1 "^$1=" <<<"$report" | cut -d= -f2- || true; }
+
+          blocking=0
+          for key in docker compose deploy_dir env_file compose_file accounts backup_script; do
+            if [[ "$(get "$key")" != "OK" ]]; then
+              echo "::error::VPS check '$key' failed in $DEPLOY_DIR."
+              blocking=1
+            fi
+          done
+          if [[ "$(get backup_script)" != "OK" ]]; then
+            echo "::error::Fix: run the 'Deploy MailBox' workflow first so scripts/backup.sh exists on the VPS."
+          fi
+          if [[ "$(get env_file)" != "OK" || "$(get accounts)" != "OK" ]]; then
+            echo "::error::Fix: run 'python3 scripts/manage.py init' manually on the VPS (README section 3)."
+          fi
+
+          runtime_kb="$(get runtime_kb)"; runtime_kb="${runtime_kb:-0}"
+          free_kb="$(get free_kb)"; free_kb="${free_kb:-0}"
+          if [[ "$free_kb" -lt "$runtime_kb" ]]; then
+            echo "::error::Not enough free disk space on the VPS: runtime/ is ${runtime_kb} KB but only ${free_kb} KB is free."
+            echo "::error::Fix: prune old archives in $DEPLOY_DIR/backups, or free space with 'docker system prune -f'."
+            blocking=1
+          fi
+
+          summary ""
+          summary "| Check | Value |"
+          summary "|---|---|"
+          summary "| \`runtime/\` size | $((runtime_kb / 1024)) MiB |"
+          summary "| Free disk space | $((free_kb / 1024)) MiB |"
+          summary "| Archives already present | $(get existing_archives) |"
+          summary "| gpg on VPS | $(get gpg) |"
+          summary ""
+
+          if [[ "$(get gpg)" != "OK" ]]; then
+            summary "- NOTE — \`gpg\` is missing on the VPS; encryption would fail. Install with \`sudo apt-get install -y gnupg\`."
+          fi
+
+          [[ "$blocking" -eq 0 ]] || exit 1
+          echo "Preflight passed."
+
+      - name: Report dry run and stop
+        if: ${{ inputs.dry_run }}
+        shell: bash
+        env:
+          DEPLOY_DIR: ${{ steps.derive.outputs.deploy_dir }}
+          KEEP: ${{ steps.derive.outputs.keep }}
+          HAS_PASSPHRASE: ${{ steps.secret-check.outputs.has_passphrase }}
+          WANT_DOWNLOAD: ${{ inputs.download }}
+        run: |
+          set -euo pipefail
+          {
+            echo "### 3. Dry run — nothing was executed"
+            echo
+            echo "A real run would, on \`$DEPLOY_DIR\`:"
+            echo "1. stop \`web\` and \`maddy\`, tar \`runtime\`, \`.env\`, \`secrets\`, \`maddy\`, \`compose.yaml\` into \`backups/<UTC>.tar.gz\`, restart the stack;"
+            echo "2. encryption: $([[ "$HAS_PASSPHRASE" == "true" ]] && echo 'GPG AES256 (.tar.gz.gpg)' || echo 'none — archive stays plaintext on the VPS');"
+            echo "3. keep the newest \`$KEEP\` archives and delete older ones;"
+            echo "4. artifact download: ${WANT_DOWNLOAD};"
+            echo "5. verify \`maddy\` and \`web\` are running again."
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "Dry run complete."
+
+      - name: Run backup on the VPS
+        id: run-backup
+        if: ${{ !inputs.dry_run }}
+        shell: bash
+        env:
+          SSH_HOST: ${{ secrets.MAILBOX_SSH_HOST }}
+          SSH_USER: ${{ secrets.MAILBOX_SSH_USER }}
+          SSH_PORT: ${{ vars.MAILBOX_SSH_PORT }}
+          DEPLOY_DIR: ${{ steps.derive.outputs.deploy_dir }}
+          KEEP: ${{ steps.derive.outputs.keep }}
+          BACKUP_PASSPHRASE: ${{ secrets.MAILBOX_BACKUP_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          port="${SSH_PORT:-22}"
+
+          # The passphrase travels on stdin and is read by the remote shell, so it never
+          # appears in the remote command line (visible in `ps`) or in any log.
+          set +e
+          out="$(printf '%s\n' "${BACKUP_PASSPHRASE:-}" | ssh -i ~/.ssh/id_deploy -p "$port" \
+            -o BatchMode=yes -o ConnectTimeout=15 "$SSH_USER@$SSH_HOST" \
+            "cd '$DEPLOY_DIR' && IFS= read -r BACKUP_PASSPHRASE && export BACKUP_PASSPHRASE && BACKUP_KEEP='$KEEP' bash scripts/backup.sh" 2>&1)"
+          rc=$?
+          set -e
+
+          echo "$out"
+          if [[ "$rc" -ne 0 ]]; then
+            echo "::error::scripts/backup.sh failed on the VPS (exit $rc)."
+            echo "::error::Fix: SSH in, run 'cd $DEPLOY_DIR && docker compose ps' and 'bash scripts/backup.sh' to see the failure."
+            echo "::error::If the stack is down, bring it back with 'docker compose up -d' before anything else."
+            exit "$rc"
+          fi
+
+          field() { grep -m1 "^$1=" <<<"$out" | cut -d= -f2- || true; }
+          {
+            echo "archive_path=$(field BACKUP_ARCHIVE)"
+            echo "archive_name=$(field BACKUP_NAME)"
+            echo "archive_size=$(field BACKUP_SIZE)"
+            echo "archive_sha256=$(field BACKUP_SHA256)"
+            echo "encrypted=$(field BACKUP_ENCRYPTED)"
+            echo "pruned=$(field BACKUP_PRUNED)"
+            echo "kept=$(field BACKUP_KEPT)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Verify mail services are running again
+        id: health
+        if: ${{ !inputs.dry_run }}
+        shell: bash
+        env:
+          SSH_HOST: ${{ secrets.MAILBOX_SSH_HOST }}
+          SSH_USER: ${{ secrets.MAILBOX_SSH_USER }}
+          SSH_PORT: ${{ vars.MAILBOX_SSH_PORT }}
+          DEPLOY_DIR: ${{ steps.derive.outputs.deploy_dir }}
+        run: |
+          set -euo pipefail
+          port="${SSH_PORT:-22}"
+
+          states="$(ssh -i ~/.ssh/id_deploy -p "$port" -o BatchMode=yes -o ConnectTimeout=15 \
+            "$SSH_USER@$SSH_HOST" "cd '$DEPLOY_DIR' && docker compose ps --format '{{.Service}} {{.State}}'")"
+          echo "$states"
+
+          failed=0
+          for svc in maddy web; do
+            if ! grep -Eq "^$svc (running|Up)" <<<"$states"; then
+              echo "::error::Service '$svc' is NOT running after the backup — mail is down."
+              echo "::error::Fix now: ssh to the VPS and run 'cd $DEPLOY_DIR && docker compose up -d', then 'docker compose logs --tail=200 $svc'."
+              failed=1
+            fi
+          done
+
+          state_line="$(tr '\n' ';' <<<"$states")"
+          echo "services=$state_line" >> "$GITHUB_OUTPUT"
+
+          [[ "$failed" -eq 0 ]] || exit 1
+
+      - name: Fetch encrypted archive
+        id: fetch
+        if: ${{ !inputs.dry_run && inputs.download && steps.secret-check.outputs.has_passphrase == 'true' && steps.run-backup.outputs.encrypted == 'yes' }}
+        shell: bash
+        env:
+          SSH_HOST: ${{ secrets.MAILBOX_SSH_HOST }}
+          SSH_USER: ${{ secrets.MAILBOX_SSH_USER }}
+          SSH_PORT: ${{ vars.MAILBOX_SSH_PORT }}
+          DEPLOY_DIR: ${{ steps.derive.outputs.deploy_dir }}
+          ARCHIVE_PATH: ${{ steps.run-backup.outputs.archive_path }}
+          ARCHIVE_NAME: ${{ steps.run-backup.outputs.archive_name }}
+        run: |
+          set -euo pipefail
+          port="${SSH_PORT:-22}"
+
+          if [[ "$ARCHIVE_NAME" != *.gpg ]]; then
+            echo "::error::Archive '$ARCHIVE_NAME' is not GPG-encrypted; refusing to download it."
+            exit 1
+          fi
+
+          mkdir -p artifact
+          scp -i ~/.ssh/id_deploy -P "$port" -o BatchMode=yes -o ConnectTimeout=15 \
+            "$SSH_USER@$SSH_HOST:$DEPLOY_DIR/$ARCHIVE_PATH" "artifact/$ARCHIVE_NAME"
+          ls -l "artifact/$ARCHIVE_NAME"
+          sha256sum "artifact/$ARCHIVE_NAME"
+
+      - name: Upload encrypted archive as artifact
+        if: ${{ steps.fetch.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: mailbox-backup-${{ steps.run-backup.outputs.archive_name }}
+          path: artifact/${{ steps.run-backup.outputs.archive_name }}
+          retention-days: 3
+          if-no-files-found: error
+
+      - name: Remove fetched archive from the runner
+        if: ${{ always() && steps.fetch.outcome != 'skipped' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf artifact
+          echo "Runner copy deleted."
+
+      - name: Emit backup report
+        if: ${{ always() && !inputs.dry_run }}
+        shell: bash
+        env:
+          DEPLOY_DIR: ${{ steps.derive.outputs.deploy_dir }}
+          ARCHIVE_NAME: ${{ steps.run-backup.outputs.archive_name }}
+          ARCHIVE_SIZE: ${{ steps.run-backup.outputs.archive_size }}
+          ARCHIVE_SHA: ${{ steps.run-backup.outputs.archive_sha256 }}
+          ENCRYPTED: ${{ steps.run-backup.outputs.encrypted }}
+          PRUNED: ${{ steps.run-backup.outputs.pruned }}
+          KEPT: ${{ steps.run-backup.outputs.kept }}
+          SERVICES: ${{ steps.health.outputs.services }}
+          DOWNLOADED: ${{ steps.fetch.outcome }}
+        run: |
+          set -euo pipefail
+          cat >> "$GITHUB_STEP_SUMMARY" <<EOF
+          ### 3. Backup result
+
+          | Item | Value |
+          |---|---|
+          | Archive | \`${ARCHIVE_NAME:-(not created)}\` |
+          | Size | ${ARCHIVE_SIZE:-—} |
+          | SHA-256 | \`${ARCHIVE_SHA:-—}\` |
+          | Encrypted (GPG AES256) | ${ENCRYPTED:-—} |
+          | Pruned old archives | ${PRUNED:-0} |
+          | Archives kept on VPS | ${KEPT:-—} |
+          | Service state | \`${SERVICES:-unknown}\` |
+          | Artifact uploaded | ${DOWNLOADED:-skipped} |
+
+          ---
+
+          ## ACTION REQUIRED — do this manually
+
+          **A. Copy the archive off-site.** A backup that only lives on the VPS is not a backup.
+          \`\`\`bash
+          scp -P <port> <user>@<host>:$DEPLOY_DIR/backups/${ARCHIVE_NAME:-<archive>} ./
+          \`\`\`
+          If the archive is not encrypted, encrypt it before it leaves the VPS — it contains DKIM
+          private keys, TLS private keys and the account passwords from \`secrets/accounts.json\`.
+
+          **B. Store \`MAILBOX_BACKUP_PASSPHRASE\` in a password manager.** Losing it makes every
+          \`.gpg\` archive permanently unreadable. It is never printed by this workflow.
+
+          **C. Restore procedure** — into a **new/empty** deploy directory, never over a running one:
+          \`\`\`bash
+          cd ${DEPLOY_DIR}-restored          # source already unpacked here, init NOT run
+          gpg --batch --decrypt --output restore.tar.gz ${ARCHIVE_NAME:-<archive>}   # only for .gpg
+          tar -xzf restore.tar.gz
+          docker compose up -d --build
+          \`\`\`
+          Then verify: certificate validity, webmail login, old mail readable, send/receive to Gmail.
+          If the IP changed, update A, PTR and SPF records first.
+
+          **D. Verify restores periodically.** An untested backup is an assumption, not a recovery plan.
+          EOF
