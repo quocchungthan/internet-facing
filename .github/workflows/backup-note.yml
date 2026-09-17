@@ -1,0 +1,56 @@
+name: Backup Note
+
+on:
+  workflow_dispatch:
+  ## Daily backup; comment out to disable scheduled runs
+  # schedule:
+  #   - cron: '0 3 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup-note-production
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$VPS_KNOWN_HOSTS"
+          test -n "$VPS_SSH_KEY"
+          mkdir -p "$HOME/.ssh"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+          eval "$(ssh-agent -s)"
+          ssh-add - <<< "$VPS_SSH_KEY"
+          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
+
+      - name: Run backup on VPS
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          set -euo pipefail
+          archive_path="$(ssh \
+            -p "$VPS_PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            "$VPS_USER@$VPS_HOST" \
+            'bash -s' \
+            < Streams/BackupNote.sh)"
+          echo "Backup archive stays on VPS: $archive_path"
+          ssh \
+            -p "$VPS_PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            "$VPS_USER@$VPS_HOST" \
+            "du -h '$archive_path'"

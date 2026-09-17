@@ -1,0 +1,136 @@
+name: Bootstrap Fences OIDC certificates
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type BOOTSTRAP_FENCES to create the initial Fences OIDC material
+        required: true
+        type: string
+      reason:
+        description: Optional change reason
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bootstrap-fences-production
+  cancel-in-progress: false
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Confirm destructive first-run bootstrap
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          set -euo pipefail
+          if [[ "$CONFIRMATION" != "BOOTSTRAP_FENCES" ]]; then
+            echo "::error::Confirmation must exactly equal BOOTSTRAP_FENCES." >&2
+            exit 1
+          fi
+
+      - name: Check out source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Validate provisioner syntax
+        run: bash -n Fences/scripts/provision-oidc-certificates.sh
+
+      - name: Transfer and run first-time bootstrap
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          FENCES_BOOTSTRAP_DOTENV: ${{ secrets.FENCES_BOOTSTRAP_DOTENV }}
+        run: |
+          set -euo pipefail
+          umask 077
+
+          runtime_env_file="$(mktemp)"
+          ssh_key_file="$(mktemp)"
+          known_hosts_file="$(mktemp)"
+          remote_dir=""
+          cleanup() {
+            if [[ -n "$remote_dir" ]]; then
+              ssh "${ssh_options[@]}" "$ssh_target" "rm -rf -- '$remote_dir'" >/dev/null 2>&1 || true
+            fi
+            rm -f -- "$runtime_env_file" "$ssh_key_file" "$known_hosts_file"
+          }
+
+          for required_secret in VPS_HOST VPS_PORT VPS_USER VPS_SSH_KEY VPS_KNOWN_HOSTS FENCES_BOOTSTRAP_DOTENV; do
+            if [[ -z "${!required_secret}" ]]; then
+              echo "::error::Missing required production environment secret: $required_secret" >&2
+              exit 1
+            fi
+          done
+          [[ "$VPS_HOST" =~ ^[A-Za-z0-9.:-]+$ ]] || { echo "::error::VPS_HOST has an invalid format." >&2; exit 1; }
+          [[ "$VPS_PORT" =~ ^[0-9]+$ ]] || { echo "::error::VPS_PORT must be numeric." >&2; exit 1; }
+          [[ "$VPS_USER" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "::error::VPS_USER has an invalid format." >&2; exit 1; }
+
+          printf '%s' "$FENCES_BOOTSTRAP_DOTENV" > "$runtime_env_file"
+          printf '%s\n' "$VPS_SSH_KEY" > "$ssh_key_file"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > "$known_hosts_file"
+          chmod 600 "$runtime_env_file" "$ssh_key_file" "$known_hosts_file"
+
+          ssh_options=(
+            -i "$ssh_key_file"
+            -p "$VPS_PORT"
+            -o BatchMode=yes
+            -o StrictHostKeyChecking=yes
+            -o UserKnownHostsFile="$known_hosts_file"
+            -o GlobalKnownHostsFile=/dev/null
+          )
+          ssh_target="$VPS_USER@$VPS_HOST"
+          trap cleanup EXIT
+
+          remote_dir="$(ssh "${ssh_options[@]}" "$ssh_target" 'set -euo pipefail
+            if [[ "$(id -u)" != 0 ]]; then
+              echo "VPS_USER must be root for Fences bootstrap." >&2
+              exit 1
+            fi
+            if [[ -e /etc/shuneo/fences-secrets || -L /etc/shuneo/fences-secrets || -e /etc/shuneo/fences.env || -L /etc/shuneo/fences.env ]]; then
+              echo "Refusing to bootstrap because Fences outputs already exist." >&2
+              exit 1
+            fi
+            if [[ ! -e /etc/shuneo && ! -L /etc/shuneo ]]; then
+              install -d -o root -g root -m 700 /etc/shuneo
+            elif [[ ! -d /etc/shuneo || -L /etc/shuneo ]]; then
+              echo "Expected non-symlink directory: /etc/shuneo" >&2
+              exit 1
+            fi
+            shuneo_metadata="$(stat -c "%u:%g:%a" -- /etc/shuneo)"
+            IFS=: read -r shuneo_owner shuneo_group shuneo_mode <<< "$shuneo_metadata"
+            if [[ "$shuneo_owner:$shuneo_group" != "0:0" ]] || (( (8#$shuneo_mode & 022) != 0 )); then
+              echo "Expected root-owned directory with no group or other write permission: /etc/shuneo" >&2
+              exit 1
+            fi
+            if [[ ! -e /var/lib/fences && ! -L /var/lib/fences ]]; then
+              install -d -o root -g root -m 700 /var/lib/fences
+            elif [[ ! -d /var/lib/fences || -L /var/lib/fences ]]; then
+              echo "Expected non-symlink directory: /var/lib/fences" >&2
+              exit 1
+            fi
+            if [[ "$(stat -c "%u:%g:%a" -- /var/lib/fences)" != "0:0:700" ]]; then
+              echo "Expected root-owned mode 700 directory: /var/lib/fences" >&2
+              exit 1
+            fi
+            command -v openssl >/dev/null 2>&1 || { echo "openssl is required for Fences bootstrap." >&2; exit 1; }
+            staging_dir="$(mktemp -d /tmp/fences-bootstrap.XXXXXX)"
+            chmod 700 -- "$staging_dir"
+            printf "%s\n" "$staging_dir"')"
+          [[ "$remote_dir" =~ ^/tmp/fences-bootstrap\.[A-Za-z0-9]{6}$ ]] || { echo "::error::Remote staging directory response was invalid." >&2; exit 1; }
+
+          scp "${ssh_options[@]}" \
+            Fences/scripts/provision-oidc-certificates.sh "$runtime_env_file" \
+            "$ssh_target:$remote_dir/"
+
+          remote_script_path="$remote_dir/provision-oidc-certificates.sh"
+          remote_env_path="$remote_dir/$(basename "$runtime_env_file")"
+          ssh "${ssh_options[@]}" "$ssh_target" "set -e; trap 'rm -rf -- '\''$remote_dir'\''' EXIT; chmod 700 -- '$remote_script_path'; chmod 600 -- '$remote_env_path'; bash '$remote_script_path' --runtime-env-file '$remote_env_path'"
