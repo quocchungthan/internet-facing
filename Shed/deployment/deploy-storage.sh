@@ -14,8 +14,9 @@ set -Eeuo pipefail
 
 echo "==> Deploying $SERVICE_NAME to $SERVICE_DOMAIN..."
 
-# Prepare directories
-mkdir -p "$STORAGE_DEPLOY_DIR/mysql" "$STORAGE_DEPLOY_DIR/data" "$CADDY_SITES_DIR"
+# Prepare directories. Caddy must be able to traverse and read its site fragments.
+mkdir -p "$STORAGE_DEPLOY_DIR/mysql" "$STORAGE_DEPLOY_DIR/data"
+install -d -m 0755 "$CADDY_SITES_DIR"
 
 # Copy compose configuration if provided
 if [[ -n "${STORAGE_SOURCE_DIR:-}" ]] && [[ -f "$STORAGE_SOURCE_DIR/docker-compose.yml" ]]; then
@@ -54,11 +55,13 @@ $SERVICE_DOMAIN {
     }
 }
 EOF
+chmod 0644 "$fragment_tmp"
 mv -f -- "$fragment_tmp" "$fragment"
 
 if ! "$CADDY_BIN" validate --config "$CADDY_CONFIG" --adapter caddyfile; then
     if [[ "$state" == "file" ]]; then
         mv -f -- "$fragment_backup" "$fragment"
+        chmod 0644 "$fragment"
     else
         rm -f -- "$fragment"
     fi
@@ -72,6 +75,7 @@ if ! systemctl reload "$CADDY_SERVICE"; then
     journalctl --no-pager -u "$CADDY_SERVICE" -n 80 >&2 || true
     if [[ "$state" == "file" ]]; then
         mv -f -- "$fragment_backup" "$fragment"
+        chmod 0644 "$fragment"
     else
         rm -f -- "$fragment"
     fi
