@@ -66,7 +66,17 @@ if ! "$CADDY_BIN" validate --config "$CADDY_CONFIG" --adapter caddyfile; then
     exit 1
 fi
 
-systemctl reload "$CADDY_SERVICE"
+if ! systemctl reload "$CADDY_SERVICE"; then
+    echo "Caddy reload failed; service diagnostics:" >&2
+    systemctl --no-pager --full status "$CADDY_SERVICE" >&2 || true
+    journalctl --no-pager -u "$CADDY_SERVICE" -n 80 >&2 || true
+    if [[ "$state" == "file" ]]; then
+        mv -f -- "$fragment_backup" "$fragment"
+    else
+        rm -f -- "$fragment"
+    fi
+    exit 1
+fi
 
 # 2. Run Seafile stack with Docker Compose
 cd "$STORAGE_DEPLOY_DIR"
