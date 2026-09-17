@@ -12,7 +12,7 @@
 #   - GitHub CLI (gh)
 #   - Python 3 + pip + venv
 #   - VPS Performance Tuning & Emergency Swapfile (4GB)
-#   - UFW Firewall (SSH: 22, HTTP: 80, HTTPS: 443)
+#   - UFW Firewall (SSH: 22, HTTP: 80, HTTPS: 443, SMTP: 25/465/587, IMAPS: 993)
 # ==============================================================================
 
 set -Eeuo pipefail
@@ -321,14 +321,18 @@ fi
 
 # UFW Firewall
 if [[ "$CONFIGURE_UFW" == "true" ]]; then
-    log_info "Configuring UFW (allow 22/SSH, 80/HTTP, 443/HTTPS)..."
+    log_info "Configuring UFW (allow 22/SSH, 80/HTTP, 443/HTTPS, 25/SMTP, 465/SMTPS, 587/submission, 993/IMAPS)..."
     ufw default deny incoming
     ufw default allow outgoing
     ufw allow 22/tcp comment 'SSH'
     ufw allow 80/tcp comment 'HTTP (Caddy)'
     ufw allow 443/tcp comment 'HTTPS (Caddy)'
+    ufw allow 25/tcp comment 'SMTP inbound mail'
+    ufw allow 465/tcp comment 'SMTPS / submissions'
+    ufw allow 587/tcp comment 'Mail submission (STARTTLS)'
+    ufw allow 993/tcp comment 'IMAPS'
     ufw --force enable
-    log_success "UFW firewall enabled and ports 22, 80, 443 opened"
+    log_success "UFW firewall enabled and ports 22, 25, 80, 443, 465, 587, 993 opened"
 fi
 
 # ── Post-Installation Verification Report ─────────────────────────────────────
