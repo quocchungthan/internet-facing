@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-: "${STORAGE_BASE_DIR:=/srv/storage}"
+: "${STORAGE_DEPLOY_DIR:=/srv/storage}"
+: "${STORAGE_BASE_DIR:=$STORAGE_DEPLOY_DIR}"
 : "${BACKUP_DIR:=$STORAGE_BASE_DIR/backups}"
 : "${RETENTION_DAYS:=14}"
 : "${MYSQL_CONTAINER:=seafile-mysql}"
@@ -10,6 +11,9 @@ set -Eeuo pipefail
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 BACKUP_NAME="seafile_backup_${TIMESTAMP}"
 TARGET_DIR="${BACKUP_DIR}/${BACKUP_NAME}"
+
+[[ -d "$STORAGE_BASE_DIR" ]] || { echo "STORAGE_DEPLOY_DIR does not exist: $STORAGE_BASE_DIR" >&2; exit 1; }
+command -v docker >/dev/null 2>&1 || { echo "docker is required for a consistent Seafile backup." >&2; exit 1; }
 
 echo "==> Starting Seafile storage backup: ${BACKUP_NAME}"
 mkdir -p "${TARGET_DIR}"
