@@ -22,11 +22,6 @@ on:
         required: false
         default: '7'
         type: string
-      download:
-        description: 'Pull the encrypted archive back as a workflow artifact (requires MAILBOX_BACKUP_PASSPHRASE)'
-        required: false
-        default: false
-        type: boolean
       dry_run:
         description: 'Plan only — verify prerequisites and report, take no action'
         required: false
@@ -44,7 +39,7 @@ jobs:
   backup:
     name: Backup MailBox on the VPS
     runs-on: ubuntu-latest
-
+    environment: hostkey-server
     steps:
       - name: Derive domain from branch name
         id: derive
@@ -128,13 +123,12 @@ jobs:
         id: secret-check
         shell: bash
         env:
-          S_SSH_HOST: ${{ secrets.MAILBOX_SSH_HOST }}
-          S_SSH_USER: ${{ secrets.MAILBOX_SSH_USER }}
-          S_SSH_KEY: ${{ secrets.MAILBOX_SSH_PRIVATE_KEY }}
-          S_KNOWN_HOSTS: ${{ secrets.MAILBOX_SSH_KNOWN_HOSTS }}
+          S_VPS_HOST: ${{ secrets.VPS_HOST }}
+          S_VPS_USER: ${{ secrets.VPS_USER }}
+          S_VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          S_VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          S_VPS_PORT: ${{ secrets.VPS_PORT }}
           S_PASSPHRASE: ${{ secrets.MAILBOX_BACKUP_PASSPHRASE }}
-          V_SSH_PORT: ${{ vars.MAILBOX_SSH_PORT }}
-          WANT_DOWNLOAD: ${{ inputs.download }}
           DEPLOY_DIR: ${{ steps.derive.outputs.deploy_dir }}
           KEEP: ${{ steps.derive.outputs.keep }}
         run: |
@@ -142,10 +136,10 @@ jobs:
 
           missing=()
           # Values are only tested for emptiness; never printed.
-          [[ -n "${S_SSH_HOST:-}" ]]    || missing+=("secret MAILBOX_SSH_HOST")
-          [[ -n "${S_SSH_USER:-}" ]]    || missing+=("secret MAILBOX_SSH_USER")
-          [[ -n "${S_SSH_KEY:-}" ]]     || missing+=("secret MAILBOX_SSH_PRIVATE_KEY")
-          [[ -n "${S_KNOWN_HOSTS:-}" ]] || missing+=("secret MAILBOX_SSH_KNOWN_HOSTS")
+          [[ -n "${S_VPS_HOST:-}" ]]        || missing+=("secret VPS_HOST")
+          [[ -n "${S_VPS_USER:-}" ]]        || missing+=("secret VPS_USER")
+          [[ -n "${S_VPS_SSH_KEY:-}" ]]     || missing+=("secret VPS_SSH_KEY")
+          [[ -n "${S_VPS_KNOWN_HOSTS:-}" ]] || missing+=("secret VPS_KNOWN_HOSTS")
 
           has_passphrase=false
           [[ -n "${S_PASSPHRASE:-}" ]] && has_passphrase=true
@@ -167,32 +161,22 @@ jobs:
             echo "::error::Fix: add the secrets above under Settings → Secrets and variables → Actions, then re-run."
             exit 1
           fi
-          echo "- PASS — all required SSH secrets are present." >> "$GITHUB_STEP_SUMMARY"
+          echo "- PASS — all required VPS SSH secrets are present." >> "$GITHUB_STEP_SUMMARY"
 
           if [[ "$has_passphrase" == "true" ]]; then
-            echo "- PASS — \`MAILBOX_BACKUP_PASSPHRASE\` is set: the archive will be GPG (AES256) encrypted." >> "$GITHUB_STEP_SUMMARY"
+            echo "- PASS — \`MAILBOX_BACKUP_PASSPHRASE\` is set: the archive will be GPG (AES256) encrypted on the VPS." >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "- NOTE — \`MAILBOX_BACKUP_PASSPHRASE\` is not set: the archive stays **unencrypted on the VPS** and cannot be downloaded." >> "$GITHUB_STEP_SUMMARY"
+            echo "- NOTE — \`MAILBOX_BACKUP_PASSPHRASE\` is not set: the archive stays unencrypted on the VPS and must be copied off with SSH only after review." >> "$GITHUB_STEP_SUMMARY"
           fi
-          [[ -n "${V_SSH_PORT:-}" ]] || echo "- NOTE — variable \`MAILBOX_SSH_PORT\` not set; defaulting to 22." >> "$GITHUB_STEP_SUMMARY"
+          [[ -n "${S_VPS_PORT:-}" ]] || echo "- NOTE — secret \`VPS_PORT\` not set; defaulting to 22." >> "$GITHUB_STEP_SUMMARY"
           echo "- Retention: keep the newest \`$KEEP\` archives." >> "$GITHUB_STEP_SUMMARY"
           echo >> "$GITHUB_STEP_SUMMARY"
-
-          if [[ "$WANT_DOWNLOAD" == "true" && "$has_passphrase" != "true" ]]; then
-            echo "::error::'download' was requested but secret MAILBOX_BACKUP_PASSPHRASE is not set."
-            echo "::error::The archive contains DKIM private keys, TLS private keys and account passwords;"
-            echo "::error::this workflow never uploads an unencrypted archive as an artifact."
-            echo "::error::Fix: create the secret MAILBOX_BACKUP_PASSPHRASE (a long random passphrase, stored in your"
-            echo "::error::password manager — losing it makes every archive unreadable), then re-run with download=true."
-            echo "- FAIL — download requested without \`MAILBOX_BACKUP_PASSPHRASE\`. Refusing to export plaintext secrets." >> "$GITHUB_STEP_SUMMARY"
-            exit 1
-          fi
 
       - name: Set up SSH
         shell: bash
         env:
-          SSH_KEY: ${{ secrets.MAILBOX_SSH_PRIVATE_KEY }}
-          KNOWN_HOSTS: ${{ secrets.MAILBOX_SSH_KNOWN_HOSTS }}
+          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
         run: |
           set -euo pipefail
           mkdir -p ~/.ssh
@@ -206,9 +190,9 @@ jobs:
         id: preflight
         shell: bash
         env:
-          SSH_HOST: ${{ secrets.MAILBOX_SSH_HOST }}
-          SSH_USER: ${{ secrets.MAILBOX_SSH_USER }}
-          SSH_PORT: ${{ vars.MAILBOX_SSH_PORT }}
+          SSH_HOST: ${{ secrets.VPS_HOST }}
+          SSH_USER: ${{ secrets.VPS_USER }}
+          SSH_PORT: ${{ secrets.VPS_PORT }}
           DEPLOY_DIR: ${{ steps.derive.outputs.deploy_dir }}
         run: |
           set -euo pipefail
@@ -239,8 +223,8 @@ jobs:
           REMOTE
           )"; then
             echo "::error::Cannot reach the VPS over SSH."
-            echo "::error::Fix: verify secrets MAILBOX_SSH_HOST / MAILBOX_SSH_USER / MAILBOX_SSH_PRIVATE_KEY and"
-            echo "::error::regenerate MAILBOX_SSH_KNOWN_HOSTS with: ssh-keyscan -p <port> <host>"
+            echo "::error::Fix: verify secrets VPS_HOST / VPS_USER / VPS_SSH_KEY and"
+            echo "::error::regenerate VPS_KNOWN_HOSTS with: ssh-keyscan -p <port> <host>"
             summary "- FAIL — cannot reach the VPS over SSH."
             exit 1
           fi
@@ -297,17 +281,16 @@ jobs:
           DEPLOY_DIR: ${{ steps.derive.outputs.deploy_dir }}
           KEEP: ${{ steps.derive.outputs.keep }}
           HAS_PASSPHRASE: ${{ steps.secret-check.outputs.has_passphrase }}
-          WANT_DOWNLOAD: ${{ inputs.download }}
         run: |
           set -euo pipefail
           {
             echo "### 3. Dry run — nothing was executed"
             echo
             echo "A real run would, on \`$DEPLOY_DIR\`:"
-            echo "1. stop \`web\` and \`maddy\`, tar \`runtime\`, \`.env\`, \`secrets\`, \`maddy\`, \`compose.yaml\` into \`backups/<UTC>.tar.gz\`, restart the stack;"
+            echo "1. stop \`web\` and \`maddy\`, create a backup of the deployment directory, restart the stack;"
             echo "2. encryption: $([[ "$HAS_PASSPHRASE" == "true" ]] && echo 'GPG AES256 (.tar.gz.gpg)' || echo 'none — archive stays plaintext on the VPS');"
             echo "3. keep the newest \`$KEEP\` archives and delete older ones;"
-            echo "4. artifact download: ${WANT_DOWNLOAD};"
+            echo "4. leave the archive on the VPS and log its path so it can be copied out with SSH;"
             echo "5. verify \`maddy\` and \`web\` are running again."
             echo
           } >> "$GITHUB_STEP_SUMMARY"
@@ -318,9 +301,9 @@ jobs:
         if: ${{ !inputs.dry_run }}
         shell: bash
         env:
-          SSH_HOST: ${{ secrets.MAILBOX_SSH_HOST }}
-          SSH_USER: ${{ secrets.MAILBOX_SSH_USER }}
-          SSH_PORT: ${{ vars.MAILBOX_SSH_PORT }}
+          SSH_HOST: ${{ secrets.VPS_HOST }}
+          SSH_USER: ${{ secrets.VPS_USER }}
+          SSH_PORT: ${{ secrets.VPS_PORT }}
           DEPLOY_DIR: ${{ steps.derive.outputs.deploy_dir }}
           KEEP: ${{ steps.derive.outputs.keep }}
           BACKUP_PASSPHRASE: ${{ secrets.MAILBOX_BACKUP_PASSPHRASE }}
@@ -361,9 +344,9 @@ jobs:
         if: ${{ !inputs.dry_run }}
         shell: bash
         env:
-          SSH_HOST: ${{ secrets.MAILBOX_SSH_HOST }}
-          SSH_USER: ${{ secrets.MAILBOX_SSH_USER }}
-          SSH_PORT: ${{ vars.MAILBOX_SSH_PORT }}
+          SSH_HOST: ${{ secrets.VPS_HOST }}
+          SSH_USER: ${{ secrets.VPS_USER }}
+          SSH_PORT: ${{ secrets.VPS_PORT }}
           DEPLOY_DIR: ${{ steps.derive.outputs.deploy_dir }}
         run: |
           set -euo pipefail
@@ -387,49 +370,6 @@ jobs:
 
           [[ "$failed" -eq 0 ]] || exit 1
 
-      - name: Fetch encrypted archive
-        id: fetch
-        if: ${{ !inputs.dry_run && inputs.download && steps.secret-check.outputs.has_passphrase == 'true' && steps.run-backup.outputs.encrypted == 'yes' }}
-        shell: bash
-        env:
-          SSH_HOST: ${{ secrets.MAILBOX_SSH_HOST }}
-          SSH_USER: ${{ secrets.MAILBOX_SSH_USER }}
-          SSH_PORT: ${{ vars.MAILBOX_SSH_PORT }}
-          DEPLOY_DIR: ${{ steps.derive.outputs.deploy_dir }}
-          ARCHIVE_PATH: ${{ steps.run-backup.outputs.archive_path }}
-          ARCHIVE_NAME: ${{ steps.run-backup.outputs.archive_name }}
-        run: |
-          set -euo pipefail
-          port="${SSH_PORT:-22}"
-
-          if [[ "$ARCHIVE_NAME" != *.gpg ]]; then
-            echo "::error::Archive '$ARCHIVE_NAME' is not GPG-encrypted; refusing to download it."
-            exit 1
-          fi
-
-          mkdir -p artifact
-          scp -i ~/.ssh/id_deploy -P "$port" -o BatchMode=yes -o ConnectTimeout=15 \
-            "$SSH_USER@$SSH_HOST:$DEPLOY_DIR/$ARCHIVE_PATH" "artifact/$ARCHIVE_NAME"
-          ls -l "artifact/$ARCHIVE_NAME"
-          sha256sum "artifact/$ARCHIVE_NAME"
-
-      - name: Upload encrypted archive as artifact
-        if: ${{ steps.fetch.outcome == 'success' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: mailbox-backup-${{ steps.run-backup.outputs.archive_name }}
-          path: artifact/${{ steps.run-backup.outputs.archive_name }}
-          retention-days: 3
-          if-no-files-found: error
-
-      - name: Remove fetched archive from the runner
-        if: ${{ always() && steps.fetch.outcome != 'skipped' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          rm -rf artifact
-          echo "Runner copy deleted."
-
       - name: Emit backup report
         if: ${{ always() && !inputs.dry_run }}
         shell: bash
@@ -442,7 +382,6 @@ jobs:
           PRUNED: ${{ steps.run-backup.outputs.pruned }}
           KEPT: ${{ steps.run-backup.outputs.kept }}
           SERVICES: ${{ steps.health.outputs.services }}
-          DOWNLOADED: ${{ steps.fetch.outcome }}
         run: |
           set -euo pipefail
           cat >> "$GITHUB_STEP_SUMMARY" <<EOF
@@ -457,7 +396,6 @@ jobs:
           | Pruned old archives | ${PRUNED:-0} |
           | Archives kept on VPS | ${KEPT:-—} |
           | Service state | \`${SERVICES:-unknown}\` |
-          | Artifact uploaded | ${DOWNLOADED:-skipped} |
 
           ---
 
@@ -467,6 +405,7 @@ jobs:
           \`\`\`bash
           scp -P <port> <user>@<host>:$DEPLOY_DIR/backups/${ARCHIVE_NAME:-<archive>} ./
           \`\`\`
+          The workflow leaves the archive on the VPS and logs the path instead of uploading it anywhere.
           If the archive is not encrypted, encrypt it before it leaves the VPS — it contains DKIM
           private keys, TLS private keys and the account passwords from \`secrets/accounts.json\`.
 
