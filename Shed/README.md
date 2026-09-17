@@ -78,7 +78,7 @@ To authenticate Seafile users via `identity.eldervibe.dev`:
    OAUTH_CREATE_UNKNOWN_USER = True
    ```
 
-   The template also sets `CSRF_TRUSTED_ORIGINS` and `SECURE_PROXY_SSL_HEADER` for HTTPS behind Caddy. If the stack was already deployed, copy the updated template to `$STORAGE_DEPLOY_DIR/data/seafile/conf/seahub_settings.py` only after reviewing any local changes, then restart `seafile-server`.
+   The template sets `CSRF_TRUSTED_ORIGINS`, `SECURE_PROXY_SSL_HEADER`, and secure cookies for HTTPS behind Caddy. The deploy script appends the managed proxy block on each deploy so existing installations receive the fix without replacing their local Seahub settings. Restart `seafile-server` after deployment.
 
 3. **Restart Seahub**:
    ```bash

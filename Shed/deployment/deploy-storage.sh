@@ -29,6 +29,20 @@ if [[ -n "${STORAGE_SOURCE_DIR:-}" ]] && [[ -f "$STORAGE_SOURCE_DIR/conf/seahub_
     if [[ ! -e "$seahub_config" ]]; then
         install -m 0640 "$STORAGE_SOURCE_DIR/conf/seahub_settings_template.py" "$seahub_config"
     fi
+    sed -i '/^# BEGIN MANAGED STORAGE PROXY SETTINGS$/,/^# END MANAGED STORAGE PROXY SETTINGS$/d' "$seahub_config"
+    cat >> "$seahub_config" <<PYTHON
+
+# BEGIN MANAGED STORAGE PROXY SETTINGS
+SERVICE_URL = 'https://${SERVICE_DOMAIN}'
+FILE_SERVER_ROOT = 'https://${SERVICE_DOMAIN}/seafhttp'
+CSRF_TRUSTED_ORIGINS = [SERVICE_URL]
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+USE_X_FORWARDED_HOST = True
+CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_SECURE = True
+# END MANAGED STORAGE PROXY SETTINGS
+PYTHON
+    chmod 0640 "$seahub_config"
 fi
 
 # 1. Update Caddy site configuration
@@ -59,7 +73,8 @@ $SERVICE_DOMAIN {
         header_up Host {host}
         header_up X-Real-IP {remote_host}
         header_up X-Forwarded-For {remote_host}
-        header_up X-Forwarded-Proto {scheme}
+        header_up X-Forwarded-Host {host}
+        header_up X-Forwarded-Proto https
     }
 }
 EOF
