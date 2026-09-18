@@ -38,10 +38,24 @@ public sealed class OidcController : Controller
         identity.SetClaim(OpenIddictConstants.Claims.Subject, subject);
         identity.SetClaim(OpenIddictConstants.Claims.Name, User.FindFirstValue(ClaimTypes.Name) ?? githubId);
 
+        var githubLogin = User.FindFirstValue("urn:github:login");
+        if (!string.IsNullOrWhiteSpace(githubLogin))
+        {
+            identity.SetClaim(OpenIddictConstants.Claims.PreferredUsername, githubLogin);
+        }
+
+        var avatarUrl = User.FindFirstValue("urn:github:avatar");
+        if (!string.IsNullOrWhiteSpace(avatarUrl))
+        {
+            identity.SetClaim(OpenIddictConstants.Claims.Picture, avatarUrl);
+        }
+
         var email = User.FindFirstValue(ClaimTypes.Email);
-        if (!string.IsNullOrWhiteSpace(email))
+        var emailVerified = string.Equals(User.FindFirstValue("urn:github:email_verified"), bool.TrueString, StringComparison.OrdinalIgnoreCase);
+        if (!string.IsNullOrWhiteSpace(email) && emailVerified)
         {
             identity.SetClaim(OpenIddictConstants.Claims.Email, email);
+            identity.SetClaim(OpenIddictConstants.Claims.EmailVerified, bool.TrueString);
         }
 
         var principal = new ClaimsPrincipal(identity);
@@ -49,7 +63,11 @@ public sealed class OidcController : Controller
         principal.SetResources("fences");
         principal.SetDestinations(static claim => claim.Type switch
         {
-            OpenIddictConstants.Claims.Name or OpenIddictConstants.Claims.Email =>
+            OpenIddictConstants.Claims.Name
+                or OpenIddictConstants.Claims.PreferredUsername
+                or OpenIddictConstants.Claims.Picture
+                or OpenIddictConstants.Claims.Email
+                or OpenIddictConstants.Claims.EmailVerified =>
                 [OpenIddictConstants.Destinations.IdentityToken, OpenIddictConstants.Destinations.AccessToken],
             _ => [OpenIddictConstants.Destinations.AccessToken]
         });
@@ -79,8 +97,21 @@ public sealed class OidcController : Controller
             claims[OpenIddictConstants.Claims.Name] = name;
         }
 
+        var preferredUsername = User.FindFirstValue(OpenIddictConstants.Claims.PreferredUsername);
+        if (!string.IsNullOrWhiteSpace(preferredUsername))
+        {
+            claims[OpenIddictConstants.Claims.PreferredUsername] = preferredUsername;
+        }
+
+        var picture = User.FindFirstValue(OpenIddictConstants.Claims.Picture);
+        if (!string.IsNullOrWhiteSpace(picture))
+        {
+            claims[OpenIddictConstants.Claims.Picture] = picture;
+        }
+
         var email = User.FindFirstValue(OpenIddictConstants.Claims.Email);
-        if (!string.IsNullOrWhiteSpace(email))
+        var emailVerified = string.Equals(User.FindFirstValue(OpenIddictConstants.Claims.EmailVerified), bool.TrueString, StringComparison.OrdinalIgnoreCase);
+        if (!string.IsNullOrWhiteSpace(email) && emailVerified)
         {
             claims[OpenIddictConstants.Claims.Email] = email;
             claims[OpenIddictConstants.Claims.EmailVerified] = true;
