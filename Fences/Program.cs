@@ -164,6 +164,13 @@ builder.Services.AddAuthentication(options =>
             response.EnsureSuccessStatusCode();
             using var payload = JsonDocument.Parse(await response.Content.ReadAsStringAsync(context.HttpContext.RequestAborted));
             context.RunClaimActions(payload.RootElement);
+            var verifiedEmail = await GetVerifiedGitHubEmailAsync(context, context.Identity?.FindFirst(ClaimTypes.Email)?.Value);
+            if (!string.IsNullOrWhiteSpace(verifiedEmail) && context.Identity is not null)
+            {
+                ReplaceClaim(context.Identity, ClaimTypes.Email, verifiedEmail);
+                ReplaceClaim(context.Identity, "urn:github:email_verified", bool.TrueString);
+            }
+
             if (string.IsNullOrWhiteSpace(context.Identity?.FindFirst(ClaimTypes.Name)?.Value))
             {
                 var login = context.Identity?.FindFirst("urn:github:login")?.Value;
@@ -262,5 +269,48 @@ static async Task SeedOidcClientsAsync(IServiceProvider services, IEnumerable<Oi
             await manager.UpdateAsync(existingApplication, descriptor);
         }
     }
+}
+
+static async Task<string?> GetVerifiedGitHubEmailAsync(OAuthCreatingTicketContext context, string? currentEmail)
+{
+    if (string.IsNullOrWhiteSpace(context.AccessToken))
+    {
+        return null;
+    }
+
+    var request = new HttpRequestMessage(HttpMethod.Get, "https://api.github.com/user/emails");
+    request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+    request.Headers.UserAgent.ParseAdd("fences-identity-app");
+    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", context.AccessToken);
+    var response = await context.Backchannel.SendAsync(request, context.HttpContext.RequestAborted);
+    if (!response.IsSuccessStatusCode)
+    {
+        return null;
+    }
+
+    using var payload = JsonDocument.Parse(await response.Content.ReadAsStringAsync(context.HttpContext.RequestAborted));
+    var verifiedEmails = payload.RootElement.EnumerateArray()
+        .Select(email => new
+        {
+            Address = email.TryGetProperty("email", out var address) ? address.GetString() : null,
+            Primary = email.TryGetProperty("primary", out var primary) && primary.GetBoolean(),
+            Verified = email.TryGetProperty("verified", out var verified) && verified.GetBoolean()
+        })
+        .Where(email => email.Verified && !string.IsNullOrWhiteSpace(email.Address))
+        .ToList();
+
+    return verifiedEmails.FirstOrDefault(email => email.Address!.Equals(currentEmail, StringComparison.OrdinalIgnoreCase))?.Address
+        ?? verifiedEmails.FirstOrDefault(email => email.Primary)?.Address
+        ?? verifiedEmails.FirstOrDefault()?.Address;
+}
+
+static void ReplaceClaim(ClaimsIdentity identity, string type, string value)
+{
+    foreach (var claim in identity.FindAll(type).ToList())
+    {
+        identity.RemoveClaim(claim);
+    }
+
+    identity.AddClaim(new Claim(type, value));
 }
 
