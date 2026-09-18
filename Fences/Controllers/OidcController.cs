@@ -1,8 +1,10 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using OpenIddict.Abstractions;
 using OpenIddict.Server.AspNetCore;
+using OpenIddict.Validation.AspNetCore;
 
 namespace Fences.Controllers;
 
@@ -53,5 +55,37 @@ public sealed class OidcController : Controller
         });
 
         return SignIn(principal, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+    }
+
+    [Authorize(AuthenticationSchemes = OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme)]
+    [HttpGet("/connect/userinfo")]
+    [HttpPost("/connect/userinfo")]
+    public IActionResult Userinfo()
+    {
+        var subject = User.FindFirstValue(OpenIddictConstants.Claims.Subject);
+        if (string.IsNullOrWhiteSpace(subject))
+        {
+            return Forbid(OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme);
+        }
+
+        var claims = new Dictionary<string, object>(StringComparer.Ordinal)
+        {
+            [OpenIddictConstants.Claims.Subject] = subject
+        };
+
+        var name = User.FindFirstValue(OpenIddictConstants.Claims.Name);
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            claims[OpenIddictConstants.Claims.Name] = name;
+        }
+
+        var email = User.FindFirstValue(OpenIddictConstants.Claims.Email);
+        if (!string.IsNullOrWhiteSpace(email))
+        {
+            claims[OpenIddictConstants.Claims.Email] = email;
+            claims[OpenIddictConstants.Claims.EmailVerified] = true;
+        }
+
+        return Ok(claims);
     }
 }

@@ -36,6 +36,7 @@ builder.Services.AddOpenIddict()
         options.SetIssuer(new Uri(identityOptions.OidcIssuer));
         options.SetAuthorizationEndpointUris("/connect/authorize");
         options.SetTokenEndpointUris("/connect/token");
+        options.SetUserInfoEndpointUris("/connect/userinfo");
         options.AllowAuthorizationCodeFlow().RequireProofKeyForCodeExchange();
         options.RegisterScopes(OpenIddictConstants.Scopes.OpenId, OpenIddictConstants.Scopes.Profile, OpenIddictConstants.Scopes.Email);
 
@@ -53,11 +54,18 @@ builder.Services.AddOpenIddict()
         options.UseAspNetCore(aspNetCore =>
         {
             aspNetCore.EnableAuthorizationEndpointPassthrough();
+            aspNetCore.EnableUserInfoEndpointPassthrough();
             if (builder.Environment.IsDevelopment())
             {
                 aspNetCore.DisableTransportSecurityRequirement();
             }
         });
+    })
+    .AddValidation(options =>
+    {
+        // Validates access tokens presented to /connect/userinfo issued by this same server.
+        options.UseLocalServer();
+        options.UseAspNetCore();
     });
 
 builder.Services.AddSingleton<IAppCatalog, AppCatalog>();
