@@ -9,7 +9,7 @@ on:
 
 permissions:
   contents: write
-  actions: write
+  workflows: write
 
 concurrency:
   group: rebase-sub-branches
