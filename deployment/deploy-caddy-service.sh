@@ -33,6 +33,7 @@ state=absent
 
 umask 077
 mkdir -p "$(dirname "$CADDY_LOCK_FILE")" "$CADDY_SITES_DIR"
+chmod 755 -- "$CADDY_SITES_DIR"
 exec 9>"$CADDY_LOCK_FILE"
 flock -n 9 || { echo "Another Caddy deployment is already running" >&2; exit 1; }
 
@@ -50,7 +51,10 @@ capture_fragment() {
 
 restore_fragment() {
 	case "$state" in
-		file) mv -f -- "$fragment_backup" "$fragment" ;;
+		file)
+			mv -f -- "$fragment_backup" "$fragment"
+			chmod 644 -- "$fragment"
+			;;
 		absent) rm -f -- "$fragment" ;;
 	esac
 }
@@ -74,6 +78,7 @@ $SERVICE_DOMAIN {
 	reverse_proxy 127.0.0.1:$SERVICE_UPSTREAM_PORT
 }
 EOF
+chmod 644 -- "$fragment_tmp"
 mv -f -- "$fragment_tmp" "$fragment"
 
 if ! "$CADDY_BIN" validate --config "$CADDY_CONFIG" --adapter caddyfile; then
