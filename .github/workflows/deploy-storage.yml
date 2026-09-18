@@ -66,6 +66,50 @@ jobs:
             "$VPS_USER@$VPS_HOST" \
             'rm -rf /tmp/storage-deploy && mkdir -p /tmp/storage-deploy && tar -xzf - -C /tmp/storage-deploy'
 
+      - name: Install storage Compose environment
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          STORAGE_DEPLOY_DIR: ${{ vars.STORAGE_DEPLOY_DIR }}
+          STORAGE_DOMAIN: ${{ vars.STORAGE_DOMAIN || 'storage.eldervibe.dev' }}
+          STORAGE_UPSTREAM_PORT: ${{ vars.STORAGE_UPSTREAM_PORT || '8080' }}
+          STORAGE_TIME_ZONE: ${{ vars.STORAGE_TIME_ZONE || 'Asia/Ho_Chi_Minh' }}
+          STORAGE_OAUTH_CLIENT_ID: ${{ vars.STORAGE_OAUTH_CLIENT_ID || 'seafile' }}
+          STORAGE_OAUTH_REDIRECT_URL: ${{ vars.STORAGE_OAUTH_REDIRECT_URL || 'https://storage.eldervibe.dev/oauth/callback/' }}
+          STORAGE_OAUTH_AUTHORIZATION_URL: ${{ vars.STORAGE_OAUTH_AUTHORIZATION_URL || 'https://identity.eldervibe.dev/connect/authorize' }}
+          STORAGE_OAUTH_TOKEN_URL: ${{ vars.STORAGE_OAUTH_TOKEN_URL || 'https://identity.eldervibe.dev/connect/token' }}
+          STORAGE_OAUTH_USER_INFO_URL: ${{ vars.STORAGE_OAUTH_USER_INFO_URL || 'https://identity.eldervibe.dev/connect/userinfo' }}
+          STORAGE_SEAFILE_ADMIN_EMAIL: ${{ vars.STORAGE_SEAFILE_ADMIN_EMAIL || 'admin@eldervibe.dev' }}
+          STORAGE_MYSQL_ROOT_PASSWORD: ${{ secrets.STORAGE_MYSQL_ROOT_PASSWORD }}
+          STORAGE_SEAFILE_ADMIN_PASSWORD: ${{ secrets.STORAGE_SEAFILE_ADMIN_PASSWORD }}
+          STORAGE_OAUTH_CLIENT_SECRET: ${{ secrets.STORAGE_OAUTH_CLIENT_SECRET }}
+        run: |
+          set -euo pipefail
+          test -n "${STORAGE_MYSQL_ROOT_PASSWORD:-}" || { echo "::error::Missing STORAGE_MYSQL_ROOT_PASSWORD."; exit 1; }
+          test -n "${STORAGE_SEAFILE_ADMIN_PASSWORD:-}" || { echo "::error::Missing STORAGE_SEAFILE_ADMIN_PASSWORD."; exit 1; }
+          test -n "${STORAGE_OAUTH_CLIENT_SECRET:-}" || { echo "::error::Missing STORAGE_OAUTH_CLIENT_SECRET."; exit 1; }
+
+          env_b64="$(printf '%s\n' \
+            "STORAGE_BASE_DIR=$STORAGE_DEPLOY_DIR" \
+            "SERVICE_DOMAIN=$STORAGE_DOMAIN" \
+            "SERVICE_UPSTREAM_PORT=$STORAGE_UPSTREAM_PORT" \
+            "TIME_ZONE=$STORAGE_TIME_ZONE" \
+            "SEAFILE_ADMIN_EMAIL=$STORAGE_SEAFILE_ADMIN_EMAIL" \
+            "SEAFILE_ADMIN_PASSWORD=$STORAGE_SEAFILE_ADMIN_PASSWORD" \
+            "MYSQL_ROOT_PASSWORD=$STORAGE_MYSQL_ROOT_PASSWORD" \
+            "OAUTH_CLIENT_ID=$STORAGE_OAUTH_CLIENT_ID" \
+            "OAUTH_CLIENT_SECRET=$STORAGE_OAUTH_CLIENT_SECRET" \
+            "OAUTH_REDIRECT_URL=$STORAGE_OAUTH_REDIRECT_URL" \
+            "OAUTH_AUTHORIZATION_URL=$STORAGE_OAUTH_AUTHORIZATION_URL" \
+            "OAUTH_TOKEN_URL=$STORAGE_OAUTH_TOKEN_URL" \
+            "OAUTH_USER_INFO_URL=$STORAGE_OAUTH_USER_INFO_URL" | base64 -w0)"
+
+          printf '%s' "$env_b64" | ssh \
+            -p "$VPS_PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            "$VPS_USER@$VPS_HOST" \
+            "base64 -d > '$STORAGE_DEPLOY_DIR/.env.new' && chmod 600 '$STORAGE_DEPLOY_DIR/.env.new' && mv '$STORAGE_DEPLOY_DIR/.env.new' '$STORAGE_DEPLOY_DIR/.env'"
+
       - name: Deploy Seafile behind Caddy
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
@@ -73,11 +117,13 @@ jobs:
           VPS_USER: ${{ secrets.VPS_USER }}
           ACME_EMAIL: ${{ secrets.ACME_EMAIL || vars.ACME_EMAIL }}
           STORAGE_DEPLOY_DIR: ${{ vars.STORAGE_DEPLOY_DIR }}
+          SERVICE_DOMAIN: ${{ vars.STORAGE_DOMAIN || 'storage.eldervibe.dev' }}
+          SERVICE_UPSTREAM_PORT: ${{ vars.STORAGE_UPSTREAM_PORT || '8080' }}
         run: |
           set -euo pipefail
           test -n "$ACME_EMAIL"
           ssh \
             -p "$VPS_PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes \
             "$VPS_USER@$VPS_HOST" \
-            "ACME_EMAIL='$ACME_EMAIL' STORAGE_SOURCE_DIR=/tmp/storage-deploy STORAGE_DEPLOY_DIR='$STORAGE_DEPLOY_DIR' bash -s" \
+            "ACME_EMAIL='$ACME_EMAIL' SERVICE_DOMAIN='$SERVICE_DOMAIN' SERVICE_UPSTREAM_PORT='$SERVICE_UPSTREAM_PORT' STORAGE_SOURCE_DIR=/tmp/storage-deploy STORAGE_DEPLOY_DIR='$STORAGE_DEPLOY_DIR' bash -s" \
             < Shed/deployment/deploy-storage.sh
