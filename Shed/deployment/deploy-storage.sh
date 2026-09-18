@@ -35,11 +35,14 @@ if [[ -n "${STORAGE_SOURCE_DIR:-}" ]] && [[ -f "$STORAGE_SOURCE_DIR/conf/seahub_
 # BEGIN MANAGED STORAGE PROXY SETTINGS
 SERVICE_URL = 'https://${SERVICE_DOMAIN}'
 FILE_SERVER_ROOT = 'https://${SERVICE_DOMAIN}/seafhttp'
+ALLOWED_HOSTS = ['${SERVICE_DOMAIN}']
 CSRF_TRUSTED_ORIGINS = [SERVICE_URL]
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 USE_X_FORWARDED_HOST = True
 CSRF_COOKIE_SECURE = True
+CSRF_COOKIE_SAMESITE = 'Lax'
 SESSION_COOKIE_SECURE = True
+SESSION_COOKIE_SAMESITE = 'Lax'
 # END MANAGED STORAGE PROXY SETTINGS
 PYTHON
     chmod 0640 "$seahub_config"
@@ -119,5 +122,20 @@ fi
 
 $COMPOSE_CMD pull || true
 $COMPOSE_CMD up -d --remove-orphans
+$COMPOSE_CMD restart seafile
+
+seahub_config="$STORAGE_DEPLOY_DIR/data/seafile/conf/seahub_settings.py"
+if [[ ! -f "$seahub_config" ]]; then
+    echo "Seahub settings file is missing: $seahub_config" >&2
+    exit 1
+fi
+grep -Fq "CSRF_TRUSTED_ORIGINS = [SERVICE_URL]" "$seahub_config" || {
+    echo "Seahub CSRF configuration was not applied for $SERVICE_DOMAIN" >&2
+    exit 1
+}
+grep -Fq "SERVICE_URL = 'https://${SERVICE_DOMAIN}'" "$seahub_config" || {
+    echo "Seahub service URL does not match $SERVICE_DOMAIN" >&2
+    exit 1
+}
 
 echo "==> Seafile Storage deployed successfully at https://$SERVICE_DOMAIN"
