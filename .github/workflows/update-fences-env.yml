@@ -173,4 +173,4 @@ jobs:
           if [[ "$RESTART_FENCES" == "true" ]]; then
             restart_flag="--restart"
           fi
-          ssh "${ssh_options[@]}" "$ssh_target" "set -e; trap 'rm -rf -- '\''$remote_dir'\''' EXIT; chmod 700 -- '$remote_script_path'; chmod 600 -- '$remote_updates_path'; bash '$remote_script_path' --updates-file '$remote_updates_path' $restart_flag"
+          ssh "${ssh_options[@]}" "$ssh_target" "set -e; trap 'rm -rf -- '\''$remote_dir'\'' || true' EXIT; chmod 700 -- '$remote_script_path'; chmod 600 -- '$remote_updates_path'; bash '$remote_script_path' --updates-file '$remote_updates_path' $restart_flag"

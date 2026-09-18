@@ -185,4 +185,4 @@ jobs:
 
           remote_script_path="$remote_dir/provision-oidc-certificates.sh"
           remote_env_path="$remote_dir/$(basename "$runtime_env_file")"
-          ssh "${ssh_options[@]}" "$ssh_target" "set -e; trap 'rm -rf -- '\''$remote_dir'\''' EXIT; chmod 700 -- '$remote_script_path'; chmod 600 -- '$remote_env_path'; bash '$remote_script_path' --runtime-env-file '$remote_env_path'"
+          ssh "${ssh_options[@]}" "$ssh_target" "set -e; trap 'rm -rf -- '\''$remote_dir'\'' || true' EXIT; chmod 700 -- '$remote_script_path'; chmod 600 -- '$remote_env_path'; bash '$remote_script_path' --runtime-env-file '$remote_env_path'"
