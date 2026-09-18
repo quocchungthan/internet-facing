@@ -1,0 +1,176 @@
+name: Update Fences runtime environment
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type UPDATE_FENCES_ENV to update existing Fences runtime values
+        required: true
+        type: string
+      restart:
+        description: Restart the Fences container after updating fences.env
+        required: true
+        type: boolean
+        default: true
+      reason:
+        description: Optional change reason
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: update-fences-env-production
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    environment: hostkey-server
+
+    steps:
+      - name: Confirm runtime environment update
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          set -euo pipefail
+          if [[ "$CONFIRMATION" != "UPDATE_FENCES_ENV" ]]; then
+            echo "::error::Confirmation must exactly equal UPDATE_FENCES_ENV." >&2
+            exit 1
+          fi
+
+      - name: Check out source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: sub/identity
+
+      - name: Validate updater syntax
+        run: bash -n Fences/scripts/update-fences-env.sh
+
+      - name: Transfer and run runtime environment update
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          RESTART_FENCES: ${{ inputs.restart }}
+          FENCES_GITHUB_CLIENT_ID: ${{ secrets.FENCES_GITHUB_CLIENT_ID }}
+          FENCES_GITHUB_CLIENT_SECRET: ${{ secrets.FENCES_GITHUB_CLIENT_SECRET }}
+          FENCES_OIDC_CLIENT_ID: ${{ secrets.FENCES_OIDC_CLIENT_ID }}
+          FENCES_OIDC_CLIENT_SECRET: ${{ secrets.FENCES_OIDC_CLIENT_SECRET }}
+          FENCES_BRAND_NAME: ${{ vars.FENCES_BRAND_NAME }}
+          FENCES_COOKIE_DOMAIN: ${{ vars.FENCES_COOKIE_DOMAIN }}
+          FENCES_PERSISTENT_LOGIN_DAYS: ${{ vars.FENCES_PERSISTENT_LOGIN_DAYS }}
+          FENCES_ALLOWED_RETURN_HOST: ${{ vars.FENCES_ALLOWED_RETURN_HOST }}
+          FENCES_ALLOWED_CORS_ORIGIN: ${{ vars.FENCES_ALLOWED_CORS_ORIGIN }}
+          FENCES_OIDC_CLIENT_NAME: ${{ vars.FENCES_OIDC_CLIENT_NAME }}
+          FENCES_OIDC_REDIRECT_URI: ${{ vars.FENCES_OIDC_REDIRECT_URI }}
+          FENCES_OIDC_POST_LOGOUT_REDIRECT_URI: ${{ vars.FENCES_OIDC_POST_LOGOUT_REDIRECT_URI }}
+        run: |
+          set -euo pipefail
+          umask 077
+
+          updates_file="$(mktemp)"
+          ssh_key_file="$(mktemp)"
+          known_hosts_file="$(mktemp)"
+          remote_dir=""
+          cleanup() {
+            if [[ -n "$remote_dir" ]]; then
+              ssh "${ssh_options[@]}" "$ssh_target" "rm -rf -- '$remote_dir'" >/dev/null 2>&1 || true
+            fi
+            rm -f -- "$updates_file" "$ssh_key_file" "$known_hosts_file"
+          }
+
+          for required_secret in VPS_HOST VPS_PORT VPS_USER VPS_SSH_KEY VPS_KNOWN_HOSTS; do
+            if [[ -z "${!required_secret}" ]]; then
+              echo "::error::Missing required hostkey-server environment value: $required_secret" >&2
+              exit 1
+            fi
+          done
+          [[ "$VPS_HOST" =~ ^[A-Za-z0-9.:-]+$ ]] || { echo "::error::VPS_HOST has an invalid format." >&2; exit 1; }
+          [[ "$VPS_PORT" =~ ^[0-9]+$ ]] || { echo "::error::VPS_PORT must be numeric." >&2; exit 1; }
+          [[ "$VPS_USER" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "::error::VPS_USER has an invalid format." >&2; exit 1; }
+
+          for dotenv_value in \
+              FENCES_GITHUB_CLIENT_ID FENCES_GITHUB_CLIENT_SECRET FENCES_OIDC_CLIENT_ID \
+              FENCES_OIDC_CLIENT_SECRET FENCES_BRAND_NAME FENCES_COOKIE_DOMAIN \
+              FENCES_PERSISTENT_LOGIN_DAYS FENCES_ALLOWED_RETURN_HOST \
+              FENCES_ALLOWED_CORS_ORIGIN FENCES_OIDC_CLIENT_NAME \
+              FENCES_OIDC_REDIRECT_URI FENCES_OIDC_POST_LOGOUT_REDIRECT_URI; do
+            if [[ "${!dotenv_value:-}" == *$'\n'* || "${!dotenv_value:-}" == *$'\r'* ]]; then
+              echo "::error::$dotenv_value must be a single-line value." >&2
+              exit 1
+            fi
+          done
+
+          {
+            [[ -n "${FENCES_GITHUB_CLIENT_ID:-}" ]] && printf 'Authentication__GitHub__ClientId=%s\n' "$FENCES_GITHUB_CLIENT_ID"
+            [[ -n "${FENCES_GITHUB_CLIENT_SECRET:-}" ]] && printf 'Authentication__GitHub__ClientSecret=%s\n' "$FENCES_GITHUB_CLIENT_SECRET"
+            [[ -n "${FENCES_BRAND_NAME:-}" ]] && printf 'IdentityApp__BrandName=%s\n' "$FENCES_BRAND_NAME"
+            [[ -n "${FENCES_COOKIE_DOMAIN:-}" ]] && printf 'IdentityApp__CookieDomain=%s\n' "$FENCES_COOKIE_DOMAIN"
+            [[ -n "${FENCES_PERSISTENT_LOGIN_DAYS:-}" ]] && printf 'IdentityApp__PersistentLoginDays=%s\n' "$FENCES_PERSISTENT_LOGIN_DAYS"
+            [[ -n "${FENCES_ALLOWED_RETURN_HOST:-}" ]] && printf 'IdentityApp__AllowedReturnHosts__0=%s\n' "$FENCES_ALLOWED_RETURN_HOST"
+            [[ -n "${FENCES_ALLOWED_CORS_ORIGIN:-}" ]] && printf 'IdentityApp__AllowedCorsOrigins__0=%s\n' "$FENCES_ALLOWED_CORS_ORIGIN"
+            [[ -n "${FENCES_OIDC_CLIENT_ID:-}" ]] && printf 'IdentityApp__OidcClients__0__ClientId=%s\n' "$FENCES_OIDC_CLIENT_ID"
+            [[ -n "${FENCES_OIDC_CLIENT_NAME:-}" ]] && printf 'IdentityApp__OidcClients__0__DisplayName=%s\n' "$FENCES_OIDC_CLIENT_NAME"
+            [[ -n "${FENCES_OIDC_CLIENT_SECRET:-}" ]] && printf 'IdentityApp__OidcClients__0__ClientSecret=%s\n' "$FENCES_OIDC_CLIENT_SECRET"
+            [[ -n "${FENCES_OIDC_REDIRECT_URI:-}" ]] && printf 'IdentityApp__OidcClients__0__RedirectUris__0=%s\n' "$FENCES_OIDC_REDIRECT_URI"
+            [[ -n "${FENCES_OIDC_POST_LOGOUT_REDIRECT_URI:-}" ]] && printf 'IdentityApp__OidcClients__0__PostLogoutRedirectUris__0=%s\n' "$FENCES_OIDC_POST_LOGOUT_REDIRECT_URI"
+            true
+          } > "$updates_file"
+
+          if [[ ! -s "$updates_file" ]]; then
+            echo "::error::No secrets or variables were provided to update; nothing to do." >&2
+            exit 1
+          fi
+
+          printf '%s\n' "$VPS_SSH_KEY" > "$ssh_key_file"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > "$known_hosts_file"
+          chmod 600 "$updates_file" "$ssh_key_file" "$known_hosts_file"
+
+          ssh_options=(
+            -i "$ssh_key_file"
+            -p "$VPS_PORT"
+            -o BatchMode=yes
+            -o StrictHostKeyChecking=yes
+            -o UserKnownHostsFile="$known_hosts_file"
+            -o GlobalKnownHostsFile=/dev/null
+          )
+          scp_options=(
+            -i "$ssh_key_file"
+            -P "$VPS_PORT"
+            -o BatchMode=yes
+            -o StrictHostKeyChecking=yes
+            -o UserKnownHostsFile="$known_hosts_file"
+            -o GlobalKnownHostsFile=/dev/null
+          )
+          ssh_target="$VPS_USER@$VPS_HOST"
+          trap cleanup EXIT
+
+          remote_dir="$(ssh "${ssh_options[@]}" "$ssh_target" 'set -euo pipefail
+            if [[ "$(id -u)" != 0 ]]; then
+              echo "VPS_USER must be root for Fences runtime environment updates." >&2
+              exit 1
+            fi
+            if [[ ! -e /etc/shuneo/fences.env || ! -e /etc/shuneo/fences-secrets ]]; then
+              echo "Refusing to update because Fences has not been bootstrapped yet." >&2
+              exit 1
+            fi
+            staging_dir="$(mktemp -d /tmp/fences-env-update.XXXXXX)"
+            chmod 700 -- "$staging_dir"
+            printf "%s\n" "$staging_dir"')"
+          [[ "$remote_dir" =~ ^/tmp/fences-env-update\.[A-Za-z0-9]{6}$ ]] || { echo "::error::Remote staging directory response was invalid." >&2; exit 1; }
+
+          scp "${scp_options[@]}" \
+            Fences/scripts/update-fences-env.sh "$updates_file" \
+            "$ssh_target:$remote_dir/"
+
+          remote_script_path="$remote_dir/update-fences-env.sh"
+          remote_updates_path="$remote_dir/$(basename "$updates_file")"
+          restart_flag=""
+          if [[ "$RESTART_FENCES" == "true" ]]; then
+            restart_flag="--restart"
+          fi
+          ssh "${ssh_options[@]}" "$ssh_target" "set -e; trap 'rm -rf -- '\''$remote_dir'\''' EXIT; chmod 700 -- '$remote_script_path'; chmod 600 -- '$remote_updates_path'; bash '$remote_script_path' --updates-file '$remote_updates_path' $restart_flag"
