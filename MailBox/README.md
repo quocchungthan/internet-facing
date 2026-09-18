@@ -72,10 +72,23 @@ Nếu có file image `shuneo-mail-images-linux-amd64.tar`, có thể upload thê
 Thay `example.com` bằng domain thực của bạn:
 
 ```bash
-python3 scripts/manage.py init --domain example.com --hostname mail.example.com
+python3 scripts/manage.py init --domain eldervibe.dev --hostname mail.eldervibe.dev --additional-domain shuneo.com
 ```
 
 Script tạo `.env`, thư mục dữ liệu và `secrets/accounts.json` với hai mật khẩu ngẫu nhiên. Không chạy lại `init` trên dữ liệu cũ hoặc đổi domain trực tiếp sau khi đã có thư. Có thể xem tài khoản khi cần bằng `cat secrets/accounts.json`; không chia sẻ file này. Chưa cần sử dụng mật khẩu ở bước DNS.
+
+`MAIL_DOMAINS` là danh sách domain local, phân tách bằng khoảng trắng. `MAIL_DOMAIN` vẫn là domain chính. Khi dùng GitHub Actions, đặt repository variable `MAILBOX_ADDITIONAL_DOMAINS` thành `shuneo.com` hoặc danh sách phân tách bằng dấu phẩy; workflow sẽ lưu danh sách này vào `.env` trước khi khởi động Maddy.
+
+Tạo hai hộp thư cho Chung sau khi khởi động và đặt mật khẩu riêng cho từng địa chỉ:
+
+```bash
+docker compose exec maddy maddy -config /data/maddy.conf creds create chung@eldervibe.dev
+docker compose exec maddy maddy -config /data/maddy.conf imap-acct create chung@eldervibe.dev
+docker compose exec maddy maddy -config /data/maddy.conf creds create chung@shuneo.com
+docker compose exec maddy maddy -config /data/maddy.conf imap-acct create chung@shuneo.com
+```
+
+Nếu muốn dùng cùng một hộp thư thay vì hai inbox, hãy tạo một alias Maddy trỏ từ địa chỉ thứ hai vào địa chỉ thứ nhất; bản thay đổi này mặc định tạo hai mailbox độc lập để cả hai địa chỉ có thể đăng nhập và gửi.
 
 ## 4. DNS trước khi khởi động
 
@@ -83,14 +96,16 @@ Giả sử IP VPS là `203.0.113.10` (IP minh họa, PHẢI thay):
 
 | Loại | Tên | Giá trị |
 |---|---|---|
-| A | `mail` | IPv4 VPS |
-| MX | `@` | ưu tiên 10, `mail.example.com` |
-| TXT | `@` | `v=spf1 ip4:203.0.113.10 -all` |
-| TXT | `_dmarc` | `v=DMARC1; p=none; rua=mailto:admin@example.com` |
+| A | `mail` on each domain | IPv4 VPS |
+| MX | `@` on each domain | ưu tiên 10, `mail.example.com` |
+| TXT | `@` on each sending domain | `v=spf1 ip4:203.0.113.10 -all` |
+| TXT | `_dmarc` on each domain | `v=DMARC1; p=none; rua=mailto:admin@example.com` |
 
 PTR ở nhà cung cấp VPS: `203.0.113.10 -> mail.example.com`. Nếu đang dùng domain có mail thật, đừng thay MX trước khi lên kế hoạch chuyển đổi. Chỉ có **một SPF record**; ví dụ SPF ở trên dành cho domain mới chỉ gửi qua VPS này. MX không làm thay đổi nơi chạy website.
 
 Nếu dùng Cloudflare, bản ghi `mail` phải là **DNS only** (mây xám). Không thêm AAAA cho đến khi IPv6, PTR, firewall và đường gửi IPv6 đã được cấu hình/kiểm tra. Bản này chỉ nêu SPF IPv4.
+
+Mỗi domain gửi mail cần DKIM riêng. Sau khi Maddy khởi động, kiểm tra toàn bộ output của `docker compose exec maddy sh -c 'cat /data/dkim_keys/*.dns'` và tạo record `default._domainkey` tương ứng cho từng domain trước khi kiểm tra gửi Internet.
 
 Kiểm tra:
 
