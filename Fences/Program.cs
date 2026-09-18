@@ -168,7 +168,7 @@ builder.Services.AddAuthentication(options =>
             if (!string.IsNullOrWhiteSpace(verifiedEmail) && context.Identity is not null)
             {
                 ReplaceClaim(context.Identity, ClaimTypes.Email, verifiedEmail);
-                ReplaceClaim(context.Identity, "urn:github:email_verified", bool.TrueString);
+                ReplaceClaim(context.Identity, "urn:github:email_verified", "true");
             }
 
             if (string.IsNullOrWhiteSpace(context.Identity?.FindFirst(ClaimTypes.Name)?.Value))
