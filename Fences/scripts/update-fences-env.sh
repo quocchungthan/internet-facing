@@ -152,3 +152,5 @@ if [[ "$restart" == true ]]; then
         --env-file "$runtime_env_file" "$image" >/dev/null
     echo "Restarted $service_container using image $image"
 fi
+
+exit 0
