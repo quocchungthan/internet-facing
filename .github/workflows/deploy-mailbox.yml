@@ -40,6 +40,7 @@ jobs:
       base_domain: ${{ steps.derive.outputs.base_domain }}
       subdomain: ${{ steps.derive.outputs.subdomain }}
       deploy_dir: ${{ steps.derive.outputs.deploy_dir }}
+      additional_domains: ${{ steps.derive.outputs.additional_domains }}
       ssh_ready: ${{ steps.ssh-check.outputs.ssh_ready }}
       secrets_ok: ${{ steps.secret-check.outputs.secrets_ok }}
 
@@ -65,6 +66,7 @@ jobs:
           INPUT_SUBDOMAIN: ${{ inputs.subdomain }}
           INPUT_BASE_DOMAIN: ${{ inputs.base_domain }}
           VAR_BASE_DOMAIN: ${{ vars.EV_DOMAIN }}
+          VAR_ADDITIONAL_DOMAINS: ${{ vars.MAILBOX_ADDITIONAL_DOMAINS }}
           VAR_DEPLOY_DIR: ${{ vars.MAILBOX_DEPLOY_DIR }}
         run: |
           set -euo pipefail
@@ -100,6 +102,18 @@ jobs:
             exit 1
           fi
 
+          additional_domains="${VAR_ADDITIONAL_DOMAINS//,/ }"
+          for additional in $additional_domains; do
+            if [[ ! "$additional" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$ ]]; then
+              echo "::error::Additional mail domain '$additional' is not a valid domain name."
+              exit 1
+            fi
+            if [[ "$additional" == "$base" ]]; then
+              echo "::error::Additional mail domain '$additional' duplicates the base domain."
+              exit 1
+            fi
+          done
+
           deploy_dir="${VAR_DEPLOY_DIR:-}"
           if [[ -z "$deploy_dir" ]]; then
             echo "::error::No deploy directory is configured — refusing to guess one."
@@ -116,6 +130,7 @@ jobs:
             echo "subdomain=$sub"
             echo "base_domain=$base"
             echo "mail_hostname=${sub}.${base}"
+            echo "additional_domains=$additional_domains"
             echo "deploy_dir=$deploy_dir"
           } >> "$GITHUB_OUTPUT"
 
@@ -123,6 +138,7 @@ jobs:
           echo "Subdomain       : $sub"
           echo "Base domain     : $base"
           echo "Mail hostname   : ${sub}.${base}"
+          echo "Additional domains: ${additional_domains:-none}"
           echo "Deploy directory: $deploy_dir"
 
       - name: Check required GitHub secrets and variables
@@ -510,6 +526,8 @@ jobs:
           SSH_PORT: ${{ secrets.VPS_PORT || '22' }}
           DEPLOY_DIR: ${{ needs.preflight.outputs.deploy_dir }}
           MAIL_HOSTNAME: ${{ needs.preflight.outputs.mail_hostname }}
+          BASE_DOMAIN: ${{ needs.preflight.outputs.base_domain }}
+          ADDITIONAL_DOMAINS: ${{ needs.preflight.outputs.additional_domains }}
         run: |
           set -euo pipefail
           port="${SSH_PORT:-22}"
@@ -658,9 +676,17 @@ jobs:
           set -euo pipefail
           port="${SSH_PORT:-22}"
           ssh -i ~/.ssh/id_deploy -p "$port" -o BatchMode=yes -o ConnectTimeout=15 \
-            "$SSH_USER@$SSH_HOST" "DEPLOY_DIR='$DEPLOY_DIR' MAIL_HOSTNAME='$MAIL_HOSTNAME' bash -s" <<'REMOTE'
+            "$SSH_USER@$SSH_HOST" "DEPLOY_DIR='$DEPLOY_DIR' MAIL_HOSTNAME='$MAIL_HOSTNAME' BASE_DOMAIN='$BASE_DOMAIN' ADDITIONAL_DOMAINS='$ADDITIONAL_DOMAINS' bash -s" <<'REMOTE'
           set -euo pipefail
           cd "$DEPLOY_DIR"
+          if [ -n "$ADDITIONAL_DOMAINS" ]; then
+            domains="$BASE_DOMAIN $ADDITIONAL_DOMAINS"
+            if grep -q '^MAIL_DOMAINS=' .env; then
+              sed -i "s/^MAIL_DOMAINS=.*/MAIL_DOMAINS=$domains/" .env
+            else
+              printf 'MAIL_DOMAINS=%s\n' "$domains" >> .env
+            fi
+          fi
           docker compose up -d --build
           MAIL_HOSTNAME="$MAIL_HOSTNAME" MAIL_DEPLOY_DIR="$DEPLOY_DIR" bash scripts/configure-caddy-web.sh
           docker compose ps
