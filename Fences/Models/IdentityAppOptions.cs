@@ -24,6 +24,8 @@ public sealed class OidcClientOptions
 {
     public string ClientId { get; init; } = string.Empty;
     public string DisplayName { get; init; } = string.Empty;
+    // Non-empty secret registers a confidential client instead of a public one.
+    public string? ClientSecret { get; init; }
     public List<string> RedirectUris { get; init; } = [];
     public List<string> PostLogoutRedirectUris { get; init; } = [];
 }
