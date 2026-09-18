@@ -121,6 +121,10 @@ sudo test -s /etc/shuneo/fences-secrets/oidc-encryption.pfx
 
 The bootstrap is intentionally first-time-only and refuses to run if either final destination exists. If an installation failure leaves a destination behind, inspect it in a private root session, remove only the incomplete Fences material after confirming it contains nothing needed, then rerun the complete bootstrap. Certificate rotation requires a separate planned replacement procedure.
 
+## Updating runtime environment values after bootstrap
+
+Use **Update Fences runtime environment** (`update-fences-env.yml`) to change values such as an OIDC client secret or redirect URI on an already-bootstrapped host, without touching `/etc/shuneo/fences-secrets` or its certificates. Type the exact confirmation `UPDATE_FENCES_ENV`, and only the secrets/variables you actually set (for example `FENCES_OIDC_CLIENT_SECRET`) are applied; unset values are left unchanged. It refuses to run unless `/etc/shuneo/fences.env` and `/etc/shuneo/fences-secrets` already exist, edits `fences.env` in place while preserving its ownership and mode, and rejects any attempt to change certificate paths, certificate passwords, the identity database path, or the Data Protection keys path. When the `restart` input is left at its default `true`, it recreates the `shuneo-fences` container from its currently running image so the new values take effect immediately; it does not touch the Caddy configuration or rebuild the image.
+
 `Fences/scripts/deploy-fences.sh` is the service-specific wrapper for `deployment/deploy-caddy-service.sh`. It mounts `/etc/shuneo/fences-secrets` read-only inside the container at `/run/secrets`, mounts `/var/lib/fences` for persistent state, and creates the Caddy site for `identity.eldervibe.dev`.
 
 For a manual deployment after bootstrap, run the root-only wrapper as root:
