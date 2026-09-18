@@ -1,4 +1,6 @@
+using System.Net.Http.Headers;
 using System.Security.Claims;
+using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -13,7 +15,7 @@ public sealed class OidcController : Controller
     [HttpGet("/connect/authorize")]
     [HttpPost("/connect/authorize")]
     [IgnoreAntiforgeryToken]
-    public IActionResult Authorize()
+    public async Task<IActionResult> Authorize()
     {
         var request = Microsoft.AspNetCore.OpenIddictServerAspNetCoreHelpers.GetOpenIddictServerRequest(HttpContext)
             ?? throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
@@ -51,11 +53,22 @@ public sealed class OidcController : Controller
         }
 
         var email = User.FindFirstValue(ClaimTypes.Email);
-        var emailVerified = string.Equals(User.FindFirstValue("urn:github:email_verified"), bool.TrueString, StringComparison.OrdinalIgnoreCase);
-        if (!string.IsNullOrWhiteSpace(email) && emailVerified)
+        var emailVerifiedClaim = User.FindFirstValue("urn:github:email_verified");
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            var verifiedEmail = await GetVerifiedGitHubEmailAsync(HttpContext, await HttpContext.GetTokenAsync("access_token"));
+            if (!string.IsNullOrWhiteSpace(verifiedEmail))
+            {
+                email = verifiedEmail;
+                emailVerifiedClaim = "true";
+            }
+        }
+
+        var emailVerified = !string.Equals(emailVerifiedClaim, bool.FalseString, StringComparison.OrdinalIgnoreCase);
+        if (!string.IsNullOrWhiteSpace(email))
         {
             identity.SetClaim(OpenIddictConstants.Claims.Email, email);
-            identity.SetClaim(OpenIddictConstants.Claims.EmailVerified, bool.TrueString);
+            identity.SetClaim(OpenIddictConstants.Claims.EmailVerified, emailVerified ? "true" : "false");
         }
 
         var principal = new ClaimsPrincipal(identity);
@@ -110,13 +123,45 @@ public sealed class OidcController : Controller
         }
 
         var email = User.FindFirstValue(OpenIddictConstants.Claims.Email);
-        var emailVerified = string.Equals(User.FindFirstValue(OpenIddictConstants.Claims.EmailVerified), bool.TrueString, StringComparison.OrdinalIgnoreCase);
-        if (!string.IsNullOrWhiteSpace(email) && emailVerified)
+        if (!string.IsNullOrWhiteSpace(email))
         {
             claims[OpenIddictConstants.Claims.Email] = email;
-            claims[OpenIddictConstants.Claims.EmailVerified] = true;
+            claims[OpenIddictConstants.Claims.EmailVerified] = !string.Equals(User.FindFirstValue(OpenIddictConstants.Claims.EmailVerified), bool.FalseString, StringComparison.OrdinalIgnoreCase);
         }
 
         return Ok(claims);
+    }
+
+    private static async Task<string?> GetVerifiedGitHubEmailAsync(HttpContext httpContext, string? accessToken)
+    {
+        if (string.IsNullOrWhiteSpace(accessToken))
+        {
+            return null;
+        }
+
+        var request = new HttpRequestMessage(HttpMethod.Get, "https://api.github.com/user/emails");
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        request.Headers.UserAgent.ParseAdd("fences-identity-app");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var client = httpContext.RequestServices.GetRequiredService<IHttpClientFactory>().CreateClient();
+        var response = await client.SendAsync(request, httpContext.RequestAborted);
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        using var payload = JsonDocument.Parse(await response.Content.ReadAsStringAsync(httpContext.RequestAborted));
+        return payload.RootElement.EnumerateArray()
+            .Select(email => new
+            {
+                Address = email.TryGetProperty("email", out var address) ? address.GetString() : null,
+                Primary = email.TryGetProperty("primary", out var primary) && primary.GetBoolean(),
+                Verified = email.TryGetProperty("verified", out var verified) && verified.GetBoolean()
+            })
+            .Where(email => email.Verified && !string.IsNullOrWhiteSpace(email.Address))
+            .OrderByDescending(email => email.Primary)
+            .Select(email => email.Address)
+            .FirstOrDefault();
     }
 }
