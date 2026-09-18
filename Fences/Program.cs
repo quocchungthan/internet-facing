@@ -228,16 +228,15 @@ static async Task SeedOidcClientsAsync(IServiceProvider services, IEnumerable<Oi
     var manager = services.GetRequiredService<IOpenIddictApplicationManager>();
     foreach (var client in clients.Where(client => !string.IsNullOrWhiteSpace(client.ClientId)))
     {
-        if (await manager.FindByClientIdAsync(client.ClientId) is not null)
-        {
-            continue;
-        }
+        // A non-empty secret registers a confidential client; otherwise the client stays public.
+        var isConfidential = !string.IsNullOrWhiteSpace(client.ClientSecret);
 
         var descriptor = new OpenIddictApplicationDescriptor
         {
             ClientId = client.ClientId,
+            ClientSecret = isConfidential ? client.ClientSecret : null,
             DisplayName = string.IsNullOrWhiteSpace(client.DisplayName) ? client.ClientId : client.DisplayName,
-            ClientType = OpenIddictConstants.ClientTypes.Public,
+            ClientType = isConfidential ? OpenIddictConstants.ClientTypes.Confidential : OpenIddictConstants.ClientTypes.Public,
             ConsentType = OpenIddictConstants.ConsentTypes.Implicit
         };
         descriptor.RedirectUris.UnionWith(client.RedirectUris.Select(uri => new Uri(uri)));
@@ -251,6 +250,17 @@ static async Task SeedOidcClientsAsync(IServiceProvider services, IEnumerable<Oi
             OpenIddictConstants.Permissions.Scopes.Email
         ]);
 
-        await manager.CreateAsync(descriptor);
+        var existingApplication = await manager.FindByClientIdAsync(client.ClientId);
+        if (existingApplication is null)
+        {
+            await manager.CreateAsync(descriptor);
+        }
+        else
+        {
+            // client_type is not mutable in-place for existing rows in every OpenIddict version;
+            // UpdateAsync re-applies the descriptor (including the new secret hash) to the existing entity.
+            await manager.UpdateAsync(existingApplication, descriptor);
+        }
     }
 }
+
