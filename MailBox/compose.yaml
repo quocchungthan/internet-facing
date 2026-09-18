@@ -6,6 +6,7 @@ services:
     environment:
       MADDY_HOSTNAME: ${MAIL_HOSTNAME:?Run setup first}
       MADDY_DOMAIN: ${MAIL_DOMAIN:?Run setup first}
+      MADDY_DOMAINS: ${MAIL_DOMAINS:-${MAIL_DOMAIN}}
     volumes:
       - ./runtime/mail:/data
       - ./maddy/maddy.conf:/data/maddy.conf:ro
@@ -24,6 +25,7 @@ services:
     restart: unless-stopped
     environment:
       MAIL_DOMAIN: ${MAIL_DOMAIN}
+      MAIL_DOMAINS: ${MAIL_DOMAINS:-${MAIL_DOMAIN}}
       MAIL_HOSTNAME: ${MAIL_HOSTNAME}
       SECRET_KEY: ${SECRET_KEY:?Run setup first}
       SSL_CERT_FILE: ${SSL_CERT_FILE:-/etc/ssl/certs/ca-certificates.crt}

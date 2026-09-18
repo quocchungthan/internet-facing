@@ -25,8 +25,8 @@ app.config.update(
     PERMANENT_SESSION_LIFETIME=3600,
 )
 DOMAIN = os.environ['MAIL_DOMAIN']
+DOMAINS = {domain.strip().lower() for domain in os.environ.get('MAIL_DOMAINS', DOMAIN).replace(',', ' ').split() if domain.strip()}
 HOST = os.environ['MAIL_HOSTNAME']
-ALLOWED = {f'shuneo@{DOMAIN}', f'admin@{DOMAIN}'}
 FOLDERS = {'inbox': 'INBOX', 'sent': 'Sent'}
 sessions = {}
 attempts = {}
@@ -107,7 +107,7 @@ def login():
     if request.method == 'POST':
         email = request.form.get('email', '').strip().lower()
         password = request.form.get('password', '')
-        if email not in ALLOWED or len(password) > 256:
+        if not any(email.endswith('@' + domain) for domain in DOMAINS) or len(password) > 256:
             flash('Email hoặc mật khẩu không đúng.', 'error')
             return render_template('login.html', domain=DOMAIN), 401
         now = time.time()
