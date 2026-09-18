@@ -672,6 +672,8 @@ jobs:
           SSH_PORT: ${{ secrets.VPS_PORT || '22' }}
           DEPLOY_DIR: ${{ needs.preflight.outputs.deploy_dir }}
           MAIL_HOSTNAME: ${{ needs.preflight.outputs.mail_hostname }}
+          BASE_DOMAIN: ${{ needs.preflight.outputs.base_domain }}
+          ADDITIONAL_DOMAINS: ${{ needs.preflight.outputs.additional_domains }}
         run: |
           set -euo pipefail
           port="${SSH_PORT:-22}"
