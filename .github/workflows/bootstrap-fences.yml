@@ -53,6 +53,7 @@ jobs:
           FENCES_GITHUB_CLIENT_ID: ${{ secrets.FENCES_GITHUB_CLIENT_ID }}
           FENCES_GITHUB_CLIENT_SECRET: ${{ secrets.FENCES_GITHUB_CLIENT_SECRET }}
           FENCES_OIDC_CLIENT_ID: ${{ secrets.FENCES_OIDC_CLIENT_ID }}
+          FENCES_OIDC_CLIENT_SECRET: ${{ secrets.FENCES_OIDC_CLIENT_SECRET }}
           FENCES_BRAND_NAME: ${{ vars.FENCES_BRAND_NAME }}
           FENCES_COOKIE_DOMAIN: ${{ vars.FENCES_COOKIE_DOMAIN }}
           FENCES_OIDC_ISSUER: ${{ vars.FENCES_OIDC_ISSUER }}
@@ -93,7 +94,7 @@ jobs:
 
           for dotenv_value in \
               FENCES_GITHUB_CLIENT_ID FENCES_GITHUB_CLIENT_SECRET FENCES_OIDC_CLIENT_ID \
-              FENCES_BRAND_NAME FENCES_COOKIE_DOMAIN FENCES_OIDC_ISSUER \
+              FENCES_OIDC_CLIENT_SECRET FENCES_BRAND_NAME FENCES_COOKIE_DOMAIN FENCES_OIDC_ISSUER \
               FENCES_PERSISTENT_LOGIN_DAYS FENCES_ALLOWED_RETURN_HOST \
               FENCES_ALLOWED_CORS_ORIGIN FENCES_OIDC_CLIENT_NAME \
               FENCES_OIDC_REDIRECT_URI FENCES_OIDC_POST_LOGOUT_REDIRECT_URI; do
@@ -114,6 +115,10 @@ jobs:
             printf 'IdentityApp__AllowedCorsOrigins__0=%s\n' "$FENCES_ALLOWED_CORS_ORIGIN"
             printf 'IdentityApp__OidcClients__0__ClientId=%s\n' "$FENCES_OIDC_CLIENT_ID"
             printf 'IdentityApp__OidcClients__0__DisplayName=%s\n' "$FENCES_OIDC_CLIENT_NAME"
+            # Leave FENCES_OIDC_CLIENT_SECRET unset/blank to register a public PKCE client instead of a confidential one.
+            if [[ -n "${FENCES_OIDC_CLIENT_SECRET:-}" ]]; then
+              printf 'IdentityApp__OidcClients__0__ClientSecret=%s\n' "$FENCES_OIDC_CLIENT_SECRET"
+            fi
             printf 'IdentityApp__OidcClients__0__RedirectUris__0=%s\n' "$FENCES_OIDC_REDIRECT_URI"
             if [[ -n "${FENCES_OIDC_POST_LOGOUT_REDIRECT_URI:-}" ]]; then
               printf 'IdentityApp__OidcClients__0__PostLogoutRedirectUris__0=%s\n' "$FENCES_OIDC_POST_LOGOUT_REDIRECT_URI"
