@@ -40,9 +40,15 @@ def init(args):
     pattern = r'(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}'
     if not re.fullmatch(pattern, domain) or not re.fullmatch(pattern, host):
         sys.exit('Invalid domain/hostname. Use an ASCII/punycode domain.')
+    additional_domains = [value.lower() for value in args.additional_domain]
+    if any(not re.fullmatch(pattern, value) for value in additional_domains):
+        sys.exit('Invalid additional domain. Use an ASCII/punycode domain.')
     for directory in ['runtime/mail', 'runtime/letsencrypt', 'runtime/acme', 'runtime/ca', 'secrets', 'backups']:
         Path(directory).mkdir(parents=True, exist_ok=True)
-    config = {'MAIL_DOMAIN': domain, 'MAIL_HOSTNAME': host, 'SECRET_KEY': secrets.token_hex(32)}
+    domains = [domain, *additional_domains]
+    if len(set(domains)) != len(domains):
+        sys.exit('Duplicate domain supplied.')
+    config = {'MAIL_DOMAIN': domain, 'MAIL_DOMAINS': ' '.join(domains), 'MAIL_HOSTNAME': host, 'SECRET_KEY': secrets.token_hex(32)}
     if args.local:
         config.update(BIND_IP='127.0.0.1', SMTP_PORT='2525', SUBMISSION_PORT='1587', IMAP_PORT='1993', HTTP_PORT='8080', HTTPS_PORT='8443', SSL_CERT_FILE='/extra-ca/test-ca.pem', LOCAL_TEST='1')
     accounts = {f'{name}@{domain}': secrets.token_urlsafe(24) for name in ['shuneo', 'admin']}
@@ -181,6 +187,7 @@ subs = parser.add_subparsers(dest='command', required=True)
 p = subs.add_parser('init')
 p.add_argument('--domain', required=True)
 p.add_argument('--hostname')
+p.add_argument('--additional-domain', action='append', default=[])
 p.add_argument('--local', action='store_true')
 p = subs.add_parser('certificate')
 p.add_argument('--email')
