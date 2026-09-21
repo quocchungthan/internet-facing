@@ -121,7 +121,12 @@ jobs:
             -o BatchMode=yes \
             -o StrictHostKeyChecking=yes \
             "$VPS_USER@$VPS_HOST" \
-            'docker load'
+            'if docker info >/dev/null 2>&1; then exec docker load; fi
+             if ! command -v sudo >/dev/null 2>&1 || ! sudo -n -l >/dev/null 2>&1; then
+               echo "Docker is unavailable to VPS_USER and passwordless sudo is not configured." >&2
+               exit 1
+             fi
+             exec sudo -n docker load'
 
       - name: Transfer common script and invoke service wrapper
         env:
@@ -137,7 +142,7 @@ jobs:
             -o BatchMode=yes \
             -o StrictHostKeyChecking=yes \
             "$VPS_USER@$VPS_HOST" \
-            "cat > '$common_script'" \
+            "cat > '$common_script' && chmod 700 '$common_script'" \
             < "${{ inputs.deploy_common_script }}"
           printf 'export ACME_EMAIL=%q\n' "$ACME_EMAIL" > /tmp/deploy-service-wrapper.sh
           cat "${{ inputs.wrapper_path }}" >> /tmp/deploy-service-wrapper.sh

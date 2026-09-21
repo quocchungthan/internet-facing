@@ -226,7 +226,7 @@ apt-get update -y
 apt-get install -y caddy
 
 # Set up sites directory and base Caddyfile
-mkdir -p /etc/caddy/sites
+install -d -m 0755 /etc/caddy/sites
 
 caddyfile_email_directive=""
 if [[ -n "$ACME_EMAIL" ]]; then
@@ -241,6 +241,7 @@ $caddyfile_email_directive
 # Import all individual site configurations from /etc/caddy/sites
 import /etc/caddy/sites/*.caddy
 EOF
+chmod 0644 /etc/caddy/Caddyfile
 
 systemctl enable caddy
 systemctl restart caddy

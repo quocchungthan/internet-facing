@@ -15,4 +15,4 @@ SERVICE_STATIC_CONTAINER_PATH=/app/wwwroot/hanging-post
 SERVICE_STATIC_ROOT=/var/lib/caddy/farm/hanging-post
 SERVICE_STATIC_PUBLIC_PREFIX=/hanging-post
 
-exec "$DEPLOY_COMMON_SCRIPT"
+exec bash "$DEPLOY_COMMON_SCRIPT"
