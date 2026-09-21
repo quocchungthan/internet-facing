@@ -1,4 +1,5 @@
 import imaplib
+import json
 import os
 import re
 import secrets
@@ -6,12 +7,15 @@ import smtplib
 import ssl
 import threading
 import time
+import urllib.parse
+import urllib.request
 from contextlib import contextmanager
 from email import policy
 from email.parser import BytesParser
 from email.message import EmailMessage
 from email.utils import formatdate, make_msgid
 from html.parser import HTMLParser
+from pathlib import Path
 
 from flask import Flask, abort, flash, redirect, render_template, request, session, url_for
 
@@ -25,13 +29,36 @@ app.config.update(
     PERMANENT_SESSION_LIFETIME=3600,
 )
 DOMAIN = os.environ['MAIL_DOMAIN']
-DOMAINS = {domain.strip().lower() for domain in os.environ.get('MAIL_DOMAINS', DOMAIN).replace(',', ' ').split() if domain.strip()}
 HOST = os.environ['MAIL_HOSTNAME']
 FOLDERS = {'inbox': 'INBOX', 'sent': 'Sent'}
 sessions = {}
-attempts = {}
 lock = threading.RLock()
 ADDRESS = re.compile(r"[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?\.[A-Za-z]{2,63}\Z")
+
+# Management login: GitHub via Fences (identity.eldervibe.dev); mailbox access is granted
+# per GitHub account through the hardcoded secrets/managed_accounts.json map, not a password form.
+OAUTH_ISSUER = os.environ.get('OAUTH_ISSUER', 'https://identity.eldervibe.dev').rstrip('/')
+OAUTH_CLIENT_ID = os.environ.get('OAUTH_CLIENT_ID', '')
+OAUTH_CLIENT_SECRET = os.environ.get('OAUTH_CLIENT_SECRET', '')
+OAUTH_REDIRECT_URL = os.environ.get('OAUTH_REDIRECT_URL', f'https://{HOST}/auth/github/callback')
+MANAGED_ACCOUNTS_PATH = Path('secrets/managed_accounts.json')
+ACCOUNTS_PATH = Path('secrets/accounts.json')
+
+
+def oauth_configured():
+    return bool(OAUTH_CLIENT_ID and OAUTH_CLIENT_SECRET)
+
+
+def load_json_map(path):
+    try:
+        return json.loads(path.read_text(encoding='utf-8'))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def managed_accounts_for(github_email):
+    mapping = {str(k).strip().lower(): [str(v).strip().lower() for v in values] for k, values in load_json_map(MANAGED_ACCOUNTS_PATH).items()}
+    return mapping.get(github_email.strip().lower(), [])
 
 
 def tls_context():
@@ -83,7 +110,7 @@ def protect():
         supplied = request.form.get('csrf', '')
         if not expected or not secrets.compare_digest(expected, supplied):
             abort(400, 'Phiên biểu mẫu hết hạn. Hãy tải lại trang.')
-    if request.endpoint not in {'login', 'static', 'health'} and not current_user():
+    if request.endpoint not in {'login', 'static', 'health', 'auth_github', 'auth_github_callback', 'choose_mailbox', 'auth_select'} and not current_user():
         return redirect(url_for('login'))
 
 
@@ -102,44 +129,113 @@ def health():
     return {'status': 'ok'}
 
 
-@app.route('/login', methods=['GET', 'POST'])
+@app.get('/login')
 def login():
-    if request.method == 'POST':
-        email = request.form.get('email', '').strip().lower()
-        password = request.form.get('password', '')
-        if not any(email.endswith('@' + domain) for domain in DOMAINS) or len(password) > 256:
-            flash('Email hoặc mật khẩu không đúng.', 'error')
-            return render_template('login.html', domain=DOMAIN), 401
-        now = time.time()
-        with lock:
-            history = [t for t in attempts.get(email, []) if now - t < 300]
-            if len(history) >= 10:
-                flash('Quá nhiều lần đăng nhập. Hãy thử lại sau 5 phút.', 'error')
-                return render_template('login.html', domain=DOMAIN), 429
-            attempts[email] = history + [now]
-        try:
-            with mailbox(email, password):
-                pass
-        except imaplib.IMAP4.error:
-            flash('Email hoặc mật khẩu không đúng.', 'error')
-            return render_template('login.html', domain=DOMAIN), 401
-        except (OSError, ssl.SSLError):
-            flash('Chưa kết nối được máy chủ mail. Kiểm tra dịch vụ và TLS.', 'error')
-            return render_template('login.html', domain=DOMAIN), 503
-        with lock:
-            attempts.pop(email, None)
-            sessions.pop(session.get('sid'), None)
-            # Limit concurrent sessions per account; credentials live only in server RAM.
-            existing = [key for key, value in sessions.items() if value['email'] == email]
-            for key in existing[:-4]:
-                sessions.pop(key, None)
-            sid = secrets.token_urlsafe(32)
-            sessions[sid] = {'email': email, 'password': password, 'expires': now + 3600, 'sends': []}
-        session.clear()
-        session['sid'] = sid
-        session.permanent = True
-        return redirect(url_for('inbox'))
-    return render_template('login.html', domain=DOMAIN)
+    return render_template('login.html', domain=DOMAIN, oauth_configured=oauth_configured())
+
+
+@app.get('/auth/github')
+def auth_github():
+    if not oauth_configured():
+        abort(503, 'GitHub login is not configured.')
+    state = secrets.token_urlsafe(32)
+    session['oauth_state'] = state
+    params = urllib.parse.urlencode({
+        'response_type': 'code',
+        'client_id': OAUTH_CLIENT_ID,
+        'redirect_uri': OAUTH_REDIRECT_URL,
+        'scope': 'openid profile email',
+        'state': state,
+    })
+    return redirect(f'{OAUTH_ISSUER}/connect/authorize?{params}')
+
+
+@app.get('/auth/github/callback')
+def auth_github_callback():
+    if not oauth_configured():
+        abort(503, 'GitHub login is not configured.')
+    state = request.args.get('state', '')
+    if not state or not secrets.compare_digest(state, session.pop('oauth_state', '')):
+        flash('Phiên đăng nhập GitHub hết hạn. Hãy thử lại.', 'error')
+        return redirect(url_for('login'))
+    code = request.args.get('code', '')
+    if not code:
+        flash('Đăng nhập GitHub bị hủy.', 'error')
+        return redirect(url_for('login'))
+    try:
+        token_body = urllib.parse.urlencode({
+            'grant_type': 'authorization_code',
+            'code': code,
+            'redirect_uri': OAUTH_REDIRECT_URL,
+            'client_id': OAUTH_CLIENT_ID,
+            'client_secret': OAUTH_CLIENT_SECRET,
+        }).encode('ascii')
+        token_request = urllib.request.Request(
+            f'{OAUTH_ISSUER}/connect/token', data=token_body, method='POST',
+            headers={'Content-Type': 'application/x-www-form-urlencoded'})
+        with urllib.request.urlopen(token_request, timeout=10) as response:
+            token = json.loads(response.read())
+        userinfo_request = urllib.request.Request(
+            f'{OAUTH_ISSUER}/connect/userinfo',
+            headers={'Authorization': f'Bearer {token["access_token"]}'})
+        with urllib.request.urlopen(userinfo_request, timeout=10) as response:
+            userinfo = json.loads(response.read())
+    except Exception:
+        flash('Không thể xác thực với GitHub. Hãy thử lại.', 'error')
+        return redirect(url_for('login'))
+    managed = managed_accounts_for(str(userinfo.get('email', '')))
+    if not managed:
+        flash('Tài khoản GitHub này chưa được cấp quyền quản lý hộp thư nào.', 'error')
+        return redirect(url_for('login'))
+    if len(managed) == 1:
+        return select_mailbox(managed[0])
+    session['manager_accounts'] = managed
+    return redirect(url_for('choose_mailbox'))
+
+
+@app.get('/auth/choose')
+def choose_mailbox():
+    managed = session.get('manager_accounts') or []
+    if not managed:
+        return redirect(url_for('login'))
+    return render_template('choose.html', domain=DOMAIN, accounts=managed)
+
+
+@app.post('/auth/select')
+def auth_select():
+    managed = session.get('manager_accounts') or []
+    address = request.form.get('address', '').strip().lower()
+    if address not in managed:
+        abort(403)
+    return select_mailbox(address)
+
+
+def select_mailbox(address):
+    password = load_json_map(ACCOUNTS_PATH).get(address)
+    if not password:
+        flash('Không tìm thấy thông tin đăng nhập hộp thư này.', 'error')
+        return redirect(url_for('login'))
+    try:
+        with mailbox(address, password):
+            pass
+    except imaplib.IMAP4.error:
+        flash('Hộp thư từ chối thông tin đăng nhập đã lưu. Liên hệ quản trị viên.', 'error')
+        return redirect(url_for('login'))
+    except (OSError, ssl.SSLError):
+        flash('Chưa kết nối được máy chủ mail. Kiểm tra dịch vụ và TLS.', 'error')
+        return redirect(url_for('login'))
+    now = time.time()
+    with lock:
+        sessions.pop(session.get('sid'), None)
+        existing = [key for key, value in sessions.items() if value['email'] == address]
+        for key in existing[:-4]:
+            sessions.pop(key, None)
+        sid = secrets.token_urlsafe(32)
+        sessions[sid] = {'email': address, 'password': password, 'expires': now + 3600, 'sends': []}
+    session.pop('manager_accounts', None)
+    session['sid'] = sid
+    session.permanent = True
+    return redirect(url_for('inbox'))
 
 
 @app.post('/logout')
