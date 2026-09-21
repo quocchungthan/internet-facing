@@ -1,3 +1,7 @@
 <Solution>
     <Project Path="Farm/Farm.csproj" />
+    <Project Path="Farm.Azure/Farm.Azure.csproj" />
+    <Project Path="Farm.Console/Farm.Console.csproj" />
+    <Project Path="Farm.Azure.Tests/Farm.Azure.Tests.csproj" />
+    <Project Path="Farm.Console.Tests/Farm.Console.Tests.csproj" />
 </Solution>

@@ -14,6 +14,18 @@ A dotnet solution which contains:
 
 The Fences identity service serves both `identity.shuneo.com` for compatibility and the canonical OIDC issuer `identity.eldervibe.dev`. See `Fences/README.md` for persistent storage, certificates, and runtime environment requirements.
 
+## Azure DevOps tools
+
+`Farm.Azure` owns the Azure DevOps client package, settings schema, and reusable work-item DTOs. `Farm.Console` is a Linux-capable command-line entry point and owns runtime configuration loading.
+
+Set these environment variables before running the console:
+
+- `FARM_AZURE_DEVOPS_ORGANIZATION_URL`
+- `FARM_AZURE_DEVOPS_PROJECT`
+- `FARM_AZURE_DEVOPS_PAT`
+
+Then query work items with `dotnet run --project Farm.Console -- work-items 123 456`. Credentials are never stored in source files.
+
 ## Caddy ingress
 
 The main branch owns the shared Caddy ingress baseline. Install Caddy on the VPS as a systemd service, place `deployment/caddy/Caddyfile` at `/etc/caddy/Caddyfile`, and create `/etc/caddy/sites`. The base file imports `/etc/caddy/sites/*.caddy`; each `sub/*` deployment owns only its own domain fragment.
