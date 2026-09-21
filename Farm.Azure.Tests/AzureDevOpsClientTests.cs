@@ -9,7 +9,7 @@ public sealed class AzureDevOpsClientTests
     [InlineData(-1)]
     public async Task GetWorkItemsAsync_rejects_non_positive_ids(int id)
     {
-        using var client = CreateClient();
+        IAzureDevOpsClient client = CreateClient();
 
         var exception = await Assert.ThrowsAsync<ArgumentException>(() => client.GetWorkItemsAsync([id]));
 
@@ -19,7 +19,7 @@ public sealed class AzureDevOpsClientTests
     [Fact]
     public async Task GetWorkItemsAsync_rejects_duplicate_ids()
     {
-        using var client = CreateClient();
+        IAzureDevOpsClient client = CreateClient();
 
         var exception = await Assert.ThrowsAsync<ArgumentException>(() => client.GetWorkItemsAsync([1, 1]));
 

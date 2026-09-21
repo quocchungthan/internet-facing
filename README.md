@@ -16,7 +16,7 @@ The Fences identity service serves both `identity.shuneo.com` for compatibility 
 
 ## Azure DevOps tools
 
-`Farm.Azure` owns the Azure DevOps client package, settings schema, and reusable work-item DTOs. `Farm.Console` is a Linux-capable command-line entry point and owns runtime configuration loading.
+`Farm.Core` owns provider-neutral resource contracts, workspace export specifications/manifests, and safe local workspace rules. `Farm.Azure` is the Azure DevOps adapter and maps Azure SDK responses into Core contracts. `Farm.Console` is a Linux-capable CLI/bootstrap entry point and owns runtime configuration loading.
 
 Set these environment variables before running the console:
 
@@ -25,6 +25,8 @@ Set these environment variables before running the console:
 - `FARM_AZURE_DEVOPS_PAT`
 
 Then query work items with `dotnet run --project Farm.Console -- work-items 123 456`. Credentials are never stored in source files.
+
+Run `powershell -ExecutionPolicy Bypass -File scripts/Invoke-FarmValidation.ps1 -Scope Core` for Core-only validation, or omit `-Scope` to validate the full solution.
 
 ## Caddy ingress
 

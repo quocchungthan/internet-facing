@@ -2,10 +2,11 @@ using Microsoft.TeamFoundation.WorkItemTracking.WebApi;
 using Microsoft.TeamFoundation.WorkItemTracking.WebApi.Models;
 using Microsoft.VisualStudio.Services.Common;
 using Microsoft.VisualStudio.Services.WebApi;
+using CoreWorkItem = Farm.Core.Domain.WorkItem;
 
 namespace Farm.Azure;
 
-public sealed class AzureDevOpsClient : IAzureDevOpsClient, IDisposable
+public sealed class AzureDevOpsClient : IAzureDevOpsClient, IAzureDomainWorkItemClient, IDisposable
 {
     private readonly VssConnection connection;
     private readonly string project;
@@ -24,6 +25,22 @@ public sealed class AzureDevOpsClient : IAzureDevOpsClient, IDisposable
     public async Task<IReadOnlyList<AzureWorkItemDto>> GetWorkItemsAsync(
         IEnumerable<int> ids,
         CancellationToken cancellationToken = default)
+    {
+        var workItems = await GetAzureWorkItemsAsync(ids, cancellationToken);
+        return workItems.Select(AzureWorkItemMapper.ToDto).ToArray();
+    }
+
+    public async Task<IReadOnlyList<CoreWorkItem>> GetDomainWorkItemsAsync(
+        IEnumerable<int> ids,
+        CancellationToken cancellationToken = default)
+    {
+        var workItems = await GetAzureWorkItemsAsync(ids, cancellationToken);
+        return workItems.Select(AzureWorkItemMapper.ToDomain).ToArray();
+    }
+
+    private async Task<IReadOnlyList<WorkItem>> GetAzureWorkItemsAsync(
+        IEnumerable<int> ids,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(ids);
 
@@ -44,7 +61,7 @@ public sealed class AzureDevOpsClient : IAzureDevOpsClient, IDisposable
             workItemIds,
             cancellationToken: cancellationToken);
 
-        return workItems.Select(AzureWorkItemMapper.ToDto).ToArray();
+        return workItems;
     }
 
     public void Dispose() => client?.Dispose();

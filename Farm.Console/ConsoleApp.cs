@@ -1,4 +1,5 @@
 using Farm.Azure;
+using Farm.Core.Contracts;
 using System.Net.Http;
 using Microsoft.VisualStudio.Services.Common;
 
@@ -38,7 +39,8 @@ public static class ConsoleApp
 
             var settings = AzureDevOpsSettingsLoader.LoadFromEnvironment();
             using var client = new AzureDevOpsClient(settings);
-            var workItems = await client.GetWorkItemsAsync(ids, cancellation.Token);
+            IWorkItemSource workItemSource = new AzureWorkItemSource(client);
+            var workItems = await workItemSource.GetWorkItemsAsync(ids, cancellation.Token);
 
             foreach (var workItem in workItems)
             {
