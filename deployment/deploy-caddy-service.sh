@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Shared by multiple deployment wrappers (e.g. Farm, Fences) across branches — keep the SERVICE_* contract backward compatible.
 set -Eeuo pipefail
 
 : "${SERVICE_NAME:?SERVICE_NAME must identify the service}"
@@ -119,7 +120,9 @@ restore_fragment() {
 		file) as_root mv -f -- "$fragment_backup" "$fragment" ;;
 		absent) as_root rm -f -- "$fragment" ;;
 	esac
-	as_root chmod 0644 "$fragment"
+	if [[ -f "$fragment" ]]; then
+		as_root chmod 0644 "$fragment"
+	fi
 }
 
 reload_caddy() {
@@ -181,7 +184,7 @@ if [[ -n "$SERVICE_STATIC_ROOT" ]]; then
 	static_release="$static_releases_dir/$candidate_container"
 	as_root install -d -m 0755 "$SERVICE_STATIC_ROOT" "$static_releases_dir" "$static_release"
 	ensure_caddy_path_access "$static_release"
-	docker cp "$candidate_container:$SERVICE_STATIC_CONTAINER_PATH/." "$static_release"
+	as_root "$DOCKER_BIN" cp "$candidate_container:$SERVICE_STATIC_CONTAINER_PATH/." "$static_release"
 	as_root find "$static_release" -type d -exec chmod 0755 {} +
 	as_root find "$static_release" -type f -exec chmod 0644 {} +
 	as_root chown -R "$CADDY_USER:$CADDY_GROUP" "$static_release"
