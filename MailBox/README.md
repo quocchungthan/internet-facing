@@ -79,6 +79,32 @@ Script tạo `.env`, thư mục dữ liệu và `secrets/accounts.json` với ha
 
 `MAIL_DOMAINS` là danh sách domain local, phân tách bằng khoảng trắng. `MAIL_DOMAIN` vẫn là domain chính. Khi dùng GitHub Actions, đặt repository variable `MAILBOX_ADDITIONAL_DOMAINS` thành `shuneo.com` hoặc danh sách phân tách bằng dấu phẩy; workflow sẽ lưu danh sách này vào `.env` trước khi khởi động Maddy.
 
+### Đăng nhập quản trị bằng GitHub (Fences)
+
+Webapp không còn nhận email/mật khẩu; đăng nhập bắt buộc qua GitHub thông qua Fences (`https://identity.eldervibe.dev`). Sau khi xác thực, quyền mở hộp thư nào do `secrets/managed_accounts.json` quyết định — ánh xạ 1-N từ email tài khoản GitHub sang danh sách hộp thư được quản lý. `init` tạo file này với `solshuneo@gmail.com` quản lý toàn bộ hộp thư vừa sinh; dùng `--manager-email` (lặp lại được) để đặt email GitHub khác ngay khi `init`:
+
+```bash
+python3 scripts/manage.py init --domain eldervibe.dev --manager-email you@example.com --manager-email other@example.com
+```
+
+Trên máy đã `init` rồi, thêm/sửa một quản trị viên bằng lệnh `managers`:
+
+```bash
+python3 scripts/manage.py managers --set you@example.com --mailbox shuneo@eldervibe.dev --mailbox admin@eldervibe.dev
+```
+
+Bỏ `--mailbox` để cấp toàn bộ hộp thư hiện có trên server. Có thể sửa `secrets/managed_accounts.json` trực tiếp nếu cần:
+
+```json
+{
+  "solshuneo@gmail.com": ["shuneo@eldervibe.dev", "admin@eldervibe.dev"]
+}
+```
+
+Đăng ký `mailbox` làm OIDC client trên Fences (xem `Fences/README.md`) rồi đặt các biến môi trường cho service `web` trong `.env`: `OAUTH_CLIENT_ID`, `OAUTH_CLIENT_SECRET`, và tùy chọn `OAUTH_ISSUER`/`OAUTH_REDIRECT_URL` nếu khác giá trị mặc định (`https://identity.eldervibe.dev` và `https://<MAIL_HOSTNAME>/auth/github/callback`). Redirect URI đăng ký trên Fences phải khớp chính xác với `OAUTH_REDIRECT_URL`.
+
+Vì đăng nhập GitHub tự lấy mật khẩu IMAP từ `secrets/accounts.json`, hộp thư tạo thủ công bằng `creds create` (như ví dụ Chung dưới đây) cần được thêm thủ công vào cả `secrets/accounts.json` (địa chỉ → mật khẩu) và `secrets/managed_accounts.json` (GitHub email → danh sách địa chỉ) để đăng nhập qua web hoạt động.
+
 Tạo hai hộp thư cho Chung sau khi khởi động và đặt mật khẩu riêng cho từng địa chỉ:
 
 ```bash
