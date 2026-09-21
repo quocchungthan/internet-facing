@@ -30,12 +30,24 @@ Set OAuth secrets with environment variables rather than committing them:
 
 OIDC uses OpenIddict 7.0.0 with EF Core SQLite persistence. The stable subject is `github:<numeric-github-id>`, so a GitHub rename does not change the OIDC subject. The issuer is `https://identity.eldervibe.dev`; `identity.shuneo.com` remains a compatibility alias.
 
-`IdentityApp:OidcClients` registers public PKCE clients at startup. Each client needs a `ClientId`, one or more exact `RedirectUris`, and optional `PostLogoutRedirectUris`; do not add wildcard redirect URIs. For example:
+`IdentityApp:OidcClients` is an indexed array and registers as many clients as needed (storage, note, mail, the main page, etc.) at startup. Each client needs a `ClientId`, one or more exact `RedirectUris`, and optional `DisplayName`, `ClientSecret`, and `PostLogoutRedirectUris`; do not add wildcard redirect URIs. For example:
 
 ```text
-IdentityApp__OidcClients__0__ClientId=affine
-IdentityApp__OidcClients__0__DisplayName=Affine
-IdentityApp__OidcClients__0__RedirectUris__0=https://<your-affine-host>/oauth/callback
+IdentityApp__OidcClients__0__ClientId=storage
+IdentityApp__OidcClients__0__DisplayName=Storage
+IdentityApp__OidcClients__0__RedirectUris__0=https://storage.eldervibe.dev/oauth/callback/
+IdentityApp__OidcClients__1__ClientId=note
+IdentityApp__OidcClients__1__DisplayName=Note
+IdentityApp__OidcClients__1__RedirectUris__0=https://note.eldervibe.dev/oauth/callback
+```
+
+The deployment workflows (`bootstrap-fences.yml` and `update-fences-env.yml`) take the full client list as a single `FENCES_OIDC_CLIENTS_JSON` secret, a JSON array of `{ "clientId", "redirectUri", "displayName", "clientSecret", "postLogoutRedirectUri" }` objects (`clientSecret` blank/omitted registers a public PKCE client). `update-fences-env.yml` additionally requires a numeric `"index"` on each entry so it can target one client slot without disturbing the others, for example:
+
+```json
+[
+  { "index": 0, "clientId": "storage", "redirectUri": "https://storage.eldervibe.dev/oauth/callback/" },
+  { "index": 1, "clientId": "note", "redirectUri": "https://note.eldervibe.dev/oauth/callback" }
+]
 ```
 
 Development uses OpenIddict development certificates. Production refuses to start without both certificate files:
@@ -96,7 +108,7 @@ The active deployment uses Caddy for HTTPS and runs the container on loopback po
 docker build -f Fences/Dockerfile -t shuneo-fences .
 ```
 
-Before the first deployment, configure the GitHub `hostkey-server` environment. Required secrets are `VPS_HOST`, `VPS_PORT`, `VPS_USER`, `VPS_SSH_KEY`, `VPS_KNOWN_HOSTS`, `FENCES_GITHUB_CLIENT_ID`, `FENCES_GITHUB_CLIENT_SECRET`, and `FENCES_OIDC_CLIENT_ID`. Required variables are `FENCES_BRAND_NAME`, `FENCES_COOKIE_DOMAIN`, `FENCES_OIDC_ISSUER`, `FENCES_PERSISTENT_LOGIN_DAYS`, `FENCES_ALLOWED_RETURN_HOST`, `FENCES_ALLOWED_CORS_ORIGIN`, `FENCES_OIDC_CLIENT_NAME`, and `FENCES_OIDC_REDIRECT_URI`. Optional variable: `FENCES_OIDC_POST_LOGOUT_REDIRECT_URI`. In the GitHub Environment UI, require reviewers, restrict deployments to the protected deployment branch, and run this workflow only from that branch; these controls are Environment and branch-protection configuration, not something the YAML can fully enforce. `VPS_USER` must be the root SSH account. The bootstrap workflow assembles these fields into the runtime environment input and never logs their values. It must not contain certificate paths, certificate passwords, or persistent-storage paths; those values are provisioner-managed.
+Before the first deployment, configure the GitHub `hostkey-server` environment. Required secrets are `VPS_HOST`, `VPS_PORT`, `VPS_USER`, `VPS_SSH_KEY`, `VPS_KNOWN_HOSTS`, `FENCES_GITHUB_CLIENT_ID`, `FENCES_GITHUB_CLIENT_SECRET`, and `FENCES_OIDC_CLIENTS_JSON`. Required variables are `FENCES_BRAND_NAME`, `FENCES_COOKIE_DOMAIN`, `FENCES_OIDC_ISSUER`, `FENCES_PERSISTENT_LOGIN_DAYS`, `FENCES_ALLOWED_RETURN_HOST`, and `FENCES_ALLOWED_CORS_ORIGIN`. `FENCES_OIDC_CLIENTS_JSON` is a JSON array with one object per client (`storage`, `note`, `mail`, the main page, etc.), each requiring `clientId` and `redirectUri`, with optional `displayName`, `clientSecret` (blank/omitted registers a public PKCE client), and `postLogoutRedirectUri`. In the GitHub Environment UI, require reviewers, restrict deployments to the protected deployment branch, and run this workflow only from that branch; these controls are Environment and branch-protection configuration, not something the YAML can fully enforce. `VPS_USER` must be the root SSH account. The bootstrap workflow assembles these fields into the runtime environment input and never logs their values. It must not contain certificate paths, certificate passwords, or persistent-storage paths; those values are provisioner-managed.
 
 Run **Bootstrap Fences OIDC certificates** manually from GitHub Actions and type the exact confirmation `BOOTSTRAP_FENCES`. The workflow pins SSH host verification with `VPS_KNOWN_HOSTS`, transfers the bootstrap input in a mode `600` temporary file, and never logs or exports its contents. It first refuses when either final Fences output exists. It creates `/etc/shuneo` and `/var/lib/fences` only when absent; existing directories are not changed and must already be root-owned, non-symlink directories. `/etc/shuneo` must not be group- or other-writable, and `/var/lib/fences` must be mode `700`. It then transfers the provisioner into a root-only temporary directory on the VPS.
 
@@ -123,7 +135,7 @@ The bootstrap is intentionally first-time-only and refuses to run if either fina
 
 ## Updating runtime environment values after bootstrap
 
-Use **Update Fences runtime environment** (`update-fences-env.yml`) to change values such as an OIDC client secret or redirect URI on an already-bootstrapped host, without touching `/etc/shuneo/fences-secrets` or its certificates. Type the exact confirmation `UPDATE_FENCES_ENV`, and only the secrets/variables you actually set (for example `FENCES_OIDC_CLIENT_SECRET`) are applied; unset values are left unchanged. It refuses to run unless `/etc/shuneo/fences.env` and `/etc/shuneo/fences-secrets` already exist, edits `fences.env` in place while preserving its ownership and mode, and rejects any attempt to change certificate paths, certificate passwords, the identity database path, or the Data Protection keys path. When the `restart` input is left at its default `true`, it recreates the `shuneo-fences` container from its currently running image so the new values take effect immediately; it does not touch the Caddy configuration or rebuild the image.
+Use **Update Fences runtime environment** (`update-fences-env.yml`) to change values such as an OIDC client secret or redirect URI, or to add a new OIDC client (storage, note, mail, the main page, etc.), on an already-bootstrapped host, without touching `/etc/shuneo/fences-secrets` or its certificates. Type the exact confirmation `UPDATE_FENCES_ENV`, and only the secrets/variables you actually set are applied; unset values are left unchanged. To add or change OIDC clients, set `FENCES_OIDC_CLIENTS_JSON` to a JSON array where each object includes a numeric `index` (the client slot to create or update) plus any of `clientId`, `redirectUri`, `displayName`, `clientSecret`, or `postLogoutRedirectUri`; only fields present in an entry are changed, so unrelated clients and unrelated fields are left untouched. It refuses to run unless `/etc/shuneo/fences.env` and `/etc/shuneo/fences-secrets` already exist, edits `fences.env` in place while preserving its ownership and mode, and rejects any attempt to change certificate paths, certificate passwords, the identity database path, or the Data Protection keys path. When the `restart` input is left at its default `true`, it recreates the `shuneo-fences` container from its currently running image so the new values take effect immediately; it does not touch the Caddy configuration or rebuild the image.
 
 `Fences/scripts/deploy-fences.sh` is the service-specific wrapper for `deployment/deploy-caddy-service.sh`. It mounts `/etc/shuneo/fences-secrets` read-only inside the container at `/run/secrets`, mounts `/var/lib/fences` for persistent state, and creates the Caddy site for `identity.eldervibe.dev`.
 

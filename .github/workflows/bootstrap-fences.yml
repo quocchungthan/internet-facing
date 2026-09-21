@@ -52,8 +52,7 @@ jobs:
           VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
           FENCES_GITHUB_CLIENT_ID: ${{ secrets.FENCES_GITHUB_CLIENT_ID }}
           FENCES_GITHUB_CLIENT_SECRET: ${{ secrets.FENCES_GITHUB_CLIENT_SECRET }}
-          FENCES_OIDC_CLIENT_ID: ${{ secrets.FENCES_OIDC_CLIENT_ID }}
-          FENCES_OIDC_CLIENT_SECRET: ${{ secrets.FENCES_OIDC_CLIENT_SECRET }}
+          FENCES_OIDC_CLIENTS_JSON: ${{ secrets.FENCES_OIDC_CLIENTS_JSON }}
           FENCES_BRAND_NAME: ${{ vars.FENCES_BRAND_NAME }}
           FENCES_COOKIE_DOMAIN: ${{ vars.FENCES_COOKIE_DOMAIN }}
           FENCES_OIDC_ISSUER: ${{ vars.FENCES_OIDC_ISSUER }}
@@ -90,11 +89,8 @@ jobs:
           [[ "$VPS_USER" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "::error::VPS_USER has an invalid format." >&2; exit 1; }
 
           for dotenv_value in \
-              FENCES_GITHUB_CLIENT_ID FENCES_GITHUB_CLIENT_SECRET FENCES_OIDC_CLIENT_ID \
-              FENCES_OIDC_CLIENT_SECRET FENCES_BRAND_NAME FENCES_COOKIE_DOMAIN FENCES_OIDC_ISSUER \
-              FENCES_PERSISTENT_LOGIN_DAYS FENCES_ALLOWED_RETURN_HOST \
-              FENCES_ALLOWED_CORS_ORIGIN FENCES_OIDC_CLIENT_NAME \
-              FENCES_OIDC_REDIRECT_URI FENCES_OIDC_POST_LOGOUT_REDIRECT_URI; do
+              FENCES_GITHUB_CLIENT_ID FENCES_GITHUB_CLIENT_SECRET FENCES_BRAND_NAME FENCES_COOKIE_DOMAIN FENCES_OIDC_ISSUER \
+              FENCES_PERSISTENT_LOGIN_DAYS FENCES_ALLOWED_RETURN_HOST FENCES_ALLOWED_CORS_ORIGIN; do
             if [[ "${!dotenv_value:-}" == *$'\n'* || "${!dotenv_value:-}" == *$'\r'* ]]; then
               echo "::error::$dotenv_value must be a single-line value." >&2
               exit 1
@@ -116,16 +112,34 @@ jobs:
             printf 'IdentityApp__PersistentLoginDays=%s\n' "$FENCES_PERSISTENT_LOGIN_DAYS"
             printf 'IdentityApp__AllowedReturnHosts__0=%s\n' "$FENCES_ALLOWED_RETURN_HOST"
             printf 'IdentityApp__AllowedCorsOrigins__0=%s\n' "$FENCES_ALLOWED_CORS_ORIGIN"
-            printf 'IdentityApp__OidcClients__0__ClientId=%s\n' "$FENCES_OIDC_CLIENT_ID"
-            printf 'IdentityApp__OidcClients__0__DisplayName=%s\n' "$FENCES_OIDC_CLIENT_NAME"
-            # Leave FENCES_OIDC_CLIENT_SECRET unset/blank to register a public PKCE client instead of a confidential one.
-            if [[ -n "${FENCES_OIDC_CLIENT_SECRET:-}" ]]; then
-              printf 'IdentityApp__OidcClients__0__ClientSecret=%s\n' "$FENCES_OIDC_CLIENT_SECRET"
-            fi
-            printf 'IdentityApp__OidcClients__0__RedirectUris__0=%s\n' "$FENCES_OIDC_REDIRECT_URI"
-            if [[ -n "${FENCES_OIDC_POST_LOGOUT_REDIRECT_URI:-}" ]]; then
-              printf 'IdentityApp__OidcClients__0__PostLogoutRedirectUris__0=%s\n' "$FENCES_OIDC_POST_LOGOUT_REDIRECT_URI"
-            fi
+
+            for ((i = 0; i < client_count; i++)); do
+              entry="$(printf '%s' "$oidc_clients_json" | jq -c ".[$i]")"
+              client_id="$(printf '%s' "$entry" | jq -r '.clientId // empty')"
+              display_name="$(printf '%s' "$entry" | jq -r '.displayName // empty')"
+              client_secret="$(printf '%s' "$entry" | jq -r '.clientSecret // empty')"
+              redirect_uri="$(printf '%s' "$entry" | jq -r '.redirectUri // empty')"
+              post_logout_redirect_uri="$(printf '%s' "$entry" | jq -r '.postLogoutRedirectUri // empty')"
+
+              for field_name in client_id display_name client_secret redirect_uri post_logout_redirect_uri; do
+                value="${!field_name}"
+                if [[ "$value" == *$'\n'* || "$value" == *$'\r'* ]]; then
+                  echo "::error::OIDC client $i has a multi-line field ($field_name); values must be single-line." >&2
+                  exit 1
+                fi
+              done
+              if [[ -z "$client_id" || -z "$redirect_uri" ]]; then
+                echo "::error::OIDC client $i is missing required clientId or redirectUri." >&2
+                exit 1
+              fi
+
+              printf 'IdentityApp__OidcClients__%d__ClientId=%s\n' "$i" "$client_id"
+              [[ -n "$display_name" ]] && printf 'IdentityApp__OidcClients__%d__DisplayName=%s\n' "$i" "$display_name"
+              # Leave clientSecret unset in the JSON entry to register a public PKCE client instead of a confidential one.
+              [[ -n "$client_secret" ]] && printf 'IdentityApp__OidcClients__%d__ClientSecret=%s\n' "$i" "$client_secret"
+              printf 'IdentityApp__OidcClients__%d__RedirectUris__0=%s\n' "$i" "$redirect_uri"
+              [[ -n "$post_logout_redirect_uri" ]] && printf 'IdentityApp__OidcClients__%d__PostLogoutRedirectUris__0=%s\n' "$i" "$post_logout_redirect_uri"
+            done
           } > "$runtime_env_file"
           printf '%s\n' "$VPS_SSH_KEY" > "$ssh_key_file"
           printf '%s\n' "$VPS_KNOWN_HOSTS" > "$known_hosts_file"
