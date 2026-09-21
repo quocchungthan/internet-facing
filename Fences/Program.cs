@@ -254,6 +254,7 @@ static async Task SeedOidcClientsAsync(IServiceProvider services, IEnumerable<Oi
             OpenIddictConstants.Permissions.GrantTypes.AuthorizationCode,
             OpenIddictConstants.Permissions.ResponseTypes.Code,
             OpenIddictConstants.Permissions.Scopes.Profile,
+            OpenIddictConstants.Permissions.Scopes.OpenId,
             OpenIddictConstants.Permissions.Scopes.Email
         ]);
 
