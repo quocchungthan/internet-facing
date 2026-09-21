@@ -11,6 +11,12 @@ public class HomeController : Controller
         return View();
     }
 
+    [HttpGet("winchester")]
+    public IActionResult Winchester()
+    {
+        return View("Index");
+    }
+
     public IActionResult Privacy()
     {
         return View();

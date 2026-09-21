@@ -1,0 +1,106 @@
+name: Build and deploy Farm
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - Farm/**
+      - Farm.Azure/**
+      - Farm.Console/**
+      - Farm.Core/**
+      - Farm.HangingPost/**
+      - .github/workflows/build-deploy-farm.yml
+      - .github/workflows/reusable-deploy-service.yml
+      - .dockerignore
+      - deployment/deploy-caddy-service.sh
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-farm-production
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.x
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+          cache-dependency-path: Farm.HangingPost/package-lock.json
+
+      - name: Restore .NET dependencies
+        run: dotnet restore PiggyFarm.slnx
+
+      - name: Build HangingPost frontend
+        working-directory: Farm.HangingPost
+        run: |
+          npm ci
+          npm run build
+
+      - name: Test solution
+        run: dotnet test PiggyFarm.slnx --configuration Release --no-restore
+
+      - name: Publish Farm web application
+        run: dotnet publish Farm/Farm.csproj --configuration Release --no-restore --output artifacts/farm-web /p:UseAppHost=false
+
+      - name: Pack Farm console dnx tool
+        run: dotnet pack Farm.Console/Farm.Console.csproj --configuration Release --no-build --output artifacts/farm-console-tool /p:PackageVersion=0.1.0-ci.${{ github.run_number }}
+
+      - name: Build Farm Docker image
+        run: docker build --pull --tag eldervibe-farm:${{ github.sha }} --file Farm/Dockerfile .
+
+      - name: Export Farm Docker image
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/farm-docker-image
+          docker save eldervibe-farm:${{ github.sha }} | gzip > artifacts/farm-docker-image/image.tar.gz
+
+      - name: Upload Farm web artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: farm-web-publish
+          path: artifacts/farm-web
+          if-no-files-found: error
+
+      - name: Upload Farm console tool
+        uses: actions/upload-artifact@v4
+        with:
+          name: farm-console-tool
+          path: artifacts/farm-console-tool/*.nupkg
+          if-no-files-found: error
+
+      - name: Upload Farm Docker image
+        uses: actions/upload-artifact@v4
+        with:
+          name: farm-docker-image
+          path: artifacts/farm-docker-image/image.tar.gz
+          if-no-files-found: error
+
+  deploy:
+    needs: build
+    uses: ./.github/workflows/reusable-deploy-service.yml
+    with:
+      image_name: eldervibe-farm
+      image_tag: ${{ github.sha }}
+      docker_context: .
+      dockerfile: Farm/Dockerfile
+      wrapper_path: Farm/scripts/deploy-farm.sh
+      deploy_common_script: deployment/deploy-caddy-service.sh
+      runtime_image_argument: FARM_IMAGE
+      image_artifact: farm-docker-image
+    secrets: inherit

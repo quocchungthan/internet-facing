@@ -8,3 +8,5 @@ MailBox/web/static/shared/
 MailBox/web/static/favicon.ico
 MailBox/runtime/
 MailBox/secrets/
+Farm/wwwroot/hanging-post/
+artifacts/

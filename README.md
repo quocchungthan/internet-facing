@@ -26,6 +26,8 @@ Set these environment variables before running the console:
 
 Then query work items with `dotnet run --project Farm.Console -- work-items 123 456`. Credentials are never stored in source files.
 
+CI publishes `Farm.Console` as a local .NET tool package artifact. Download the `farm-console-tool` artifact on a Linux machine, then run `dnx --source /path/to/farm-console-tool Farm.Console -- work-items 123 456` with the same environment variables. The console is not exposed by the Farm web application.
+
 Run `powershell -ExecutionPolicy Bypass -File scripts/Invoke-FarmValidation.ps1 -Scope Core` for Core-only validation, or omit `-Scope` to validate the full solution.
 
 ## Caddy ingress
@@ -35,5 +37,7 @@ The main branch owns the shared Caddy ingress baseline. Install Caddy on the VPS
 Set `ACME_EMAIL` in the ingress service environment when an email should be registered for ACME account notices. For example, add `Environment=ACME_EMAIL=ops@example.com` to the Caddy service override, then run `systemctl daemon-reload` and `systemctl restart caddy`. Keep Caddy's data directory persistent, normally `/var/lib/caddy/.local/share/caddy`, so certificates and ACME state survive service restarts and image or package upgrades. The deployment workflow may pass the same variable to the remote wrapper, but the ingress service environment is the source of truth.
 
 Allow inbound TCP ports 80 and 443 and point each managed DNS record at the VPS. Caddy obtains and renews certificates automatically after a service fragment is installed. Caddy-managed domains do not use Certbot or nginx; do not add those tools to the Caddy deployment path.
+
+Farm deployments start a candidate container on the unused loopback port, require a local HTTP response, then validate and reload Caddy to switch traffic. The previous container remains running until that switch succeeds. The deployer extracts the Vite output from the candidate image into `/var/lib/caddy/farm/hanging-post/releases`, makes it readable by the `caddy` service account, and Caddy directly serves only `/hanging-post/assets/*` and `/hanging-post/favicon.svg`. Requests for `/hanging-post/index.html` continue to reach Farm; there is no Caddy SPA fallback.
 
 ---

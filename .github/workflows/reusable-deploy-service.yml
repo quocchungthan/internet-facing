@@ -31,6 +31,11 @@ on:
         description: Environment variable name consumed by the service wrapper
         required: true
         type: string
+      image_artifact:
+        description: Optional workflow artifact containing a gzip-compressed Docker image tarball
+        required: false
+        type: string
+        default: ''
     secrets:
       VPS_HOST:
         required: true
@@ -61,7 +66,23 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
+      - name: Download prebuilt service image
+        if: inputs.image_artifact != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.image_artifact }}
+          path: ${{ runner.temp }}/service-image
+
+      - name: Load prebuilt service image
+        if: inputs.image_artifact != ''
+        run: |
+          set -euo pipefail
+          image_archive="${{ runner.temp }}/service-image/image.tar.gz"
+          test -s "$image_archive"
+          gzip --decompress --stdout "$image_archive" | docker load
+
       - name: Build service image
+        if: inputs.image_artifact == ''
         run: docker build --pull --tag "${{ inputs.image_name }}:${{ inputs.image_tag }}" --file "${{ inputs.dockerfile }}" "${{ inputs.docker_context }}"
 
       - name: Configure SSH host verification
