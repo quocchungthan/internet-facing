@@ -54,12 +54,18 @@ def init(args):
     accounts = {f'{name}@{domain}': secrets.token_urlsafe(24) for name in ['shuneo', 'admin']}
     Path('.env').write_text(''.join(f'{k}={v}\n' for k, v in config.items()), encoding='utf-8')
     Path('secrets/accounts.json').write_text(json.dumps(accounts, indent=2), encoding='utf-8')
+    # 1-to-N map: which GitHub-login (by email) manages which mailboxes on this server.
+    manager_emails = [email.strip().lower() for email in args.manager_email] or ['solshuneo@gmail.com']
+    managers = {email: list(accounts.keys()) for email in manager_emails}
+    Path('secrets/managed_accounts.json').write_text(json.dumps(managers, indent=2), encoding='utf-8')
     if os.name != 'nt':
         os.chmod('.env', 0o600)
         os.chmod('secrets', 0o700)
         os.chmod('secrets/accounts.json', 0o600)
+        os.chmod('secrets/managed_accounts.json', 0o600)
     print('Configured domain:', domain)
     print('Credentials saved to secrets/accounts.json (not printed).')
+    print('GitHub login -> mailbox map saved to secrets/managed_accounts.json.')
     if args.local:
         local_certificate(host)
 
@@ -145,6 +151,22 @@ def renew(args):
         compose('restart', 'maddy')
 
 
+def managers(args):
+    settings()
+    path = Path('secrets/managed_accounts.json')
+    mapping = json.loads(path.read_text(encoding='utf-8')) if path.exists() else {}
+    email = args.set.strip().lower()
+    if args.mailbox:
+        mapping[email] = [address.strip().lower() for address in args.mailbox]
+    else:
+        # No --mailbox given: grant this manager every mailbox currently on the server.
+        mapping[email] = list(json.loads(Path('secrets/accounts.json').read_text(encoding='utf-8')).keys())
+    path.write_text(json.dumps(mapping, indent=2), encoding='utf-8')
+    if os.name != 'nt':
+        os.chmod(path, 0o600)
+    print('Manager updated:', email, '->', mapping[email])
+
+
 def backup(args):
     settings()
     Path('backups').mkdir(exist_ok=True)
@@ -188,10 +210,14 @@ p = subs.add_parser('init')
 p.add_argument('--domain', required=True)
 p.add_argument('--hostname')
 p.add_argument('--additional-domain', action='append', default=[])
+p.add_argument('--manager-email', action='append', default=[], help='GitHub login email allowed to manage mailboxes (repeatable; default solshuneo@gmail.com)')
 p.add_argument('--local', action='store_true')
 p = subs.add_parser('certificate')
 p.add_argument('--email')
 subs.add_parser('accounts')
+p = subs.add_parser('managers')
+p.add_argument('--set', required=True, metavar='EMAIL', help='GitHub login email to grant/update mailbox management for')
+p.add_argument('--mailbox', action='append', default=[], help='Mailbox address to grant (repeatable; omit to grant every current mailbox)')
 p = subs.add_parser('renew')
 p.add_argument('--dry-run', action='store_true')
 subs.add_parser('backup')
