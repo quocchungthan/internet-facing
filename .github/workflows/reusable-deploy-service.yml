@@ -137,6 +137,7 @@ jobs:
         run: |
           set -euo pipefail
           common_script=/tmp/deploy-common.sh
+          wrapper_script=/tmp/deploy-service-wrapper.sh
           ssh \
             -p "$VPS_PORT" \
             -o BatchMode=yes \
@@ -144,12 +145,24 @@ jobs:
             "$VPS_USER@$VPS_HOST" \
             "cat > '$common_script' && chmod 700 '$common_script'" \
             < "${{ inputs.deploy_common_script }}"
-          printf 'export ACME_EMAIL=%q\n' "$ACME_EMAIL" > /tmp/deploy-service-wrapper.sh
-          cat "${{ inputs.wrapper_path }}" >> /tmp/deploy-service-wrapper.sh
+          printf 'export ACME_EMAIL=%q\n' "$ACME_EMAIL" > /tmp/deploy-service-wrapper.local.sh
+          cat "${{ inputs.wrapper_path }}" >> /tmp/deploy-service-wrapper.local.sh
+          # Transfer the wrapper as a real file (same as the common script above) rather than
+          # piping it through `bash -s`. The wrapper ends with `exec bash "$DEPLOY_COMMON_SCRIPT"`,
+          # which replaces the running process while its stdin is still attached to this SSH
+          # channel; running the wrapper from a file instead of a stdin-fed `bash -s` removes any
+          # dependency on that pipe's buffering/EOF timing at the moment of exec.
           ssh \
             -p "$VPS_PORT" \
             -o BatchMode=yes \
             -o StrictHostKeyChecking=yes \
             "$VPS_USER@$VPS_HOST" \
-            "trap 'rm -f $common_script' EXIT; DEPLOY_COMMON_SCRIPT='$common_script' ${{ inputs.runtime_image_argument }}='${{ inputs.image_name }}:${{ inputs.image_tag }}' bash -s" \
-            < /tmp/deploy-service-wrapper.sh
+            "cat > '$wrapper_script' && chmod 700 '$wrapper_script'" \
+            < /tmp/deploy-service-wrapper.local.sh
+          ssh \
+            -p "$VPS_PORT" \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            "$VPS_USER@$VPS_HOST" \
+            "trap 'rm -f $common_script $wrapper_script' EXIT; DEPLOY_COMMON_SCRIPT='$common_script' ${{ inputs.runtime_image_argument }}='${{ inputs.image_name }}:${{ inputs.image_tag }}' bash '$wrapper_script'" \
+            < /dev/null
