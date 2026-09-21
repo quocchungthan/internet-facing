@@ -29,8 +29,13 @@ services:
       MAIL_HOSTNAME: ${MAIL_HOSTNAME}
       SECRET_KEY: ${SECRET_KEY:?Run setup first}
       SSL_CERT_FILE: ${SSL_CERT_FILE:-/etc/ssl/certs/ca-certificates.crt}
+      OAUTH_ISSUER: ${OAUTH_ISSUER:-https://identity.eldervibe.dev}
+      OAUTH_CLIENT_ID: ${OAUTH_CLIENT_ID:-}
+      OAUTH_CLIENT_SECRET: ${OAUTH_CLIENT_SECRET:-}
+      OAUTH_REDIRECT_URL: ${OAUTH_REDIRECT_URL:-}
     volumes:
       - ./runtime/ca:/extra-ca:ro
+      - ./secrets:/app/secrets:ro
     depends_on:
       - maddy
     read_only: true
