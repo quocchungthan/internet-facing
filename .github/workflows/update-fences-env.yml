@@ -58,16 +58,12 @@ jobs:
           RESTART_FENCES: ${{ inputs.restart }}
           FENCES_GITHUB_CLIENT_ID: ${{ secrets.FENCES_GITHUB_CLIENT_ID }}
           FENCES_GITHUB_CLIENT_SECRET: ${{ secrets.FENCES_GITHUB_CLIENT_SECRET }}
-          FENCES_OIDC_CLIENT_ID: ${{ secrets.FENCES_OIDC_CLIENT_ID }}
-          FENCES_OIDC_CLIENT_SECRET: ${{ secrets.FENCES_OIDC_CLIENT_SECRET }}
+          FENCES_OIDC_CLIENTS_JSON: ${{ secrets.FENCES_OIDC_CLIENTS_JSON }}
           FENCES_BRAND_NAME: ${{ vars.FENCES_BRAND_NAME }}
           FENCES_COOKIE_DOMAIN: ${{ vars.FENCES_COOKIE_DOMAIN }}
           FENCES_PERSISTENT_LOGIN_DAYS: ${{ vars.FENCES_PERSISTENT_LOGIN_DAYS }}
           FENCES_ALLOWED_RETURN_HOST: ${{ vars.FENCES_ALLOWED_RETURN_HOST }}
           FENCES_ALLOWED_CORS_ORIGIN: ${{ vars.FENCES_ALLOWED_CORS_ORIGIN }}
-          FENCES_OIDC_CLIENT_NAME: ${{ vars.FENCES_OIDC_CLIENT_NAME }}
-          FENCES_OIDC_REDIRECT_URI: ${{ vars.FENCES_OIDC_REDIRECT_URI }}
-          FENCES_OIDC_POST_LOGOUT_REDIRECT_URI: ${{ vars.FENCES_OIDC_POST_LOGOUT_REDIRECT_URI }}
         run: |
           set -euo pipefail
           umask 077
@@ -94,11 +90,8 @@ jobs:
           [[ "$VPS_USER" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "::error::VPS_USER has an invalid format." >&2; exit 1; }
 
           for dotenv_value in \
-              FENCES_GITHUB_CLIENT_ID FENCES_GITHUB_CLIENT_SECRET FENCES_OIDC_CLIENT_ID \
-              FENCES_OIDC_CLIENT_SECRET FENCES_BRAND_NAME FENCES_COOKIE_DOMAIN \
-              FENCES_PERSISTENT_LOGIN_DAYS FENCES_ALLOWED_RETURN_HOST \
-              FENCES_ALLOWED_CORS_ORIGIN FENCES_OIDC_CLIENT_NAME \
-              FENCES_OIDC_REDIRECT_URI FENCES_OIDC_POST_LOGOUT_REDIRECT_URI; do
+              FENCES_GITHUB_CLIENT_ID FENCES_GITHUB_CLIENT_SECRET FENCES_BRAND_NAME FENCES_COOKIE_DOMAIN \
+              FENCES_PERSISTENT_LOGIN_DAYS FENCES_ALLOWED_RETURN_HOST FENCES_ALLOWED_CORS_ORIGIN; do
             if [[ "${!dotenv_value:-}" == *$'\n'* || "${!dotenv_value:-}" == *$'\r'* ]]; then
               echo "::error::$dotenv_value must be a single-line value." >&2
               exit 1
@@ -113,13 +106,47 @@ jobs:
             [[ -n "${FENCES_PERSISTENT_LOGIN_DAYS:-}" ]] && printf 'IdentityApp__PersistentLoginDays=%s\n' "$FENCES_PERSISTENT_LOGIN_DAYS"
             [[ -n "${FENCES_ALLOWED_RETURN_HOST:-}" ]] && printf 'IdentityApp__AllowedReturnHosts__0=%s\n' "$FENCES_ALLOWED_RETURN_HOST"
             [[ -n "${FENCES_ALLOWED_CORS_ORIGIN:-}" ]] && printf 'IdentityApp__AllowedCorsOrigins__0=%s\n' "$FENCES_ALLOWED_CORS_ORIGIN"
-            [[ -n "${FENCES_OIDC_CLIENT_ID:-}" ]] && printf 'IdentityApp__OidcClients__0__ClientId=%s\n' "$FENCES_OIDC_CLIENT_ID"
-            [[ -n "${FENCES_OIDC_CLIENT_NAME:-}" ]] && printf 'IdentityApp__OidcClients__0__DisplayName=%s\n' "$FENCES_OIDC_CLIENT_NAME"
-            [[ -n "${FENCES_OIDC_CLIENT_SECRET:-}" ]] && printf 'IdentityApp__OidcClients__0__ClientSecret=%s\n' "$FENCES_OIDC_CLIENT_SECRET"
-            [[ -n "${FENCES_OIDC_REDIRECT_URI:-}" ]] && printf 'IdentityApp__OidcClients__0__RedirectUris__0=%s\n' "$FENCES_OIDC_REDIRECT_URI"
-            [[ -n "${FENCES_OIDC_POST_LOGOUT_REDIRECT_URI:-}" ]] && printf 'IdentityApp__OidcClients__0__PostLogoutRedirectUris__0=%s\n' "$FENCES_OIDC_POST_LOGOUT_REDIRECT_URI"
             true
           } > "$updates_file"
+
+          if [[ -n "${FENCES_OIDC_CLIENTS_JSON:-}" ]]; then
+            command -v jq >/dev/null 2>&1 || { echo "::error::jq is required to parse FENCES_OIDC_CLIENTS_JSON." >&2; exit 1; }
+            oidc_clients_json="$(printf '%s' "$FENCES_OIDC_CLIENTS_JSON" | jq -c '.')" || { echo "::error::FENCES_OIDC_CLIENTS_JSON must be valid JSON." >&2; exit 1; }
+            client_count="$(printf '%s' "$oidc_clients_json" | jq 'length')"
+            [[ "$client_count" -ge 1 ]] || { echo "::error::FENCES_OIDC_CLIENTS_JSON must contain at least one OIDC client." >&2; exit 1; }
+
+            for ((i = 0; i < client_count; i++)); do
+              entry="$(printf '%s' "$oidc_clients_json" | jq -c ".[$i]")"
+              client_index="$(printf '%s' "$entry" | jq -r '.index // empty')"
+              client_id="$(printf '%s' "$entry" | jq -r '.clientId // empty')"
+              display_name="$(printf '%s' "$entry" | jq -r '.displayName // empty')"
+              client_secret="$(printf '%s' "$entry" | jq -r '.clientSecret // empty')"
+              redirect_uri="$(printf '%s' "$entry" | jq -r '.redirectUri // empty')"
+              post_logout_redirect_uri="$(printf '%s' "$entry" | jq -r '.postLogoutRedirectUri // empty')"
+
+              for field_name in client_index client_id display_name client_secret redirect_uri post_logout_redirect_uri; do
+                value="${!field_name}"
+                if [[ "$value" == *$'\n'* || "$value" == *$'\r'* ]]; then
+                  echo "::error::OIDC client entry $i has a multi-line field ($field_name); values must be single-line." >&2
+                  exit 1
+                fi
+              done
+              # Each JSON entry targets an explicit client slot so unrelated clients are left untouched.
+              [[ "$client_index" =~ ^[0-9]+$ ]] || { echo "::error::OIDC client entry $i is missing a numeric index." >&2; exit 1; }
+              if [[ -z "$client_id" && -z "$redirect_uri" && -z "$display_name" && -z "$client_secret" && -z "$post_logout_redirect_uri" ]]; then
+                echo "::error::OIDC client entry $i has no fields to update." >&2
+                exit 1
+              fi
+
+              {
+                [[ -n "$client_id" ]] && printf 'IdentityApp__OidcClients__%d__ClientId=%s\n' "$client_index" "$client_id"
+                [[ -n "$display_name" ]] && printf 'IdentityApp__OidcClients__%d__DisplayName=%s\n' "$client_index" "$display_name"
+                [[ -n "$client_secret" ]] && printf 'IdentityApp__OidcClients__%d__ClientSecret=%s\n' "$client_index" "$client_secret"
+                [[ -n "$redirect_uri" ]] && printf 'IdentityApp__OidcClients__%d__RedirectUris__0=%s\n' "$client_index" "$redirect_uri"
+                [[ -n "$post_logout_redirect_uri" ]] && printf 'IdentityApp__OidcClients__%d__PostLogoutRedirectUris__0=%s\n' "$client_index" "$post_logout_redirect_uri"
+              } >> "$updates_file"
+            done
+          fi
 
           if [[ ! -s "$updates_file" ]]; then
             echo "::error::No secrets or variables were provided to update; nothing to do." >&2
