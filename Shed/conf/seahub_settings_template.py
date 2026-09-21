@@ -29,10 +29,12 @@ OAUTH_AUTHORIZATION_URL = os.environ.get('OAUTH_AUTHORIZATION_URL', 'https://ide
 OAUTH_TOKEN_URL = os.environ.get('OAUTH_TOKEN_URL', 'https://identity.eldervibe.dev/connect/token')
 OAUTH_USER_INFO_URL = os.environ.get('OAUTH_USER_INFO_URL', 'https://identity.eldervibe.dev/connect/userinfo')
 OAUTH_SCOPE = os.environ.get('OAUTH_SCOPE', 'openid profile email').split()
+# Fences' userinfo response has no 'id' claim; 'sub' is the stable github:<id> subject,
+# so map it to uid instead of falling back to (possibly absent/unverified) email.
 OAUTH_ATTRIBUTE_MAP = {
-    "id": (True, "email"),
-    "name": (False, "name"),
+    "sub": (True, "uid"),
     "email": (True, "email"),
+    "name": (False, "name"),
 }
 
 # Auto-activate user upon SSO login
