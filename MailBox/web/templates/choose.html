@@ -1,0 +1,5 @@
+{% extends 'base.html' %}{% block content %}
+<section class="login-card"><div class="eyebrow">CHỌN HỘP THƯ</div><h1>Bạn quản lý nhiều hộp thư.</h1><p class="muted">Chọn hộp thư muốn mở trên {{ domain }}.</p>
+{% for address in accounts %}<form method="post" action="{{ url_for('auth_select') }}"><input type="hidden" name="csrf" value="{{ csrf() }}"><input type="hidden" name="address" value="{{ address }}"><button class="button full">{{ address }} →</button></form>{% endfor %}
+</section>
+{% endblock %}
