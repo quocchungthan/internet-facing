@@ -38,6 +38,7 @@ jobs:
         run: |
           bash -n KyHoi/deployment/deploy.sh KyHoi/deployment/test-image.sh
           shellcheck KyHoi/deployment/deploy.sh KyHoi/deployment/test-image.sh
+          python3 KyHoi/deployment/test-deploy.py
       - name: Build and smoke test production image
         working-directory: .
         run: |

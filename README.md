@@ -86,5 +86,5 @@ The deploy user must also have passwordless, noninteractive sudo access for the 
 ---
 ## Kỳ Hội browser game
 
-[KyHoi](KyHoi/README.md) contains an independent Node.js 24+ turn-based room game with IP-based identity, team voting and host moderation. Its PARA documentation and downloaded upstream references live alongside the app. See [setup and tests](KyHoi/Projects/TikTok-Live-Turnbased/README.md). This addition does not register a production deployment.
+[KyHoi](KyHoi/README.md) contains an independent Node.js 24+ turn-based room game with IP-based identity, team voting and host moderation. Its PARA documentation and downloaded upstream references live alongside the app. See [setup and tests](KyHoi/Projects/TikTok-Live-Turnbased/README.md) and [deployment to kyhoi.shuneo.com](KyHoi/deployment/README.md). The scoped deployment workflow uses the existing hostkey-server environment after changes reach main.
 
