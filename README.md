@@ -26,7 +26,7 @@ Set these environment variables before running the console:
 - `FARM_AZURE_DEVOPS_TEAM` — required by `work-items needs-attention` so Azure DevOps can resolve `@CurrentIteration` in team context.
 - `FARM_AZURE_DEVOPS_TERMINAL_STATES` — optional comma-separated completed states excluded by `work-items needs-attention`; defaults to `Done,Closed,Removed`.
 
-`Farm.Console` (tool name `farm`) is a multi-command CLI. Running it with no arguments prints the tool version and full command list, exiting `0`; `--help`/`-h` and `--version`/`-v` work standalone or after a command (e.g. `farm work-items --help`). List-style output (work items, pull requests, discussion threads) renders as a Spectre.Console table with colored status columns. Available commands:
+`Farm.Console` is the project and package ID; its installed command is `sam`. Running it with no arguments prints the tool version and full command list, exiting `0`; `--help`/`-h` and `--version`/`-v` work standalone or after a command (e.g. `sam work-items --help`). List-style output (work items, pull requests, discussion threads) renders as a Spectre.Console table with colored status columns. Available commands:
 
 - `work-items <id> [<id> ...]` — query one or more Azure DevOps work items by ID (fully implemented).
 - `work-items assigned-to <email-or-me>` — list work items assigned to the given user (unique name/email), or the current authenticated user when passed `me` (fully implemented, WIQL-based).
@@ -49,14 +49,14 @@ The PAT configured via `FARM_AZURE_DEVOPS_PAT` needs these scopes, least-privile
 - **Identity (Read)** — `whoami`, `my-groups`, and PR reviewer resolution (including group membership for `assigned-to-me`/`pending-review`).
 - **Code (Read)** — `pull-requests`, `pull-requests approved-by-me`, `assigned-to-me`, `pending-review`, `mine`, `pr-threads`.
 
-CI publishes `Farm.Console` as a real NuGet package to GitHub Packages (`https://nuget.pkg.github.com/<owner>/index.json`) on every push to `main`, in addition to an ephemeral `farm-console-tool` build artifact. GitHub Packages requires authentication even for reads (public visibility does not exempt the NuGet feed), so add the source with a personal access token that has the `read:packages` scope, then install `farm` as a regular global .NET tool:
+CI publishes `Farm.Console` as a real NuGet package to GitHub Packages (`https://nuget.pkg.github.com/<owner>/index.json`) on every push to `main`, in addition to an ephemeral `farm-console-tool` build artifact. GitHub Packages requires authentication even for reads (public visibility does not exempt the NuGet feed), so add the source with a personal access token that has the `read:packages` scope, then install `sam` as a regular global .NET tool:
 
 ```bash
 dotnet nuget add source https://nuget.pkg.github.com/<owner>/index.json \
   --name github-internet-facing --username <github-username> --password <PAT> --store-password-in-clear-text
 
 dotnet tool install --global Farm.Console --add-source github-internet-facing
-farm work-items 123 456
+sam work-items 123 456
 ```
 
 To upgrade to a newer published version: `dotnet tool update --global Farm.Console --add-source github-internet-facing`. To remove it: `dotnet tool uninstall --global Farm.Console`.

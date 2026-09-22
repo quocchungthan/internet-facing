@@ -31,10 +31,13 @@ public sealed class ConsoleAppTests
         try
         {
             var exitCode = await ConsoleApp.RunAsync([]);
+            var renderedOutput = output.ToString();
 
             Assert.Equal(0, exitCode);
-            Assert.Contains("Usage:", output.ToString());
-            Assert.Contains("work-items", output.ToString());
+            Assert.StartsWith("sam ", renderedOutput);
+            Assert.Contains("Usage: sam <command>", renderedOutput);
+            Assert.DoesNotContain("Usage: farm ", renderedOutput);
+            Assert.Contains("work-items", renderedOutput);
         }
         finally
         {
@@ -51,12 +54,16 @@ public sealed class ConsoleAppTests
         try
         {
             var exitCode = await ConsoleApp.RunAsync(["--help"]);
+            var renderedOutput = output.ToString();
 
             Assert.Equal(0, exitCode);
-            Assert.Contains("pull-requests approved-by-me", output.ToString());
-            Assert.Contains("pull-requests assigned-to-me", output.ToString());
-            Assert.Contains("pull-requests pending-review", output.ToString());
-            Assert.Contains("pull-requests mine", output.ToString());
+            Assert.StartsWith("sam ", renderedOutput);
+            Assert.Contains("Usage: sam <command>", renderedOutput);
+            Assert.DoesNotContain("Usage: farm ", renderedOutput);
+            Assert.Contains("pull-requests approved-by-me", renderedOutput);
+            Assert.Contains("pull-requests assigned-to-me", renderedOutput);
+            Assert.Contains("pull-requests pending-review", renderedOutput);
+            Assert.Contains("pull-requests mine", renderedOutput);
         }
         finally
         {

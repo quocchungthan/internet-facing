@@ -6,7 +6,7 @@ using Microsoft.VisualStudio.Services.Common;
 
 public static class ConsoleApp
 {
-    private const string ToolName = "farm";
+    private const string ToolName = "sam";
     private const int NotImplementedExitCode = 3;
 
     private sealed record CommandDefinition(
