@@ -51,7 +51,8 @@ if ! "${docker_command[@]}" info >/dev/null 2>&1; then
 fi
 
 docker() {
-	"${docker_command[@]}" "$@"
+	# `command` bypasses this function's own name when docker_command=("docker"), avoiding infinite self-recursion.
+	command "${docker_command[@]}" "$@"
 }
 
 if [[ ! "$SERVICE_DOMAIN" =~ ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$ ]]; then
