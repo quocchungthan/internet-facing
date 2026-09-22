@@ -18,6 +18,7 @@ on:
 
 permissions:
   contents: read
+  packages: write
 
 concurrency:
   group: deploy-farm-production
@@ -60,6 +61,14 @@ jobs:
 
       - name: Pack Farm console dnx tool
         run: dotnet pack Farm.Console/Farm.Console.csproj --configuration Release --no-build --output artifacts/farm-console-tool /p:PackageVersion=0.1.0-ci.${{ github.run_number }}
+
+      - name: Publish Farm console tool to GitHub Packages
+        run: |
+          set -euo pipefail
+          dotnet nuget push artifacts/farm-console-tool/*.nupkg \
+            --source https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json \
+            --api-key "${{ secrets.GITHUB_TOKEN }}" \
+            --skip-duplicate
 
       - name: Build Farm Docker image
         run: docker build --pull --tag eldervibe-farm:${{ github.sha }} --file Farm/Dockerfile .

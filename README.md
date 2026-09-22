@@ -26,7 +26,15 @@ Set these environment variables before running the console:
 
 Then query work items with `dotnet run --project Farm.Console -- work-items 123 456`. Credentials are never stored in source files.
 
-CI publishes `Farm.Console` as a local .NET tool package artifact. Download the `farm-console-tool` artifact on a Linux machine, then run `dnx --source /path/to/farm-console-tool Farm.Console -- work-items 123 456` with the same environment variables. The console is not exposed by the Farm web application.
+CI publishes `Farm.Console` as a real NuGet package to GitHub Packages (`https://nuget.pkg.github.com/<owner>/index.json`) on every push to `main`, in addition to an ephemeral `farm-console-tool` build artifact. GitHub Packages requires authentication even for reads, so consuming it via `dnx` needs a personal access token with `read:packages` scope:
+
+```bash
+dotnet nuget add source https://nuget.pkg.github.com/<owner>/index.json \
+  --name github-internet-facing --username <github-username> --password <PAT> --store-password-in-clear-text
+dnx --source github-internet-facing Farm.Console -- work-items 123 456
+```
+
+The console is not exposed by the Farm web application.
 
 Run `powershell -ExecutionPolicy Bypass -File scripts/Invoke-FarmValidation.ps1 -Scope Core` for Core-only validation, or omit `-Scope` to validate the full solution.
 
