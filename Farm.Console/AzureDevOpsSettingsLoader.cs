@@ -7,6 +7,9 @@ public static class AzureDevOpsSettingsLoader
         var organizationUrl = GetRequired("FARM_AZURE_DEVOPS_ORGANIZATION_URL");
         var project = GetRequired("FARM_AZURE_DEVOPS_PROJECT");
         var token = GetRequired("FARM_AZURE_DEVOPS_PAT");
+        var team = GetOptional("FARM_AZURE_DEVOPS_TEAM");
+        var terminalStates = GetOptional("FARM_AZURE_DEVOPS_TERMINAL_STATES")?
+            .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
 
         if (!Uri.TryCreate(organizationUrl, UriKind.Absolute, out var parsedOrganizationUrl))
         {
@@ -17,7 +20,9 @@ public static class AzureDevOpsSettingsLoader
         {
             OrganizationUrl = parsedOrganizationUrl,
             Project = project,
-            PersonalAccessToken = token
+            Team = team,
+            PersonalAccessToken = token,
+            TerminalStates = terminalStates ?? AzureDevOpsSettings.DefaultTerminalStates
         };
 
         settings.Validate();
@@ -28,4 +33,9 @@ public static class AzureDevOpsSettingsLoader
         Environment.GetEnvironmentVariable(name) is { Length: > 0 } value
             ? value
             : throw new InvalidOperationException($"Environment variable '{name}' is required.");
+
+    private static string? GetOptional(string name) =>
+        Environment.GetEnvironmentVariable(name) is { } value && !string.IsNullOrWhiteSpace(value)
+            ? value.Trim()
+            : null;
 }

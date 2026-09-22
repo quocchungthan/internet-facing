@@ -24,6 +24,30 @@ public sealed class AzureDevOpsSettingsTests
         settings.Validate();
     }
 
+    [Fact]
+    public void TerminalStates_default_to_standard_completed_states()
+    {
+        var settings = CreateSettings(new Uri("https://dev.azure.com/example"));
+
+        Assert.Equal(["Done", "Closed", "Removed"], settings.TerminalStates);
+    }
+
+    [Fact]
+    public void Validate_rejects_empty_terminal_states()
+    {
+        var settings = new AzureDevOpsSettings
+        {
+            OrganizationUrl = new Uri("https://dev.azure.com/example"),
+            Project = "Project",
+            PersonalAccessToken = "token",
+            TerminalStates = []
+        };
+
+        var exception = Assert.Throws<InvalidOperationException>(settings.Validate);
+
+        Assert.Contains("terminal states", exception.Message);
+    }
+
     private static AzureDevOpsSettings CreateSettings(Uri organizationUrl) => new()
     {
         OrganizationUrl = organizationUrl,

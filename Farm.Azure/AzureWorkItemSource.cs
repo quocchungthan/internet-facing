@@ -12,6 +12,9 @@ public interface IAzureDomainWorkItemClient
     Task<IReadOnlyList<CoreWorkItem>> GetWorkItemsAssignedToAsync(
         string assignee,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<CoreWorkItem>> GetNeedsAttentionWorkItemsAsync(
+        CancellationToken cancellationToken = default);
 }
 
 public sealed class AzureWorkItemSource(IAzureDomainWorkItemClient client) : IWorkItemSource
@@ -25,4 +28,8 @@ public sealed class AzureWorkItemSource(IAzureDomainWorkItemClient client) : IWo
         string assignee,
         CancellationToken cancellationToken = default) =>
         client.GetWorkItemsAssignedToAsync(assignee, cancellationToken);
+
+    public Task<IReadOnlyList<CoreWorkItem>> GetNeedsAttentionAsync(
+        CancellationToken cancellationToken = default) =>
+        client.GetNeedsAttentionWorkItemsAsync(cancellationToken);
 }

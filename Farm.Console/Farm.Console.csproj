@@ -14,4 +14,8 @@
     <ProjectReference Include="..\Farm.Azure\Farm.Azure.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Spectre.Console" Version="0.57.2" />
+  </ItemGroup>
+
 </Project>

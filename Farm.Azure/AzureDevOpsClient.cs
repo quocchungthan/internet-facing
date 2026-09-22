@@ -1,4 +1,5 @@
 using Microsoft.TeamFoundation.SourceControl.WebApi;
+using Microsoft.TeamFoundation.Core.WebApi.Types;
 using Microsoft.TeamFoundation.WorkItemTracking.WebApi;
 using Microsoft.TeamFoundation.WorkItemTracking.WebApi.Models;
 using Microsoft.VisualStudio.Services.Common;
@@ -10,6 +11,7 @@ using Microsoft.VisualStudio.Services.WebApi;
 using CoreGroup = Farm.Core.Domain.Group;
 using CoreIdentity = Farm.Core.Domain.Identity;
 using CorePullRequestSummary = Farm.Core.Domain.PullRequestSummary;
+using CorePullRequestThread = Farm.Core.Domain.PullRequestThread;
 using CoreWorkItem = Farm.Core.Domain.WorkItem;
 
 namespace Farm.Azure;
@@ -23,6 +25,8 @@ public sealed class AzureDevOpsClient :
 {
     private readonly VssConnection connection;
     private readonly string project;
+    private readonly string? team;
+    private readonly IReadOnlyList<string> terminalStates;
     private WorkItemTrackingHttpClient? client;
     private ProfileHttpClient? profileClient;
     private GraphHttpClient? graphClient;
@@ -34,6 +38,8 @@ public sealed class AzureDevOpsClient :
         ArgumentNullException.ThrowIfNull(settings);
         settings.Validate();
         project = settings.Project;
+        team = settings.Team;
+        terminalStates = settings.TerminalStates;
 
         var credentials = new VssBasicCredential(string.Empty, settings.PersonalAccessToken);
         connection = new VssConnection(settings.OrganizationUrl, credentials);
@@ -128,8 +134,27 @@ public sealed class AzureDevOpsClient :
         var lookup = new GraphSubjectLookup(
             memberships.Select(membership => new GraphSubjectLookupKey(membership.ContainerDescriptor)).ToList());
         var subjects = await graphClient.LookupSubjectsAsync(lookup, cancellationToken: cancellationToken);
+        var groups = subjects.Values.OfType<GraphGroup>().ToArray();
 
-        return subjects.Values.OfType<GraphGroup>().Select(AzureIdentityMapper.ToGroup).ToArray();
+        var result = new List<CoreGroup>(groups.Length);
+        foreach (var group in groups)
+        {
+            // Reviewer identities on pull requests are legacy TFID GUIDs, not Graph descriptors; resolve the mapping
+            // so group-based "assigned to me" matching can compare against reviewer.Identity.Id.
+            var storageKey = await graphClient.GetStorageKeyAsync(group.Descriptor.ToString(), cancellationToken: cancellationToken);
+            result.Add(AzureIdentityMapper.ToGroup(group, storageKey.Value.ToString()));
+        }
+
+        return result;
+    }
+
+    private async Task<IReadOnlyList<string>> GetCurrentUserGroupLegacyIdsAsync(CancellationToken cancellationToken)
+    {
+        var groups = await GetGroupsForCurrentUserAsync(cancellationToken);
+        return groups
+            .Where(group => !string.IsNullOrEmpty(group.LegacyId))
+            .Select(group => group.LegacyId!)
+            .ToArray();
     }
 
     public async Task<IReadOnlyList<CorePullRequestSummary>> ListActivePullRequestsAsync(
@@ -165,6 +190,132 @@ public sealed class AzureDevOpsClient :
             .Select(AzurePullRequestMapper.ToSummary)
             .Where(pullRequest => AzurePullRequestMapper.IsApprovedByReviewer(pullRequest.Reviewers, currentUser.Id))
             .ToArray();
+    }
+
+    public async Task<IReadOnlyList<CorePullRequestSummary>> ListPullRequestsAssignedToCurrentUserAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var currentUser = await GetCurrentUserAsync(cancellationToken);
+        var groupIds = await GetCurrentUserGroupLegacyIdsAsync(cancellationToken);
+
+        gitClient ??= connection.GetClient<GitHttpClient>();
+        var criteria = new GitPullRequestSearchCriteria { Status = PullRequestStatus.Active };
+        var pullRequests = await gitClient.GetPullRequestsByProjectAsync(
+            project,
+            criteria,
+            cancellationToken: cancellationToken);
+
+        return pullRequests
+            .Select(AzurePullRequestMapper.ToSummary)
+            .Where(pullRequest => AzurePullRequestMapper.IsAssignedToReviewer(pullRequest.Reviewers, currentUser.Id, groupIds))
+            .ToArray();
+    }
+
+    public async Task<IReadOnlyList<CorePullRequestSummary>> ListPullRequestsPendingReviewByCurrentUserAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var currentUser = await GetCurrentUserAsync(cancellationToken);
+        var groupIds = await GetCurrentUserGroupLegacyIdsAsync(cancellationToken);
+
+        gitClient ??= connection.GetClient<GitHttpClient>();
+        var criteria = new GitPullRequestSearchCriteria { Status = PullRequestStatus.Active };
+        var pullRequests = await gitClient.GetPullRequestsByProjectAsync(
+            project,
+            criteria,
+            cancellationToken: cancellationToken);
+
+        return pullRequests
+            .Select(AzurePullRequestMapper.ToSummary)
+            .Where(pullRequest => AzurePullRequestMapper.IsPendingReviewByCurrentUser(pullRequest.Reviewers, currentUser.Id, groupIds))
+            .ToArray();
+    }
+
+    public async Task<IReadOnlyList<CorePullRequestSummary>> ListPullRequestsCreatedByCurrentUserAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var currentUser = await GetCurrentUserAsync(cancellationToken);
+
+        gitClient ??= connection.GetClient<GitHttpClient>();
+        var criteria = new GitPullRequestSearchCriteria
+        {
+            Status = PullRequestStatus.Active,
+            CreatorId = Guid.Parse(currentUser.Id)
+        };
+        var pullRequests = await gitClient.GetPullRequestsByProjectAsync(
+            project,
+            criteria,
+            cancellationToken: cancellationToken);
+
+        return pullRequests.Select(AzurePullRequestMapper.ToSummary).ToArray();
+    }
+
+    public async Task<IReadOnlyList<CorePullRequestThread>> GetPullRequestThreadsAsync(
+        int pullRequestId,
+        CancellationToken cancellationToken = default)
+    {
+        if (pullRequestId <= 0)
+        {
+            throw new ArgumentException("Pull request ID must be positive.", nameof(pullRequestId));
+        }
+
+        gitClient ??= connection.GetClient<GitHttpClient>();
+        var pullRequest = await gitClient.GetPullRequestByIdAsync(pullRequestId, cancellationToken: cancellationToken);
+        var threads = await gitClient.GetThreadsAsync(
+            project,
+            pullRequest.Repository.Id.ToString(),
+            pullRequestId,
+            cancellationToken: cancellationToken);
+
+        // System-generated threads (status changes, etc.) carry no comments; they add noise to a "discussion" view.
+        return threads
+            .Where(thread => thread.Comments is { Count: > 0 })
+            .Select(AzurePullRequestMapper.ToThread)
+            .ToArray();
+    }
+
+    public async Task<IReadOnlyList<CoreWorkItem>> GetNeedsAttentionWorkItemsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(team))
+        {
+            throw new InvalidOperationException(
+                "Environment variable 'FARM_AZURE_DEVOPS_TEAM' is required for work-items needs-attention because @CurrentIteration requires Azure DevOps team context.");
+        }
+
+        client ??= connection.GetClient<WorkItemTrackingHttpClient>();
+
+        var wiql = new Wiql { Query = BuildNeedsAttentionWiql(project, terminalStates) };
+
+        var queryResult = await client.QueryByWiqlAsync(
+            wiql,
+            new TeamContext(project, team),
+            cancellationToken: cancellationToken);
+        var ids = queryResult.WorkItems.Select(reference => reference.Id).ToArray();
+        if (ids.Length == 0)
+        {
+            return [];
+        }
+
+        return await GetDomainWorkItemsAsync(ids, cancellationToken);
+    }
+
+    internal static string BuildNeedsAttentionWiql(string project, IReadOnlyList<string> terminalStates)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(project);
+        ArgumentNullException.ThrowIfNull(terminalStates);
+
+        if (terminalStates.Count == 0 || terminalStates.Any(string.IsNullOrWhiteSpace))
+        {
+            throw new ArgumentException("At least one non-empty terminal state is required.", nameof(terminalStates));
+        }
+
+        var excludedStates = string.Join(", ", terminalStates.Select(state => $"'{EscapeWiqlLiteral(state)}'"));
+        return "SELECT [System.Id] FROM WorkItems " +
+               $"WHERE [System.TeamProject] = '{EscapeWiqlLiteral(project)}' " +
+               "AND [System.IterationPath] = @CurrentIteration " +
+               "AND [System.AssignedTo] = '' " +
+               $"AND [System.State] NOT IN ({excludedStates}) " +
+               "ORDER BY [System.ChangedDate] DESC";
     }
 
     private async Task<IReadOnlyList<WorkItem>> GetAzureWorkItemsAsync(

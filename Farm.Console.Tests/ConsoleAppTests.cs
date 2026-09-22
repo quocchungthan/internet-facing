@@ -42,6 +42,28 @@ public sealed class ConsoleAppTests
         }
     }
 
+    [Fact]
+    public async Task RunAsync_help_prints_complete_pull_request_command_forms()
+    {
+        var output = new StringWriter();
+        var originalOut = System.Console.Out;
+        System.Console.SetOut(output);
+        try
+        {
+            var exitCode = await ConsoleApp.RunAsync(["--help"]);
+
+            Assert.Equal(0, exitCode);
+            Assert.Contains("pull-requests approved-by-me", output.ToString());
+            Assert.Contains("pull-requests assigned-to-me", output.ToString());
+            Assert.Contains("pull-requests pending-review", output.ToString());
+            Assert.Contains("pull-requests mine", output.ToString());
+        }
+        finally
+        {
+            System.Console.SetOut(originalOut);
+        }
+    }
+
     [Theory]
     [InlineData("--version")]
     [InlineData("-v")]
@@ -63,7 +85,6 @@ public sealed class ConsoleAppTests
     }
 
     [Theory]
-    [InlineData("pr-threads", "1")]
     [InlineData("pr-diff", "1")]
     [InlineData("work-item-comments", "1")]
     [InlineData("work-item-relations", "1")]
@@ -130,6 +151,14 @@ public sealed class ConsoleAppTests
     }
 
     [Fact]
+    public async Task RunAsync_work_items_needs_attention_rejects_extra_args()
+    {
+        var exitCode = await ConsoleApp.RunAsync(["work-items", "needs-attention", "extra"]);
+
+        Assert.Equal(2, exitCode);
+    }
+
+    [Fact]
     public async Task RunAsync_whoami_rejects_arguments()
     {
         var exitCode = await ConsoleApp.RunAsync(["whoami", "extra"]);
@@ -149,7 +178,12 @@ public sealed class ConsoleAppTests
     [InlineData("whoami")]
     [InlineData("my-groups")]
     [InlineData("pull-requests")]
-    public async Task RunAsync_commands_requiring_configuration_fail_cleanly_without_environment(string command)
+    [InlineData("pull-requests assigned-to-me")]
+    [InlineData("pull-requests pending-review")]
+    [InlineData("pull-requests mine")]
+    [InlineData("work-items needs-attention")]
+    [InlineData("pr-threads 1")]
+    public async Task RunAsync_commands_requiring_configuration_fail_cleanly_without_environment(string commandLine)
     {
         var organizationUrl = Environment.GetEnvironmentVariable("FARM_AZURE_DEVOPS_ORGANIZATION_URL");
         var project = Environment.GetEnvironmentVariable("FARM_AZURE_DEVOPS_PROJECT");
@@ -163,7 +197,7 @@ public sealed class ConsoleAppTests
         System.Console.SetError(error);
         try
         {
-            var exitCode = await ConsoleApp.RunAsync([command]);
+            var exitCode = await ConsoleApp.RunAsync(commandLine.Split(' '));
 
             Assert.Equal(1, exitCode);
             Assert.Contains("Environment variable", error.ToString());

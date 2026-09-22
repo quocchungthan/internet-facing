@@ -12,6 +12,10 @@ public interface IWorkItemSource
     Task<IReadOnlyList<WorkItem>> GetWorkItemsAssignedToAsync(
         string assignee,
         CancellationToken cancellationToken = default);
+
+    /// <summary>Unassigned, non-terminal work items in the current iteration.</summary>
+    Task<IReadOnlyList<WorkItem>> GetNeedsAttentionAsync(
+        CancellationToken cancellationToken = default);
 }
 
 public interface IPullRequestSource
@@ -20,6 +24,21 @@ public interface IPullRequestSource
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<PullRequestSummary>> ListApprovedByCurrentUserAsync(
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Active PRs where the current user is a reviewer, directly or via a group membership.</summary>
+    Task<IReadOnlyList<PullRequestSummary>> ListAssignedToCurrentUserAsync(
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Of the PRs assigned to the current user, those where their own vote is still 0 (no-vote).</summary>
+    Task<IReadOnlyList<PullRequestSummary>> ListPendingReviewByCurrentUserAsync(
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<PullRequestSummary>> ListCreatedByCurrentUserAsync(
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<PullRequestThread>> ListThreadsAsync(
+        int pullRequestId,
         CancellationToken cancellationToken = default);
 }
 

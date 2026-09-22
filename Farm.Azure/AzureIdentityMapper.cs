@@ -14,11 +14,11 @@ public static class AzureIdentityMapper
         return new CoreIdentity(profile.Id.ToString(), profile.DisplayName, profile.EmailAddress);
     }
 
-    public static CoreGroup ToGroup(AzureGroup group)
+    public static CoreGroup ToGroup(AzureGroup group, string? legacyId = null)
     {
         ArgumentNullException.ThrowIfNull(group);
 
-        return new CoreGroup(group.Descriptor.ToString(), group.DisplayName, []);
+        return new CoreGroup(group.Descriptor.ToString(), group.DisplayName, [], legacyId);
     }
 }
 

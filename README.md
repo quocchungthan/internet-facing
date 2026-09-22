@@ -23,24 +23,31 @@ Set these environment variables before running the console:
 - `FARM_AZURE_DEVOPS_ORGANIZATION_URL`
 - `FARM_AZURE_DEVOPS_PROJECT`
 - `FARM_AZURE_DEVOPS_PAT`
+- `FARM_AZURE_DEVOPS_TEAM` — required by `work-items needs-attention` so Azure DevOps can resolve `@CurrentIteration` in team context.
+- `FARM_AZURE_DEVOPS_TERMINAL_STATES` — optional comma-separated completed states excluded by `work-items needs-attention`; defaults to `Done,Closed,Removed`.
 
-`Farm.Console` (tool name `farm`) is a multi-command CLI. Running it with no arguments prints the tool version and full command list, exiting `0`; `--help`/`-h` and `--version`/`-v` work standalone or after a command (e.g. `farm work-items --help`). Available commands:
+`Farm.Console` (tool name `farm`) is a multi-command CLI. Running it with no arguments prints the tool version and full command list, exiting `0`; `--help`/`-h` and `--version`/`-v` work standalone or after a command (e.g. `farm work-items --help`). List-style output (work items, pull requests, discussion threads) renders as a Spectre.Console table with colored status columns. Available commands:
 
 - `work-items <id> [<id> ...]` — query one or more Azure DevOps work items by ID (fully implemented).
 - `work-items assigned-to <email-or-me>` — list work items assigned to the given user (unique name/email), or the current authenticated user when passed `me` (fully implemented, WIQL-based).
+- `work-items needs-attention` — list unassigned, non-terminal work items in the configured team's current iteration, using the WIQL `@CurrentIteration` macro and configurable terminal-state exclusions (fully implemented).
 - `whoami` — print the current authenticated identity: id, display name, unique name (fully implemented).
 - `my-groups` — list the groups/teams the current authenticated user belongs to (fully implemented).
 - `pull-requests` — list active pull requests in the configured project (fully implemented).
 - `pull-requests approved-by-me` — list active pull requests where the current user is a reviewer who has approved (vote &gt;= 5) (fully implemented).
-- `pr-threads <pr-id>`, `pr-diff <pr-id>`, `work-item-comments <id>`, `work-item-relations <id>` — scaffolded commands that validate their arguments but exit `3` with a "not yet implemented" message, since the backing Farm.Azure/Farm.Core clients don't exist yet.
+- `pull-requests assigned-to-me` — list active pull requests where the current user is a reviewer, directly or via a group they belong to (fully implemented).
+- `pull-requests pending-review` — of the PRs assigned to the current user (direct or via group), those where the applicable direct or group reviewer vote is still 0 (fully implemented).
+- `pull-requests mine` — list active pull requests created by the current user (fully implemented).
+- `pr-threads <pr-id>` — list discussion threads on a pull request, showing status (resolved vs unresolved), comment count, and a preview of the first comment (fully implemented).
+- `pr-diff <pr-id>`, `work-item-comments <id>`, `work-item-relations <id>` — scaffolded commands that validate their arguments but exit `3` with a "not yet implemented" message, since the backing Farm.Azure/Farm.Core clients don't exist yet.
 
 Query work items with `dotnet run --project Farm.Console -- work-items 123 456`. Credentials are never stored in source files.
 
 The PAT configured via `FARM_AZURE_DEVOPS_PAT` needs these scopes, least-privilege:
 
-- **Work Items (Read)** — `work-items`, `work-items assigned-to`.
-- **Identity (Read)** — `whoami`, `my-groups`, and PR reviewer resolution.
-- **Code (Read)** — `pull-requests`, `pull-requests approved-by-me`.
+- **Work Items (Read)** — `work-items`, `work-items assigned-to`, `work-items needs-attention`.
+- **Identity (Read)** — `whoami`, `my-groups`, and PR reviewer resolution (including group membership for `assigned-to-me`/`pending-review`).
+- **Code (Read)** — `pull-requests`, `pull-requests approved-by-me`, `assigned-to-me`, `pending-review`, `mine`, `pr-threads`.
 
 CI publishes `Farm.Console` as a real NuGet package to GitHub Packages (`https://nuget.pkg.github.com/<owner>/index.json`) on every push to `main`, in addition to an ephemeral `farm-console-tool` build artifact. GitHub Packages requires authentication even for reads (public visibility does not exempt the NuGet feed), so add the source with a personal access token that has the `read:packages` scope, then install `farm` as a regular global .NET tool:
 

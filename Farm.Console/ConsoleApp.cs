@@ -19,8 +19,8 @@ public static class ConsoleApp
     [
         new(
             "work-items",
-            "Query one or more Azure DevOps work items by ID, or list work items assigned to a user.",
-            "work-items <id> [<id> ...] | work-items assigned-to <email-or-me>",
+            "Query work items by ID, list work items assigned to a user, or list unassigned items needing attention.",
+            "work-items <id> [<id> ...] | work-items assigned-to <email-or-me> | work-items needs-attention",
             RunWorkItemsAsync),
         new(
             "whoami",
@@ -34,14 +34,14 @@ public static class ConsoleApp
             RunMyGroupsAsync),
         new(
             "pull-requests",
-            "List active pull requests, or pull requests approved by the current user.",
-            "pull-requests | pull-requests approved-by-me",
+            "List active pull requests, or filter by approved/assigned/pending-review/mine.",
+            "pull-requests | pull-requests approved-by-me | pull-requests assigned-to-me | pull-requests pending-review | pull-requests mine",
             RunPullRequestsAsync),
         new(
             "pr-threads",
-            "List discussion threads/comments on a pull request. (not yet implemented)",
+            "List discussion threads on a pull request, with resolved/unresolved status.",
             "pr-threads <pr-id>",
-            (args, _) => Task.FromResult(RunNotImplementedStub(args, "pull request ID", "pr-threads <pr-id>"))),
+            RunPrThreadsAsync),
         new(
             "pr-diff",
             "Show the file diff for a pull request. (not yet implemented)",
@@ -141,6 +141,11 @@ public static class ConsoleApp
             return await RunWorkItemsAssignedToAsync(args.Skip(1).ToArray(), cancellationToken);
         }
 
+        if (args.Length == 1 && string.Equals(args[0], "needs-attention", StringComparison.OrdinalIgnoreCase))
+        {
+            return await RunWorkItemsNeedsAttentionAsync(cancellationToken);
+        }
+
         if (!TryParsePositiveIds(args, "work item ID", out var ids, out var error))
         {
             Console.Error.WriteLine(error);
@@ -153,11 +158,18 @@ public static class ConsoleApp
         IWorkItemSource workItemSource = new AzureWorkItemSource(client);
         var workItems = await workItemSource.GetWorkItemsAsync(ids, cancellationToken);
 
-        foreach (var workItem in workItems)
-        {
-            Console.WriteLine($"{workItem.Id}: {workItem.Title} [{workItem.State}]");
-        }
+        ConsoleTables.RenderWorkItems(workItems);
+        return 0;
+    }
 
+    private static async Task<int> RunWorkItemsNeedsAttentionAsync(CancellationToken cancellationToken)
+    {
+        var settings = AzureDevOpsSettingsLoader.LoadFromEnvironment();
+        using var client = new AzureDevOpsClient(settings);
+        IWorkItemSource workItemSource = new AzureWorkItemSource(client);
+        var workItems = await workItemSource.GetNeedsAttentionAsync(cancellationToken);
+
+        ConsoleTables.RenderWorkItems(workItems, needsAttention: true);
         return 0;
     }
 
@@ -175,11 +187,7 @@ public static class ConsoleApp
         IWorkItemSource workItemSource = new AzureWorkItemSource(client);
         var workItems = await workItemSource.GetWorkItemsAssignedToAsync(args[0], cancellationToken);
 
-        foreach (var workItem in workItems)
-        {
-            Console.WriteLine($"{workItem.Id}: {workItem.Title} [{workItem.State}]");
-        }
-
+        ConsoleTables.RenderWorkItems(workItems);
         return 0;
     }
 
@@ -228,11 +236,12 @@ public static class ConsoleApp
 
     private static async Task<int> RunPullRequestsAsync(string[] args, CancellationToken cancellationToken)
     {
-        var approvedByMe = args.Length == 1 && string.Equals(args[0], "approved-by-me", StringComparison.OrdinalIgnoreCase);
-        if (args.Length > 1 || (args.Length == 1 && !approvedByMe))
+        string[] validSubcommands = ["approved-by-me", "assigned-to-me", "pending-review", "mine"];
+        var subcommand = args.Length == 1 ? args[0].ToLowerInvariant() : null;
+        if (args.Length > 1 || (args.Length == 1 && !validSubcommands.Contains(subcommand)))
         {
             Console.Error.WriteLine("Unknown pull-requests arguments.");
-            Console.Error.WriteLine("Usage: pull-requests | pull-requests approved-by-me");
+            Console.Error.WriteLine("Usage: pull-requests | pull-requests approved-by-me | pull-requests assigned-to-me | pull-requests pending-review | pull-requests mine");
             return 2;
         }
 
@@ -240,15 +249,34 @@ public static class ConsoleApp
         using var client = new AzureDevOpsClient(settings);
         IPullRequestSource pullRequestSource = new AzurePullRequestSource(client);
 
-        var pullRequests = approvedByMe
-            ? await pullRequestSource.ListApprovedByCurrentUserAsync(cancellationToken)
-            : await pullRequestSource.ListActiveAsync(cancellationToken);
-
-        foreach (var pullRequest in pullRequests)
+        var pullRequests = subcommand switch
         {
-            Console.WriteLine($"{pullRequest.Id}: {pullRequest.Title} [{pullRequest.Status}]");
+            "approved-by-me" => await pullRequestSource.ListApprovedByCurrentUserAsync(cancellationToken),
+            "assigned-to-me" => await pullRequestSource.ListAssignedToCurrentUserAsync(cancellationToken),
+            "pending-review" => await pullRequestSource.ListPendingReviewByCurrentUserAsync(cancellationToken),
+            "mine" => await pullRequestSource.ListCreatedByCurrentUserAsync(cancellationToken),
+            _ => await pullRequestSource.ListActiveAsync(cancellationToken)
+        };
+
+        ConsoleTables.RenderPullRequests(pullRequests);
+        return 0;
+    }
+
+    private static async Task<int> RunPrThreadsAsync(string[] args, CancellationToken cancellationToken)
+    {
+        if (!TryParseSingleId(args, "pull request ID", out var pullRequestId, out var error))
+        {
+            Console.Error.WriteLine(error);
+            Console.Error.WriteLine("Usage: pr-threads <pr-id>");
+            return 2;
         }
 
+        var settings = AzureDevOpsSettingsLoader.LoadFromEnvironment();
+        using var client = new AzureDevOpsClient(settings);
+        IPullRequestSource pullRequestSource = new AzurePullRequestSource(client);
+        var threads = await pullRequestSource.ListThreadsAsync(pullRequestId, cancellationToken);
+
+        ConsoleTables.RenderThreads(threads);
         return 0;
     }
 

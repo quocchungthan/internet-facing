@@ -38,6 +38,29 @@ public sealed class AzureDevOpsClientTests
         Assert.Contains("empty", exception.Message);
     }
 
+    [Fact]
+    public async Task GetNeedsAttentionWorkItemsAsync_requires_team_context()
+    {
+        IAzureDomainWorkItemClient client = CreateClient();
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => client.GetNeedsAttentionWorkItemsAsync());
+
+        Assert.Contains("FARM_AZURE_DEVOPS_TEAM", exception.Message);
+        Assert.Contains("@CurrentIteration", exception.Message);
+    }
+
+    [Fact]
+    public void BuildNeedsAttentionWiql_escapes_project_and_each_terminal_state()
+    {
+        var query = AzureDevOpsClient.BuildNeedsAttentionWiql(
+            "Owner's Project",
+            ["Done", "Ready for O'Brien"]);
+
+        Assert.Contains("[System.TeamProject] = 'Owner''s Project'", query);
+        Assert.Contains("[System.State] NOT IN ('Done', 'Ready for O''Brien')", query);
+    }
+
     private static AzureDevOpsClient CreateClient() => new(new AzureDevOpsSettings
     {
         OrganizationUrl = new Uri("https://dev.azure.com/example"),

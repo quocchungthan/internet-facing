@@ -43,7 +43,8 @@ public sealed record Identity(
 public sealed record Group(
     string Id,
     string DisplayName,
-    IReadOnlyList<Identity> Members);
+    IReadOnlyList<Identity> Members,
+    string? LegacyId = null);
 
 public sealed record PullRequestSummary(
     int Id,
@@ -56,4 +57,5 @@ public sealed record PullRequestSummary(
 public sealed record PullRequestReviewer(
     Identity Identity,
     int Vote,
-    bool IsRequired);
+    bool IsRequired,
+    bool IsContainer = false);
