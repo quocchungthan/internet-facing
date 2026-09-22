@@ -1,3 +1,5 @@
+using System.Reflection;
+using Microsoft.VisualStudio.Services.Profile;
 using Xunit;
 
 namespace Farm.Azure.Tests;
@@ -5,16 +7,14 @@ namespace Farm.Azure.Tests;
 public sealed class AzureIdentityMapperTests
 {
     [Fact]
-    public void ToDomain_maps_identity_self_fields()
+    public void ToDomain_maps_profile_fields()
     {
-        var self = new Microsoft.VisualStudio.Services.Identity.IdentitySelf
-        {
-            Id = Guid.Parse("11111111-1111-1111-1111-111111111111"),
-            DisplayName = "Person Example",
-            AccountName = "person@example.com"
-        };
+        var profile = CreateProfile(
+            Guid.Parse("11111111-1111-1111-1111-111111111111"),
+            "Person Example",
+            "person@example.com");
 
-        var result = AzureIdentityMapper.ToDomain(self);
+        var result = AzureIdentityMapper.ToDomain(profile);
 
         Assert.Equal("11111111-1111-1111-1111-111111111111", result.Id);
         Assert.Equal("Person Example", result.DisplayName);
@@ -22,18 +22,34 @@ public sealed class AzureIdentityMapperTests
     }
 
     [Fact]
-    public void ToGroup_maps_identity_fields_with_no_members()
+    public void ToGroup_maps_graph_group_fields_with_no_members()
     {
-        var group = new Microsoft.VisualStudio.Services.Identity.Identity
-        {
-            Id = Guid.Parse("22222222-2222-2222-2222-222222222222"),
-            ProviderDisplayName = "[Project]\\Contributors"
-        };
+        var group = Newtonsoft.Json.JsonConvert.DeserializeObject<Microsoft.VisualStudio.Services.Graph.Client.GraphGroup>(
+            "{\"subjectKind\":\"group\",\"descriptor\":\"vssgp.abc\",\"displayName\":\"[Project]\\\\Contributors\"}")!;
 
         var result = AzureIdentityMapper.ToGroup(group);
 
-        Assert.Equal("22222222-2222-2222-2222-222222222222", result.Id);
+        Assert.Equal(group.Descriptor.ToString(), result.Id);
         Assert.Equal("[Project]\\Contributors", result.DisplayName);
         Assert.Empty(result.Members);
     }
+
+    // Profile.DisplayName/EmailAddress are read from an internal CoreAttributes dictionary rather than
+    // simple settable properties, so tests populate it via reflection to mirror what GetProfileAsync returns.
+    private static Profile CreateProfile(Guid id, string displayName, string email)
+    {
+        var profile = new Profile();
+        typeof(Profile).GetField("<Id>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .SetValue(profile, id);
+        var coreAttributes = new Dictionary<string, CoreProfileAttribute>
+        {
+            ["DisplayName"] = new() { Value = displayName },
+            ["EmailAddress"] = new() { Value = email }
+        };
+        typeof(Profile).GetProperty("CoreAttributes", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)!
+            .SetValue(profile, coreAttributes);
+        return profile;
+    }
 }
+
+

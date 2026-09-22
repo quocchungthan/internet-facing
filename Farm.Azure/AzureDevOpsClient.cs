@@ -2,8 +2,10 @@ using Microsoft.TeamFoundation.SourceControl.WebApi;
 using Microsoft.TeamFoundation.WorkItemTracking.WebApi;
 using Microsoft.TeamFoundation.WorkItemTracking.WebApi.Models;
 using Microsoft.VisualStudio.Services.Common;
-using Microsoft.VisualStudio.Services.Identity;
-using Microsoft.VisualStudio.Services.Identity.Client;
+using Microsoft.VisualStudio.Services.Graph;
+using Microsoft.VisualStudio.Services.Graph.Client;
+using Microsoft.VisualStudio.Services.Profile;
+using Microsoft.VisualStudio.Services.Profile.Client;
 using Microsoft.VisualStudio.Services.WebApi;
 using CoreGroup = Farm.Core.Domain.Group;
 using CoreIdentity = Farm.Core.Domain.Identity;
@@ -22,7 +24,8 @@ public sealed class AzureDevOpsClient :
     private readonly VssConnection connection;
     private readonly string project;
     private WorkItemTrackingHttpClient? client;
-    private IdentityHttpClient? identityClient;
+    private ProfileHttpClient? profileClient;
+    private GraphHttpClient? graphClient;
     private GitHttpClient? gitClient;
     private CoreIdentity? cachedCurrentUser;
 
@@ -92,40 +95,41 @@ public sealed class AzureDevOpsClient :
             return cachedCurrentUser;
         }
 
-        identityClient ??= connection.GetClient<IdentityHttpClient>();
-        var self = await identityClient.GetIdentitySelfAsync(cancellationToken: cancellationToken);
-        cachedCurrentUser = AzureIdentityMapper.ToDomain(self);
+        // IdentityHttpClient.GetIdentitySelfAsync is not a registered API resource on many VSSPS instances for PAT auth;
+        // ProfileHttpClient.GetProfileAsync is the reliable, documented way to resolve the caller's identity.
+        profileClient ??= connection.GetClient<ProfileHttpClient>();
+        var profile = await profileClient.GetProfileAsync(
+            new ProfileQueryContext(AttributesScope.Core),
+            cancellationToken: cancellationToken);
+        cachedCurrentUser = AzureIdentityMapper.ToDomain(profile);
         return cachedCurrentUser;
     }
 
     public async Task<IReadOnlyList<CoreGroup>> GetGroupsForCurrentUserAsync(CancellationToken cancellationToken = default)
     {
-        identityClient ??= connection.GetClient<IdentityHttpClient>();
-        var self = await identityClient.GetIdentitySelfAsync(cancellationToken: cancellationToken);
+        var currentUser = await GetCurrentUserAsync(cancellationToken);
 
-        var expanded = await identityClient.ReadIdentitiesAsync(
-            new List<Guid> { self.Id },
-            QueryMembership.Direct,
-            propertyNameFilters: null,
-            includeRestrictedVisibility: false,
-            userState: null,
+        // IdentityHttpClient is likewise unreliable across orgs; GraphHttpClient is the modern, consistently-registered API.
+        graphClient ??= connection.GetClient<GraphHttpClient>();
+        var descriptorResult = await graphClient.GetDescriptorAsync(
+            Guid.Parse(currentUser.Id),
             cancellationToken: cancellationToken);
 
-        var memberOfDescriptors = expanded.FirstOrDefault()?.MemberOf?.ToList() ?? [];
-        if (memberOfDescriptors.Count == 0)
+        var memberships = await graphClient.ListMembershipsAsync(
+            descriptorResult.Value.ToString(),
+            GraphTraversalDirection.Up,
+            cancellationToken: cancellationToken);
+
+        if (memberships.Count == 0)
         {
             return [];
         }
 
-        var groups = await identityClient.ReadIdentitiesAsync(
-            memberOfDescriptors,
-            QueryMembership.None,
-            propertyNameFilters: null,
-            includeRestrictedVisibility: false,
-            userState: null,
-            cancellationToken: cancellationToken);
+        var lookup = new GraphSubjectLookup(
+            memberships.Select(membership => new GraphSubjectLookupKey(membership.ContainerDescriptor)).ToList());
+        var subjects = await graphClient.LookupSubjectsAsync(lookup, cancellationToken: cancellationToken);
 
-        return groups.Select(AzureIdentityMapper.ToGroup).ToArray();
+        return subjects.Values.OfType<GraphGroup>().Select(AzureIdentityMapper.ToGroup).ToArray();
     }
 
     public async Task<IReadOnlyList<CorePullRequestSummary>> ListActivePullRequestsAsync(
@@ -194,7 +198,8 @@ public sealed class AzureDevOpsClient :
     public void Dispose()
     {
         client?.Dispose();
-        identityClient?.Dispose();
+        profileClient?.Dispose();
+        graphClient?.Dispose();
         gitClient?.Dispose();
     }
 }

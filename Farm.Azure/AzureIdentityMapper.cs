@@ -1,5 +1,5 @@
-using AzureIdentity = Microsoft.VisualStudio.Services.Identity.Identity;
-using AzureIdentitySelf = Microsoft.VisualStudio.Services.Identity.IdentitySelf;
+using AzureGroup = Microsoft.VisualStudio.Services.Graph.Client.GraphGroup;
+using AzureProfile = Microsoft.VisualStudio.Services.Profile.Profile;
 using CoreGroup = Farm.Core.Domain.Group;
 using CoreIdentity = Farm.Core.Domain.Identity;
 
@@ -7,17 +7,18 @@ namespace Farm.Azure;
 
 public static class AzureIdentityMapper
 {
-    public static CoreIdentity ToDomain(AzureIdentitySelf self)
+    public static CoreIdentity ToDomain(AzureProfile profile)
     {
-        ArgumentNullException.ThrowIfNull(self);
+        ArgumentNullException.ThrowIfNull(profile);
 
-        return new CoreIdentity(self.Id.ToString(), self.DisplayName, self.AccountName);
+        return new CoreIdentity(profile.Id.ToString(), profile.DisplayName, profile.EmailAddress);
     }
 
-    public static CoreGroup ToGroup(AzureIdentity group)
+    public static CoreGroup ToGroup(AzureGroup group)
     {
         ArgumentNullException.ThrowIfNull(group);
 
-        return new CoreGroup(group.Id.ToString(), group.DisplayName, []);
+        return new CoreGroup(group.Descriptor.ToString(), group.DisplayName, []);
     }
 }
+
