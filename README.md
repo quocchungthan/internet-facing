@@ -42,13 +42,19 @@ The PAT configured via `FARM_AZURE_DEVOPS_PAT` needs these scopes, least-privile
 - **Identity (Read)** — `whoami`, `my-groups`, and PR reviewer resolution.
 - **Code (Read)** — `pull-requests`, `pull-requests approved-by-me`.
 
-CI publishes `Farm.Console` as a real NuGet package to GitHub Packages (`https://nuget.pkg.github.com/<owner>/index.json`) on every push to `main`, in addition to an ephemeral `farm-console-tool` build artifact. GitHub Packages requires authentication even for reads, so consuming it via `dnx` needs a personal access token with `read:packages` scope:
+CI publishes `Farm.Console` as a real NuGet package to GitHub Packages (`https://nuget.pkg.github.com/<owner>/index.json`) on every push to `main`, in addition to an ephemeral `farm-console-tool` build artifact. GitHub Packages requires authentication even for reads (public visibility does not exempt the NuGet feed), so add the source with a personal access token that has the `read:packages` scope, then install `farm` as a regular global .NET tool:
 
 ```bash
 dotnet nuget add source https://nuget.pkg.github.com/<owner>/index.json \
   --name github-internet-facing --username <github-username> --password <PAT> --store-password-in-clear-text
-dnx --source github-internet-facing Farm.Console -- work-items 123 456
+
+dotnet tool install --global Farm.Console --add-source github-internet-facing
+farm work-items 123 456
 ```
+
+To upgrade to a newer published version: `dotnet tool update --global Farm.Console --add-source github-internet-facing`. To remove it: `dotnet tool uninstall --global Farm.Console`.
+
+`dnx` is not a reliable way to consume this package: GitHub Packages' NuGet v3 feed does not implement the search/autocomplete API some `dnx`/`dotnet tool install` discovery paths depend on, and `dnx`'s credential handling against this feed has been unreliable in practice. Prefer `dotnet tool install --global` with an explicit `--add-source`, which resolves packages by exact ID against the feed directly.
 
 The console is not exposed by the Farm web application.
 
