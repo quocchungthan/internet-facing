@@ -1,0 +1,113 @@
+name: Diagnose VPS bash/libc segfault (read-only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type DIAGNOSE_VPS_SEGFAULT to confirm
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vps-diagnose-segfault-production
+  cancel-in-progress: false
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    environment: hostkey-server
+
+    steps:
+      - name: Confirm diagnostic run
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          set -euo pipefail
+          if [[ "$CONFIRMATION" != "DIAGNOSE_VPS_SEGFAULT" ]]; then
+            echo "::error::Confirmation must exactly equal DIAGNOSE_VPS_SEGFAULT." >&2
+            exit 1
+          fi
+
+      - name: Run read-only bash/libc diagnostics over SSH
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          umask 077
+
+          ssh_key_file="$(mktemp)"
+          known_hosts_file="$(mktemp)"
+          cleanup() {
+            rm -f -- "$ssh_key_file" "$known_hosts_file"
+          }
+          trap cleanup EXIT
+
+          for required_secret in VPS_HOST VPS_PORT VPS_USER VPS_SSH_KEY VPS_KNOWN_HOSTS; do
+            if [[ -z "${!required_secret}" ]]; then
+              echo "::error::Missing required hostkey-server environment value: $required_secret" >&2
+              exit 1
+            fi
+          done
+          [[ "$VPS_HOST" =~ ^[A-Za-z0-9.:-]+$ ]] || { echo "::error::VPS_HOST has an invalid format." >&2; exit 1; }
+          [[ "$VPS_PORT" =~ ^[0-9]+$ ]] || { echo "::error::VPS_PORT must be numeric." >&2; exit 1; }
+          [[ "$VPS_USER" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "::error::VPS_USER has an invalid format." >&2; exit 1; }
+
+          printf '%s\n' "$VPS_SSH_KEY" > "$ssh_key_file"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > "$known_hosts_file"
+          chmod 600 "$ssh_key_file" "$known_hosts_file"
+
+          ssh_options=(
+            -i "$ssh_key_file"
+            -p "$VPS_PORT"
+            -o BatchMode=yes
+            -o StrictHostKeyChecking=yes
+            -o UserKnownHostsFile="$known_hosts_file"
+            -o GlobalKnownHostsFile=/dev/null
+          )
+          ssh_target="$VPS_USER@$VPS_HOST"
+
+          echo "Connecting to $VPS_HOST to run read-only bash/libc diagnostics (no system modification)..."
+          ssh "${ssh_options[@]}" "$ssh_target" 'set -uo pipefail
+
+            echo "===== 1. dpkg --audit (interrupted/half-configured packages) ====="
+            dpkg --audit || echo "(dpkg --audit reported issues above, or none found)"
+            echo
+
+            echo "===== 2. apt list --upgradable (bash/libc6/libtinfo related) ====="
+            apt list --upgradable 2>/dev/null | grep -Ei "bash|libc6|libtinfo" || echo "(no matching upgradable packages found)"
+            echo
+
+            echo "===== 3. bash binary fingerprint (ldd + sha256sum) ====="
+            bash_path="$(command -v bash)"
+            echo "bash path: $bash_path"
+            ldd "$bash_path" || echo "(ldd failed or bash is statically linked)"
+            sha256sum "$bash_path"
+            echo
+
+            echo "===== 4. dpkg -V verify against package checksums (bash libc6 libtinfo6) ====="
+            dpkg -V bash libc6 libtinfo6 2>&1 | head -50 || echo "(dpkg -V reported issues above, or none found)"
+            echo
+
+            echo "===== 5. Repeated bash invocation test (5x, checking for intermittent crash) ====="
+            for i in 1 2 3 4 5; do
+              echo "--- iteration $i ---"
+              bash --version | head -1 || echo "iteration $i: bash --version FAILED (exit $?)"
+              echo test | bash -c "echo ok" || echo "iteration $i: bash -c FAILED (exit $?)"
+            done
+            echo
+
+            echo "===== 6. System identification (uname -a, /etc/os-release) ====="
+            uname -a
+            cat /etc/os-release || echo "(/etc/os-release not readable)"
+            echo
+
+            echo "===== Diagnostics complete. No packages were reinstalled, repaired, or modified. ====="'
+
+          echo "VPS diagnostic run completed. Review the log above; no reinstall/repair was performed automatically."
