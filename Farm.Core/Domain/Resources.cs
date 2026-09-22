@@ -44,3 +44,16 @@ public sealed record Group(
     string Id,
     string DisplayName,
     IReadOnlyList<Identity> Members);
+
+public sealed record PullRequestSummary(
+    int Id,
+    string Title,
+    string Status,
+    Identity? CreatedBy,
+    Uri Url,
+    IReadOnlyList<PullRequestReviewer> Reviewers);
+
+public sealed record PullRequestReviewer(
+    Identity Identity,
+    int Vote,
+    bool IsRequired);

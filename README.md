@@ -24,7 +24,23 @@ Set these environment variables before running the console:
 - `FARM_AZURE_DEVOPS_PROJECT`
 - `FARM_AZURE_DEVOPS_PAT`
 
-Then query work items with `dotnet run --project Farm.Console -- work-items 123 456`. Credentials are never stored in source files.
+`Farm.Console` (tool name `farm`) is a multi-command CLI. Running it with no arguments prints the tool version and full command list, exiting `0`; `--help`/`-h` and `--version`/`-v` work standalone or after a command (e.g. `farm work-items --help`). Available commands:
+
+- `work-items <id> [<id> ...]` — query one or more Azure DevOps work items by ID (fully implemented).
+- `work-items assigned-to <email-or-me>` — list work items assigned to the given user (unique name/email), or the current authenticated user when passed `me` (fully implemented, WIQL-based).
+- `whoami` — print the current authenticated identity: id, display name, unique name (fully implemented).
+- `my-groups` — list the groups/teams the current authenticated user belongs to (fully implemented).
+- `pull-requests` — list active pull requests in the configured project (fully implemented).
+- `pull-requests approved-by-me` — list active pull requests where the current user is a reviewer who has approved (vote &gt;= 5) (fully implemented).
+- `pr-threads <pr-id>`, `pr-diff <pr-id>`, `work-item-comments <id>`, `work-item-relations <id>` — scaffolded commands that validate their arguments but exit `3` with a "not yet implemented" message, since the backing Farm.Azure/Farm.Core clients don't exist yet.
+
+Query work items with `dotnet run --project Farm.Console -- work-items 123 456`. Credentials are never stored in source files.
+
+The PAT configured via `FARM_AZURE_DEVOPS_PAT` needs these scopes, least-privilege:
+
+- **Work Items (Read)** — `work-items`, `work-items assigned-to`.
+- **Identity (Read)** — `whoami`, `my-groups`, and PR reviewer resolution.
+- **Code (Read)** — `pull-requests`, `pull-requests approved-by-me`.
 
 CI publishes `Farm.Console` as a real NuGet package to GitHub Packages (`https://nuget.pkg.github.com/<owner>/index.json`) on every push to `main`, in addition to an ephemeral `farm-console-tool` build artifact. GitHub Packages requires authentication even for reads, so consuming it via `dnx` needs a personal access token with `read:packages` scope:
 

@@ -26,6 +26,18 @@ public sealed class AzureDevOpsClientTests
         Assert.Contains("duplicates", exception.Message);
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task GetWorkItemsAssignedToAsync_rejects_blank_assignee(string assignee)
+    {
+        IAzureDomainWorkItemClient client = CreateClient();
+
+        var exception = await Assert.ThrowsAsync<ArgumentException>(() => client.GetWorkItemsAssignedToAsync(assignee));
+
+        Assert.Contains("empty", exception.Message);
+    }
+
     private static AzureDevOpsClient CreateClient() => new(new AzureDevOpsSettings
     {
         OrganizationUrl = new Uri("https://dev.azure.com/example"),

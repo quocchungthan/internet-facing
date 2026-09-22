@@ -8,6 +8,10 @@ public interface IAzureDomainWorkItemClient
     Task<IReadOnlyList<CoreWorkItem>> GetDomainWorkItemsAsync(
         IEnumerable<int> ids,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<CoreWorkItem>> GetWorkItemsAssignedToAsync(
+        string assignee,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed class AzureWorkItemSource(IAzureDomainWorkItemClient client) : IWorkItemSource
@@ -16,4 +20,9 @@ public sealed class AzureWorkItemSource(IAzureDomainWorkItemClient client) : IWo
         IEnumerable<int> ids,
         CancellationToken cancellationToken = default) =>
         client.GetDomainWorkItemsAsync(ids, cancellationToken);
+
+    public Task<IReadOnlyList<CoreWorkItem>> GetWorkItemsAssignedToAsync(
+        string assignee,
+        CancellationToken cancellationToken = default) =>
+        client.GetWorkItemsAssignedToAsync(assignee, cancellationToken);
 }
