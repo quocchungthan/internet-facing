@@ -18,10 +18,14 @@ wait_health() {
 wait_health
 code=$(docker exec -i "$name" node --input-type=module <<'JS'
 import assert from 'node:assert/strict';
-const base='http://127.0.0.1:13400';
+import {request} from 'node:http';
 async function api(path,ip,body) {
-  const r=await fetch(base+path,{method:body?'POST':'GET',headers:{'content-type':'application/json','x-forwarded-for':ip,origin:'https://kyhoi.shuneo.com',host:'kyhoi.shuneo.com','x-forwarded-proto':'https'},body:body?JSON.stringify(body):undefined});
-  assert.ok(r.ok,await r.clone().text());return r.json();
+  // http.request preserves the Host header exactly as Caddy sends it.
+  return new Promise((resolve,reject)=>{
+    const req=request({hostname:'127.0.0.1',port:13400,path,method:body?'POST':'GET',headers:{'content-type':'application/json','x-forwarded-for':ip,origin:'https://kyhoi.shuneo.com',host:'kyhoi.shuneo.com','x-forwarded-proto':'https'}},res=>{
+      let text='';res.on('data',chunk=>text+=chunk);res.on('end',()=>{try{assert.ok(res.statusCode>=200&&res.statusCode<300,text);resolve(JSON.parse(text));}catch(error){reject(error);}});
+    });req.on('error',reject);req.end(body?JSON.stringify(body):undefined);
+  });
 }
 const room=await api('/api/rooms','192.0.2.1',{name:'Host',settings:{turnSeconds:300}});
 const member=await api(`/api/rooms/${room.code}/join`,'192.0.2.2',{name:'Player'});
