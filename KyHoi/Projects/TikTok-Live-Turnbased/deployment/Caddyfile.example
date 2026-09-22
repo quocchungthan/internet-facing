@@ -1,0 +1,6 @@
+# Replace domain after DNS is ready.
+# App env for this loopback proxy: HOST=127.0.0.1 and TRUSTED_PROXY=127.0.0.1
+# Do not expose port 3000 publicly when using this proxy.
+game.example.com {
+    reverse_proxy 127.0.0.1:3000
+}

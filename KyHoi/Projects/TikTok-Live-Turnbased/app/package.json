@@ -1,0 +1,36 @@
+{
+  "name": "tiktok-live-turnbased",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc --noEmit && vite build",
+    "start": "tsx src/server.ts",
+    "test": "tsx --test tests/*.test.ts",
+    "test:browser": "tsx scripts/rooms-browser-test.ts",
+    "test:multiplayer": "tsx scripts/rooms-browser-test.ts",
+    "soak": "tsx scripts/soak.ts"
+  },
+  "dependencies": {
+    "@fastify/static": "10.1.4",
+    "@fastify/websocket": "11.3.1",
+    "dotenv": "18.0.2",
+    "fastify": "5.12.5",
+    "jquery": "3.7.1",
+    "tiktok-live-connector": "2.5.0",
+    "ws": "8.21.3"
+  },
+  "devDependencies": {
+    "@types/jquery": "4.0.1",
+    "@types/node": "26.6.2",
+    "@types/ws": "8.18.1",
+    "playwright": "1.63.0",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2",
+    "vite": "8.3.0"
+  }
+}

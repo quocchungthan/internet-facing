@@ -1,0 +1,8 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';import {XiangqiAdapter} from '../src/games.ts';
+function from(fen:string){const game=new XiangqiAdapter();game.restore(JSON.stringify({baseFen:fen,moves:[]}));return game;}
+test('opening has 44 moves; illegal move cannot change board',()=>{const g=new XiangqiAdapter();assert.equal(g.getLegalMoves().length,44);const before=g.serialize();assert.throws(()=>g.applyMove('a3a6'));assert.equal(g.serialize(),before);});
+test('facing generals: cannot remove the only blocker',()=>{const g=from('4k4/9/9/9/4P4/9/9/9/9/4K4 r - - 0 1');assert.ok(!g.getLegalMoves().includes('e5f5'));assert.ok(g.getLegalMoves().includes('e5e6'));});
+test('checked king must escape rook file',()=>{const g=from('4k4/9/9/9/4R4/9/9/9/9/4K4 b - - 0 1');assert.ok(!g.getLegalMoves().includes('e9e8'));assert.ok(g.getLegalMoves().includes('e9d9'));});
+test('stalemate is a loss in Xiangqi',()=>{const g=from('4k4/3R1R3/9/9/4P4/9/9/9/9/4K4 b - - 0 1');assert.deepEqual(g.getOutcome(),{winner:'red',reason:'Hết nước đi hợp lệ'});});
+test('checkmate position ends the game',()=>{const g=from('4k4/3RPR3/4C4/9/9/9/9/9/9/4K4 b - - 0 1');assert.equal(g.getOutcome()?.winner,'red');assert.equal(g.getOutcome()?.reason,'Chiếu bí');});
+test('threefold survives serialize/restore (history is preserved, not only FEN)',()=>{const g=new XiangqiAdapter();for(let i=0;i<2;i++)for(const move of ['b0c2','b9c7','c2b0','c7b9'])g.applyMove(move);assert.equal(g.getOutcome()?.winner,null);assert.match(g.getOutcome()?.reason??'',/Lặp thế/);const restored=new XiangqiAdapter();restored.restore(g.serialize());assert.deepEqual(restored.getOutcome(),g.getOutcome());});
