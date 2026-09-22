@@ -1,0 +1,65 @@
+name: Deploy Kỳ Hội
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'KyHoi/**'
+      - '.github/workflows/deploy-kyhoi.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+concurrency:
+  group: deploy-kyhoi-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.repository == 'quocchungthan/internet-facing'
+    runs-on: ubuntu-latest
+    environment: hostkey-server
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check deployment credentials
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          for key in VPS_HOST VPS_USER VPS_SSH_KEY VPS_KNOWN_HOSTS; do
+            test -n "${!key}" || { echo "::error::Missing hostkey-server secret: $key"; exit 1; }
+          done
+      - name: Build tested image
+        run: docker build --pull -t kyhoi:${{ github.sha }} -f KyHoi/Dockerfile KyHoi
+      - name: Smoke test container persistence and proxy identity
+        run: bash KyHoi/deployment/test-image.sh kyhoi:${{ github.sha }}
+      - name: Configure SSH
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+          eval "$(ssh-agent -s)"
+          ssh-add - <<< "$VPS_SSH_KEY"
+          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
+      - name: Transfer image and deploy with backup and rollback
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT || '22' }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          IMAGE: kyhoi:${{ github.sha }}
+        run: |
+          set -euo pipefail
+          ssh_args=(-p "$VPS_PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes "$VPS_USER@$VPS_HOST")
+          docker save "$IMAGE" | gzip | ssh "${ssh_args[@]}" 'if docker info >/dev/null 2>&1; then gzip -dc | docker load; else gzip -dc | sudo -n docker load; fi'
+          remote_script=$(ssh "${ssh_args[@]}" 'mktemp /tmp/kyhoi-deploy.XXXXXXXX.sh')
+          [[ "$remote_script" =~ ^/tmp/kyhoi-deploy\.[A-Za-z0-9]+\.sh$ ]]
+          trap 'ssh "${ssh_args[@]}" "rm -f -- $remote_script"' EXIT
+          ssh "${ssh_args[@]}" "cat > $remote_script" < KyHoi/deployment/deploy.sh
+          ssh "${ssh_args[@]}" "KYHOI_IMAGE=$IMAGE bash $remote_script" < /dev/null

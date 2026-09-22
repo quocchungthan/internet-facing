@@ -6,7 +6,7 @@ on:
       - 'KyHoi/**'
       - '.github/workflows/kyhoi.yml'
   push:
-    branches: [main]
+    branches: [main, 'codex/kyhoi-ip-rooms']
     paths:
       - 'KyHoi/**'
       - '.github/workflows/kyhoi.yml'
@@ -33,6 +33,16 @@ jobs:
       - run: npm test
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
+      - name: Check deployment scripts
+        working-directory: .
+        run: |
+          bash -n KyHoi/deployment/deploy.sh KyHoi/deployment/test-image.sh
+          shellcheck KyHoi/deployment/deploy.sh KyHoi/deployment/test-image.sh
+      - name: Build and smoke test production image
+        working-directory: .
+        run: |
+          docker build -t kyhoi:${{ github.sha }} -f KyHoi/Dockerfile KyHoi
+          bash KyHoi/deployment/test-image.sh kyhoi:${{ github.sha }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
