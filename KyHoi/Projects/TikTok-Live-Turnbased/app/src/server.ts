@@ -1,0 +1,11 @@
+import dotenv from 'dotenv';
+import {resolve} from 'node:path';
+import {existsSync} from 'node:fs';
+import {createRoomServer} from './room-server.ts';
+dotenv.config({path:resolve('../.env'),quiet:true});dotenv.config({path:resolve('.env'),quiet:true});
+if(!existsSync(resolve('dist/index.html')))throw new Error('Run npm run build before starting');
+const {app}=await createRoomServer({directory:process.env.ROOMS_PATH??'./data/rooms',trustProxy:process.env.TRUSTED_PROXY||undefined,logger:true});
+const port=Number(process.env.PORT??3000);if(!Number.isInteger(port)||port<1||port>65535)throw new Error('PORT is invalid');
+await app.listen({host:process.env.HOST??'0.0.0.0',port});
+let closing=false;const stop=async()=>{if(closing)return;closing=true;await app.close();};
+process.on('SIGINT',()=>void stop());process.on('SIGTERM',()=>void stop());

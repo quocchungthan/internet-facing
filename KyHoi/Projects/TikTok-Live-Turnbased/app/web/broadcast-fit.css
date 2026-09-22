@@ -1,0 +1,14 @@
+/* Portrait broadcast framing: leave 140 px below the content for platform chrome. */
+@media(min-width:751px){
+ .broadcast{padding-top:40px;padding-bottom:140px}
+ .intro{margin:24px 0 20px}
+ .intro h1{font-size:48px;margin:12px 0 10px}
+ .team{padding-top:16px;padding-bottom:16px}
+ .board-wrap{max-width:760px;margin-inline:auto}
+ .xiangqi-game{min-height:0}
+ .notation-8c7a2{font-size:16px!important}
+ .votes{margin:20px 0}
+ .empty{padding:8px 0}
+ .how-to{display:grid;grid-template-columns:1fr 1fr;column-gap:20px;padding:20px 24px}
+ .how-to>.eyebrow,.how-to>small{grid-column:1/-1}
+}

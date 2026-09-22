@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+
+<head>
+  <title>Browser Source | OBS</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+      <meta name="description" content="OBS (Open Broadcaster Software) is free and open source software for video recording and live streaming. Stream to Twitch, YouTube and many other providers or record your own videos with high quality H264 / AAC encoding.">
+    <meta name="keywords" content="OBS, OBS Studio, Stream, Video, Live Streaming, Recording, Games, Twitch, YouTube, Livestream, Open Broadcaster Software">
+    <!--<link rel="preload" href="/assets/fonts/open-sans-v18-latin-ext_latin_cyrillic-regular.woff2" as="font" type="font/woff2" crossorigin>-->
+  <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin>
+  <link rel="dns-prefetch" href="https://cdn-fastly.obsproject.com/">
+  <link href="https://obsproject.com/assets/css/blurple.min.css?20260123-1" rel="stylesheet">    <link rel="alternate" type="application/rss+xml" title="RSS Feed obsproject.com" href="/blog/rss">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+                    <link rel="alternate" hreflang="cs" href="https://obsproject.com/cs/kb/browser-source">
+                        <link rel="alternate" hreflang="da" href="https://obsproject.com/da/kb/browser-source">
+                        <link rel="alternate" hreflang="de" href="https://obsproject.com/de/kb/browser-source">
+                        <link rel="alternate" hreflang="en" href="https://obsproject.com/kb/browser-source">
+                        <link rel="alternate" hreflang="es" href="https://obsproject.com/es/kb/browser-source">
+                        <link rel="alternate" hreflang="eu" href="https://obsproject.com/eu/kb/browser-source">
+                        <link rel="alternate" hreflang="fi" href="https://obsproject.com/fi/kb/browser-source">
+                        <link rel="alternate" hreflang="fr" href="https://obsproject.com/fr/kb/browser-source">
+                        <link rel="alternate" hreflang="hu" href="https://obsproject.com/hu/kb/browser-source">
+                        <link rel="alternate" hreflang="ja" href="https://obsproject.com/ja/kb/browser-source">
+                        <link rel="alternate" hreflang="ko" href="https://obsproject.com/ko/kb/browser-source">
+                        <link rel="alternate" hreflang="pt-br" href="https://obsproject.com/pt-br/kb/browser-source">
+                        <link rel="alternate" hreflang="ru" href="https://obsproject.com/ru/kb/browser-source">
+                        <link rel="alternate" hreflang="sv" href="https://obsproject.com/sv/kb/browser-source">
+                        <link rel="alternate" hreflang="tr" href="https://obsproject.com/tr/kb/browser-source">
+                        <link rel="alternate" hreflang="uk" href="https://obsproject.com/uk/kb/browser-source">
+                        <link rel="alternate" hreflang="zh-cn" href="https://obsproject.com/zh-cn/kb/browser-source">
+            
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-34644124-1"></script>
+
+  <script>
+    window.dataLayer = window.dataLayer || [];
+
+    function gtag() {
+      dataLayer.push(arguments);
+    }
+    gtag('js', new Date());
+    gtag('config', 'UA-34644124-1', {
+      'anonymize_ip': true
+    });
+  </script>
+</head>
+
+<body class="">
+
+  <div id="wrapper">
+
+    <header id="header" class="cf">
+  <a class="logo" href="https://obsproject.com">
+    <img src="/assets/images/new_icon_small-r.png" alt="OBS" />
+  </a>
+
+  <div class="header_title">
+    <div class="header_title_main">OBS</div>
+    <div class="header_subtitle">Open Broadcaster Software<span class="smalltext">®️</span></div>
+  </div>
+
+  <div id="SocialButtons">
+
+    <div id="DiscordButton">
+      <a href="https://discord.gg/obsproject" target="_blank" aria-label="OBS Discord">
+        <img src="/assets/images/Discord.svg" class="icon-discord" />
+      </a>
+      <span class="tooltip">Discord</span>
+    </div>
+
+    <div id="TwitterButton">
+      <a rel="me" href="https://twitter.com/OBSProject" target="_blank" aria-label="OBS Twitter">
+        <i class="icon-twitter"></i>
+      </a>
+      <span class="tooltip">Twitter</span>
+    </div>
+
+    <div id="MastodonButton">
+      <a rel="me" href="https://mastodon.social/@OBSProject" target="_blank" aria-label="OBS Mastodon">
+        <img src="/assets/images/Mastodon.svg" class="icon-mastodon">
+      </a>
+      <span class="tooltip">Mastodon</span>
+    </div>
+
+    <div id="GitHubButton">
+      <a rel="me" href="https://github.com/obsproject/obs-studio" target="_blank" aria-label="OBS Studio GitHub">
+        <i class="icon-github"></i>
+      </a>
+      <span class="tooltip">GitHub</span>
+    </div>
+    <!--
+          <div id="BlogButton">
+            <a href="https://obsproject.com/blog">
+              <i class="icon-blog"></i>
+            </a>
+          </div>
+
+          <div id="LivechatButton">
+            <a href="https://obsproject.com/chat" target="_blank">
+              <i class="icon-comment">Community Chat</i>
+            </a>
+          </div>
+        -->
+
+    <div id="ContributeButton">
+      <a href="https://obsproject.com/contribute">
+        <i class="icon-heart">Contribute</i>
+      </a>
+    </div>
+
+  </div>
+
+  <nav>
+
+  <ul class="menu cf">
+          <li>
+                <a  href="https://obsproject.com">Home</a>
+
+        
+      </li>
+          <li>
+                <a  href="https://obsproject.com/download">Download</a>
+
+        
+      </li>
+          <li>
+                <a  href="https://obsproject.com/blog">News</a>
+
+        
+      </li>
+          <li>
+                <a  href="https://obsproject.com/help">Help</a>
+
+        
+      </li>
+          <li>
+                <a  href="/forum/">Forum</a>
+
+        
+      </li>
+      </ul>
+
+</nav>
+</header>
+
+<div class="headerpusher"></div>
+
+<!--<div id="noticeBar" style="margin-bottom: 32px;">Hey there! The OBS knowledge base is still currently a work in progress. While it is publicly accessible, we ask that you avoid linking users to any knowledge base pages at this time. Thank you!</div>-->
+
+<div class="kb_top">
+    <div class="pagewidth">
+
+        <div class="kb_header">
+            <div class="kb_breadcrumb">
+                <a href="https://obsproject.com/kb">Knowledge Base</a> >
+                                    <a href="https://obsproject.com/kb/category/0">F.A.Q.s</a> >
+                                Browser Source            </div>
+
+            <form id="kb_search_form" action="/kb">
+                <input id="kb_search" name="q" type="text" placeholder="Search" value=""></input>
+            </form>
+            <div class="clear"></div>
+        </div>
+
+    </div>
+</div>
+
+<div class="pagewidth kb_wrapper">
+    <div class="full_width kb_flex">
+
+        <div class="kb_main">
+            <div class="kb_main_header">
+                <h1>Browser Source</h1>
+                <div class="kb_date">
+                    <time datetime="2022-01-11">2022-01-11</time>
+                </div>
+
+                            </div>
+
+            <div class="kb_main_content">
+                <h1>Browser Source</h1>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Windows</th>
+<th style="text-align: center;">macOS</th>
+<th style="text-align: center;">Linux</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">✅ Available</td>
+<td style="text-align: center;">✅ Available</td>
+<td style="text-align: center;">✅ Available (<a href="Linux-Installation">through official packages</a>)</td>
+</tr>
+</tbody>
+</table><figure data-ratio="auto">
+    <img src="https://obsproject.com/media/pages/kb/browser-source/f506ac48ba-1767490374/browser-properties.png" alt="">
+  
+  </figure>
+<h2>Description</h2>
+<p>Browser source is one of the most versatile sources available in OBS. It is, quite literally, a web browser that you can add directly to OBS. This allows you to perform all sorts of custom layout, image, video, and even audio tasks. Anything that you can program to run in a normal browser (within reason, of course), can be added directly to OBS.</p><h2>Properties</h2>
+<table class="kb_tablestyle_table">
+  <thead>
+      <tr>
+      <th>Property</th>
+      <th>Description</th>
+      <th>Default</th>
+    </tr>
+    </thead>
+  
+  <tbody>
+      <tr>
+      <td style="text-align: left;"><p>Local file</p></td>
+      <td style="text-align: left;"><p>Loads a web page from your local machine instead of via URL</p></td>
+      <td style="text-align: right;"><p>Off</p></td>
+    </tr>
+      <tr>
+      <td style="text-align: left;"><p>URL</p></td>
+      <td style="text-align: left;"><p>If Local file is set to Off, loads a web page from the specified URL</p></td>
+      <td style="text-align: right;"><p><a href="https://obsproject.com/browser-source" rel="noopener noreferrer nofollow">https://obsproject.com/browser-source</a></p></td>
+    </tr>
+      <tr>
+      <td style="text-align: left;"><p>Width</p></td>
+      <td style="text-align: left;"><p>Sets the viewport width of the browser page</p></td>
+      <td style="text-align: right;"><p>800</p></td>
+    </tr>
+      <tr>
+      <td style="text-align: left;"><p>Height</p></td>
+      <td style="text-align: left;"><p>Sets the viewport height of the browser page</p></td>
+      <td style="text-align: right;"><p>600</p></td>
+    </tr>
+      <tr>
+      <td style="text-align: left;"><p>Use custom frame rate</p></td>
+      <td style="text-align: left;"><p>Sets a custom frame rate at which to render the web page</p></td>
+      <td style="text-align: right;"><p>Off</p></td>
+    </tr>
+      <tr>
+      <td style="text-align: left;"><p>FPS</p></td>
+      <td style="text-align: left;"><p>Defines the custom frame rate at which to render the web page</p></td>
+      <td style="text-align: right;"><p>30</p></td>
+    </tr>
+      <tr>
+      <td style="text-align: left;"><p>Custom CSS</p></td>
+      <td style="text-align: left;"><p>By default, sets the background to be transparent, removes margins on the body, and hides the scroll bar (if the page renders larger than your viewport width/height)</p></td>
+      <td style="text-align: right;"><p><code>body { <br>  background-color: rgba(0, 0, 0, 0);<br>  margin: 0px auto; overflow: hidden;<br>}</code></p></td>
+    </tr>
+      <tr>
+      <td style="text-align: left;"><p>Shutdown source when not visible</p></td>
+      <td style="text-align: left;"><p>Unloads the page when the source is no longer visible (by clicking the eye icon to hide, or not in the active scene)</p></td>
+      <td style="text-align: right;"><p>Off</p></td>
+    </tr>
+      <tr>
+      <td style="text-align: left;"><p>Refresh browser source when scene becomes active</p></td>
+      <td style="text-align: left;"><p>Refresh the page when it becomes active (scene is switched to)</p></td>
+      <td style="text-align: right;"><p>Off</p></td>
+    </tr>
+      <tr>
+      <td style="text-align: left;"><p>Page permissions</p></td>
+      <td style="text-align: left;"><p>Depending on the setting, this allows the browser to read and/or modify OBS options</p></td>
+      <td style="text-align: right;"><p>Read access to OBS status information</p></td>
+    </tr>
+      <tr>
+      <td style="text-align: left;"><p>Refresh cache of current page</p></td>
+      <td style="text-align: left;"><p>Clicking this will immediately refresh the page and reload any content</p></td>
+      <td style="text-align: right;"><p></p></td>
+    </tr>
+    </tbody>
+</table>
+<h2>Notes</h2>
+<p>As Browser Source is based on Chrome Embedded Framework, any CEF flags (<code>--enable-gpu</code> for example) can be passed from the OBS Studio shortcut. A fairly comprehensive list can be found <a href="https://peter.sh/experiments/chromium-command-line-switches/" target="_blank" rel="noopener noreferrer nofollow">here</a>.</p>            </div>
+
+            <div class="kb_main_content">
+                            </div>
+
+                    </div>
+
+        <div class="kb_sidebar">
+                            <h4>Related Articles</h4>
+                <div class="kb_related_list">
+                                            <div class="kb_article_list_item">
+                            <a href="https://obsproject.com/kb/sources-guide">
+                                <div class="kb_article_list_item_title">Sources Guide</div>
+                            </a>
+                        </div>
+                                            <div class="kb_article_list_item">
+                            <a href="https://obsproject.com/kb/audio-sources">
+                                <div class="kb_article_list_item_title">Audio Sources</div>
+                            </a>
+                        </div>
+                                    </div>
+            
+            
+                            <h4>Similar Articles</h4>
+                <div class="kb_related_list">
+                                            <div class="kb_article_list_item">
+                            <a href="https://obsproject.com/kb/window-capture-sources">
+                                <div class="kb_article_list_item_title">Window Capture Sources</div>
+                            </a>
+                        </div>
+                                    </div>
+            
+                    </div>
+    </div>
+
+</div>
+
+    <!-- Lightbox Enabled -->
+    <script type="text/javascript">
+        // Custom Lightbox
+        let kbImages = document.querySelectorAll(".kb_main img[src$='.png'], .kb_main img[src$='.jpeg'], .kb_main img[src$='.jpg']");
+
+        for (i = 0; i < kbImages.length; i++) {
+            let image = kbImages[i];
+
+            image.addEventListener('click', function(e) {
+                console.log(image.parentElement.tagName);
+
+                if (image.parentElement.tagName !== 'A') {
+                    e.preventDefault();
+                    createLightbox(image.src);
+                }
+            });
+        }
+
+
+        function createLightbox(imageLink) {
+            // Delete old lightbox in case it exists already
+            let oldLightbox = document.getElementById('kb_lightbox');
+            if (oldLightbox) {
+                oldLightbox.remove();
+            }
+
+            // Create lightbox wrapper
+            let lightbox = document.createElement("div");
+            lightbox.id = 'kb_lightbox';
+            lightbox.classList.add('kb_lightbox_hide');
+
+            // Background dim
+            let lightbox_dim = document.createElement("div");
+            lightbox_dim.classList.add('kb_lightbox_dim');
+            lightbox_dim.classList.add('kb_lightbox_exit');
+
+            // Content wrapper
+            let lightbox_content = document.createElement("div");
+            lightbox_content.classList.add('kb_lightbox_content');
+
+            lightbox.appendChild(lightbox_dim);
+            lightbox.appendChild(lightbox_content);
+
+            // Header bar for close button
+            let lightbox_header = document.createElement("div");
+            lightbox_header.classList.add('kb_lightbox_header');
+
+            // Close button
+            let lightbox_close = document.createElement("button");
+            lightbox_close.classList.add('kb_lightbox_close');
+            lightbox_close.classList.add('kb_lightbox_exit');
+            lightbox_close.title = "Close (Esc)";
+            lightbox_close.innerText = "×";
+
+            lightbox_header.appendChild(lightbox_close);
+
+            lightbox_content.appendChild(lightbox_header);
+
+            // Image container and image
+            let lightbox_container = document.createElement("div");
+            lightbox_container.classList.add('kb_lightbox_container');
+
+            let lightbox_image = document.createElement("img");
+            lightbox_image.classList.add('kb_lightbox_image');
+            lightbox_image.src = imageLink;
+            lightbox_image.style.maxHeight = window.innerHeight;
+
+            lightbox_container.appendChild(lightbox_image);
+
+            lightbox_content.appendChild(lightbox_container);
+
+            document.body.prepend(lightbox);
+            document.body.classList.add('kb_lightbox_open');
+
+            setTimeout(function() {
+                lightbox.classList.remove('kb_lightbox_hide');
+            }, 20);
+
+            // Close lightbox buttons
+            let exitElems = document.getElementsByClassName('kb_lightbox_exit');
+            for (i = 0; i < exitElems.length; i++) {
+                let item = exitElems[i];
+
+                item.addEventListener('click', function() {
+                    let lightbox = document.getElementById('kb_lightbox');
+                    lightbox.classList.add('kb_lightbox_hide');
+
+                    setTimeout(function() {
+                        lightbox.remove();
+                    }, 200);
+
+                    document.body.classList.remove('kb_lightbox_open');
+                });
+            }
+        }
+    </script>
+
+    <!-- End Lightbox -->
+
+  <div class="footer_push"></div>
+  </div>
+  <!-- End Wrapper -->
+
+  <footer id="footer" class="footer cf">
+    <div class="footer_extra">
+      <div class="footer_left">
+        <div class="footer_row">
+          <div class="logo"><img src="/assets/images/new_icon_small-r.png"></div>
+          <div class="footer_title">OBS Project</div>
+        </div>
+        <div class="footer_row footer_social">
+          <a href="https://twitter.com/OBSProject" target="_blank" aria-label="OBS Twitter">
+            <i class="icon-twitter"></i>
+          </a>
+          <a href="https://facebook.com/OpenBroadcasterSoftware" target="_blank" aria-label="OBS Facebook">
+            <i class="icon-facebook"></i>
+          </a>
+          <a href="/discord" target="_blank" aria-label="OBS Discord">
+            <img src="/assets/images/Discord.svg" class="icon-discord">
+          </a>
+          <a href="https://github.com/obsproject/obs-studio" target="_blank" aria-label="OBS GitHub">
+            <i class="icon-github"></i>
+          </a>
+        </div>
+      </div>
+      <div class="footer_right">
+
+        <!-- App -->
+        <div class="footer_items">
+          <div class="footer_category">OBS Studio</div>
+          <a href="/download" aria-label="Download">Download</a>
+          <a href="https://ideas.obsproject.com/" target="_blank" aria-label="Feature suggestions">Ideas</a>
+          <a href="/privacy-policy" aria-label="Privacy Policy">Privacy Policy</a>
+          <!-- <a id="cookie-footer" href="#" aria-label="Manage Cookies">Manage Cookies</a> -->
+        </div>
+
+        <!-- Contribute -->
+        <div class="footer_items">
+          <div class="footer_category">Contribute</div>
+          <a href="https://github.com/obsproject/obs-studio" target="_blank" aria-label="OBS GitHub">GitHub</a>
+          <a href="https://opencollective.com/obsproject" aria-label="OBS on Open Collective">Open Collective</a>
+          <a href="https://www.patreon.com/obsproject/overview" aria-label="OBS on Patreon">Patreon</a>
+        </div>
+
+        <!-- Help -->
+        <div class="footer_items">
+          <div class="footer_category">Support</div>
+          <a href="/kb" aria-label="Knowledge Base">Knowledge Base</a>
+          <a href="/discord" aria-label="Official Discord">Discord</a>
+          <a href="/forum/" aria-label="Forums">Forums</a>
+          <a href="/help" aria-label="Help Portal">Help Portal</a>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="copyright">
+      <p>© 2012 - 2026. All rights reserved. OBS, OBS Studio, Open Broadcaster Software, and the OBS Studio logo are registered trademarks of Wizards of OBS LLC.<br />
+OBS and OBS Studio are open source projects created and maintained by Lain. Development by <a href="https://github.com/obsproject/obs-studio/graphs/contributors">OBS Studio Contributors</a>.<br />
+Website designed and created by <a href="https://twitter.com/Warchamp7">Warchamp7</a>, powered by <a href="https://getkirby.com/made-with-kirby-and-love">Kirby CMS</a>. Downloads powered by <a href="https://fastly.com">Fastly</a>.</p>    </div>
+    <br>
+    <div class="languages" arial-label="Select Language">
+      <p>
+                              <a href="https://obsproject.com/cs/kb/browser-source">Čeština</a>
+                                        <a href="https://obsproject.com/da/kb/browser-source">Dansk</a>
+                                        <a href="https://obsproject.com/de/kb/browser-source">Deutsch</a>
+                                                          <a href="https://obsproject.com/es/kb/browser-source">Español</a>
+                                        <a href="https://obsproject.com/eu/kb/browser-source">Euskara</a>
+                                        <a href="https://obsproject.com/fi/kb/browser-source">Suomi</a>
+                                        <a href="https://obsproject.com/fr/kb/browser-source">Français</a>
+                                        <a href="https://obsproject.com/hu/kb/browser-source">Magyar</a>
+                                        <a href="https://obsproject.com/ja/kb/browser-source">日本語</a>
+                                        <a href="https://obsproject.com/ko/kb/browser-source">한국어</a>
+                                        <a href="https://obsproject.com/pt-br/kb/browser-source">Português do Brasil</a>
+                                        <a href="https://obsproject.com/ru/kb/browser-source">ру́сский</a>
+                                        <a href="https://obsproject.com/sv/kb/browser-source">Svenska</a>
+                                        <a href="https://obsproject.com/tr/kb/browser-source">Türkçe</a>
+                                        <a href="https://obsproject.com/uk/kb/browser-source">українська</a>
+                                        <a href="https://obsproject.com/zh-cn/kb/browser-source">中文(简体)</a>
+                        </p>
+    </div>
+
+  </footer>
+
+  
+  </body>
+
+  </html>

@@ -84,3 +84,7 @@ Farm deployments start a candidate container on the unused loopback port, requir
 The deploy user must also have passwordless, noninteractive sudo access for the shared ingress operations: creating and maintaining `/etc/caddy/sites`, writing and restoring `/etc/caddy/sites/<domain>.caddy` at mode `0644`, creating and maintaining `/var/lib/caddy/farm/**` at Caddy-readable directory/file modes, creating `/var/lock/deploy-caddy.lock`, and `systemctl reload caddy`. These capabilities are intentionally limited to deployment paths and Caddy reloads; do not grant unrestricted `ALL` sudo access. The deployment script checks `sudo -n -l` before creating a candidate and exits with a clear error if this contract is missing.
 
 ---
+## Kỳ Hội browser game
+
+[KyHoi](KyHoi/README.md) contains an independent Node.js 24+ turn-based room game with IP-based identity, team voting and host moderation. Its PARA documentation and downloaded upstream references live alongside the app. See [setup and tests](KyHoi/Projects/TikTok-Live-Turnbased/README.md) and [deployment to kyhoi.shuneo.com](KyHoi/deployment/README.md). The scoped deployment workflow uses the existing hostkey-server environment after changes reach main.
+

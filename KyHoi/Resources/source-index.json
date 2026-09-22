@@ -1,0 +1,336 @@
+[
+  {
+    "url": "https://raw.githubusercontent.com/lengyanyu258/xiangqi.js/f9019ac2303d4b80ef0b82fd0515bfb55a80a62b/README.md",
+    "path": "Resources/Game/xiangqi-README.md",
+    "purpose": "Game API / license",
+    "version": "f9019ac2303d4b80ef0b82fd0515bfb55a80a62b",
+    "fetchedAt": "2026-09-22T02:25:20.074804+00:00",
+    "status": "downloaded",
+    "bytes": 19525,
+    "sha256": "8e9f7e566d203bed5f883e3c163e5907691330fdab45e665fa75fc65a89ddff7"
+  },
+  {
+    "url": "https://raw.githubusercontent.com/lengyanyu258/xiangqi.js/f9019ac2303d4b80ef0b82fd0515bfb55a80a62b/package.json",
+    "path": "Resources/Game/xiangqi-package.json",
+    "purpose": "Game API / license",
+    "version": "f9019ac2303d4b80ef0b82fd0515bfb55a80a62b",
+    "fetchedAt": "2026-09-22T02:25:20.076803+00:00",
+    "status": "downloaded",
+    "bytes": 1036,
+    "sha256": "0829f1f52d16657f1187c906bb57b711a73e8307e778ec8c71992c251f4bae27"
+  },
+  {
+    "url": "https://raw.githubusercontent.com/lengyanyu258/xiangqi.js/f9019ac2303d4b80ef0b82fd0515bfb55a80a62b/LICENSE",
+    "path": "Resources/Game/xiangqi-LICENSE",
+    "purpose": "Game API / license",
+    "version": "f9019ac2303d4b80ef0b82fd0515bfb55a80a62b",
+    "fetchedAt": "2026-09-22T02:25:20.076803+00:00",
+    "status": "downloaded",
+    "bytes": 1380,
+    "sha256": "48095c80be59c5ab41f730d9fa5291b539495bc818be3d54e6ac9f602ebeaa9e"
+  },
+  {
+    "url": "https://raw.githubusercontent.com/lengyanyu258/xiangqiboardjs/c36e1046c424e7abf1405904006043f6426b8ee8/README.md",
+    "path": "Resources/Game/board-README.md",
+    "purpose": "Game API / license",
+    "version": "c36e1046c424e7abf1405904006043f6426b8ee8",
+    "fetchedAt": "2026-09-22T02:25:20.076803+00:00",
+    "status": "downloaded",
+    "bytes": 2838,
+    "sha256": "c78ecc3485d72ba4bf004aa6d4d8870567ffabd67130894afa101792170a3c47"
+  },
+  {
+    "url": "https://raw.githubusercontent.com/lengyanyu258/xiangqiboardjs/c36e1046c424e7abf1405904006043f6426b8ee8/package.json",
+    "path": "Resources/Game/board-package.json",
+    "purpose": "Game API / license",
+    "version": "c36e1046c424e7abf1405904006043f6426b8ee8",
+    "fetchedAt": "2026-09-22T02:25:20.077804+00:00",
+    "status": "downloaded",
+    "bytes": 910,
+    "sha256": "13a127c8a18e4746626aeae02589ba7c84e47f4a5907215bbb6eb056b6a69ae4"
+  },
+  {
+    "url": "https://raw.githubusercontent.com/lengyanyu258/xiangqiboardjs/c36e1046c424e7abf1405904006043f6426b8ee8/LICENSE.md",
+    "path": "Resources/Game/board-LICENSE.md",
+    "purpose": "Game API / license",
+    "version": "c36e1046c424e7abf1405904006043f6426b8ee8",
+    "fetchedAt": "2026-09-22T02:25:20.077804+00:00",
+    "status": "downloaded",
+    "bytes": 1122,
+    "sha256": "a2fd86246ffccf95e11f29b227b0db636353e88c46d3abc0bf4500e147ee2985"
+  },
+  {
+    "url": "https://raw.githubusercontent.com/lengyanyu258/xiangqi.js/f9019ac2303d4b80ef0b82fd0515bfb55a80a62b/xiangqi.js",
+    "path": "Projects/TikTok-Live-Turnbased/app/vendor/xiangqi.cjs",
+    "purpose": "Pinned rule runtime",
+    "version": "f9019ac2303d4b80ef0b82fd0515bfb55a80a62b",
+    "fetchedAt": "2026-09-22T02:25:20.573805+00:00",
+    "status": "downloaded",
+    "bytes": 43260,
+    "sha256": "f2de592d3a81cf79cd36f0d09e6efbb4bdb357082c2d421bf76d2d8eb7c619fe"
+  },
+  {
+    "url": "https://raw.githubusercontent.com/lengyanyu258/xiangqiboardjs/c36e1046c424e7abf1405904006043f6426b8ee8/src/xiangqiboard.js",
+    "path": "Projects/TikTok-Live-Turnbased/app/web/public/vendor/xiangqiboard.js",
+    "purpose": "Pinned board renderer",
+    "version": "c36e1046c424e7abf1405904006043f6426b8ee8",
+    "fetchedAt": "2026-09-22T02:25:20.605369+00:00",
+    "status": "downloaded",
+    "bytes": 54551,
+    "sha256": "f98570f0309d11d6d89e26b068df591e3bb80c76c045d3b83fa59ff8fde4c010"
+  },
+  {
+    "url": "https://raw.githubusercontent.com/lengyanyu258/xiangqiboardjs/c36e1046c424e7abf1405904006043f6426b8ee8/src/xiangqiboard.css",
+    "path": "Projects/TikTok-Live-Turnbased/app/web/public/vendor/xiangqiboard.css",
+    "purpose": "Pinned board renderer",
+    "version": "c36e1046c424e7abf1405904006043f6426b8ee8",
+    "fetchedAt": "2026-09-22T02:25:20.626125+00:00",
+    "status": "downloaded",
+    "bytes": 950,
+    "sha256": "6edfca2bf739118d73df689c1c5f10aa9d7700af69f40069cfeab78313d820ee"
+  },
+  {
+    "url": "https://lengyanyu258.github.io/xiangqiboardjs/docs",
+    "path": "Resources/Game/board-api.html",
+    "purpose": "Board API reference",
+    "version": "snapshot",
+    "fetchedAt": "2026-09-22T02:25:20.646153+00:00",
+    "status": "downloaded",
+    "bytes": 29781,
+    "sha256": "90e98418f3cb1a1abf266ca0231aaeb4ba53397ef149947a9e32089e17731464"
+  },
+  {
+    "url": "https://lengyanyu258.github.io/xiangqiboardjs/examples",
+    "path": "Resources/Game/board-examples.html",
+    "purpose": "Board examples",
+    "version": "snapshot",
+    "fetchedAt": "2026-09-22T02:25:20.666735+00:00",
+    "status": "downloaded",
+    "bytes": 56917,
+    "sha256": "a1fe40b614ed45821bb542ec8053d8fd4bd2c427c1338ec3bda861f369360144"
+  },
+  {
+    "url": "https://raw.githubusercontent.com/zerodytrash/TikTok-Live-Connector/master/README.md",
+    "path": "Resources/TikTok/connector-README.md",
+    "purpose": "Connector integration",
+    "version": "snapshot",
+    "fetchedAt": "2026-09-22T02:25:20.686814+00:00",
+    "status": "downloaded",
+    "bytes": 51689,
+    "sha256": "f925134e8be454f9c294d5d3fb45a5b975b87e36dff4f44ea915a05df6c72708"
+  },
+  {
+    "url": "https://raw.githubusercontent.com/zerodytrash/TikTok-Live-Connector/master/LICENSE",
+    "path": "Resources/TikTok/connector-LICENSE",
+    "purpose": "Connector license",
+    "version": "snapshot",
+    "fetchedAt": "2026-09-22T02:25:21.011522+00:00",
+    "status": "downloaded",
+    "bytes": 37546,
+    "sha256": "dcf7980cd048cf1d9ec1177cdf73d5c3e363150653f43b8ef8eafd28c83928e2"
+  },
+  {
+    "url": "https://www.eulerstream.com/docs/quickstart",
+    "path": "Resources/TikTok/euler-quickstart.html",
+    "purpose": "Signing key and connection",
+    "version": "snapshot",
+    "fetchedAt": "2026-09-22T02:25:21.061828+00:00",
+    "status": "downloaded",
+    "bytes": 257349,
+    "sha256": "4c43083bdfbf00522d08181fe112e078d80572cb2e1c46a4699233a687cd0c1b"
+  },
+  {
+    "url": "https://www.eulerstream.com/docs/libraries/nodejs",
+    "path": "Resources/TikTok/euler-nodejs.html",
+    "purpose": "Node integration",
+    "version": "snapshot",
+    "fetchedAt": "2026-09-22T02:25:21.083202+00:00",
+    "status": "downloaded",
+    "bytes": 218171,
+    "sha256": "425a33d015a9892a3b3485ab03a208368a4096d7ea30c91eedb9ebfe9b6bedb1"
+  },
+  {
+    "url": "https://www.eulerstream.com/pricing",
+    "path": "Resources/TikTok/euler-pricing.html",
+    "purpose": "Prices; verify before buying",
+    "version": "snapshot",
+    "fetchedAt": "2026-09-22T02:25:21.126912+00:00",
+    "status": "downloaded",
+    "bytes": 255158,
+    "sha256": "44e7935c5d97b3f72180456ae2b40009bf44e1878e559f224fea290bc0ad8d87"
+  },
+  {
+    "url": "https://www.eulerstream.com/docs",
+    "path": "Resources/TikTok/euler-index.html",
+    "purpose": "Documentation entrypoint",
+    "version": "snapshot",
+    "fetchedAt": "2026-09-22T02:25:21.126912+00:00",
+    "status": "downloaded",
+    "bytes": 314260,
+    "sha256": "7abdc9a1a35ecba2e4ef735f73dcde3e9d4450f5275ab84d8615a638fc90ad2e"
+  },
+  {
+    "url": "https://www.eulerstream.com/docs/api/rate-limits",
+    "path": "Resources/TikTok/euler-rate-limits.html",
+    "purpose": "Signing quotas and 429 handling",
+    "version": "snapshot",
+    "fetchedAt": "2026-09-22T02:25:21.171336+00:00",
+    "status": "downloaded",
+    "bytes": 221066,
+    "sha256": "f801d838eb3a8f34da26ff0a22fc400f7b3492c61941ebf55e0c6291c47e7358"
+  },
+  {
+    "url": "https://www.eulerstream.com/docs/api/tiktok-live",
+    "path": "Resources/TikTok/euler-api.html",
+    "purpose": "API reference entrypoint",
+    "version": "snapshot",
+    "fetchedAt": "2026-09-22T02:25:21.510211+00:00",
+    "status": "downloaded",
+    "bytes": 375656,
+    "sha256": "d474ebc09cea042ca14e122c354806d6526b73ab8fa87e257c72d29fbdd83ee9"
+  },
+  {
+    "url": "https://support.tiktok.com/en/live-gifts-wallet/tiktok-live/what-is-tiktok-live",
+    "path": "Resources/TikTok/live-eligibility.html",
+    "purpose": "LIVE account prerequisites",
+    "version": "snapshot",
+    "fetchedAt": "2026-09-22T02:25:21.866014+00:00",
+    "status": "downloaded",
+    "bytes": 35546,
+    "sha256": "3f0fc5afe743cb1b0747857d94d0b80dbcc7498b8cc167d90ca04b402aa7d732"
+  },
+  {
+    "url": "https://obsproject.com/kb/browser-source",
+    "path": "Resources/Broadcasting/obs-browser-source.html",
+    "purpose": "Capture web UI",
+    "version": "snapshot",
+    "fetchedAt": "2026-09-22T02:25:22.055033+00:00",
+    "status": "downloaded",
+    "bytes": 22186,
+    "sha256": "4713aa83b2245bab68d8de5eaa2b9e6fd6a7fe744db6b38d583e85ec3ca26eb1"
+  },
+  {
+    "url": "https://obsproject.com/kb/quick-start-guide",
+    "path": "Resources/Broadcasting/obs-quickstart.html",
+    "purpose": "Broadcast setup",
+    "version": "snapshot",
+    "fetchedAt": "2026-09-22T02:25:22.261820+00:00",
+    "status": "downloaded",
+    "bytes": 27922,
+    "sha256": "5dd4061577a4abc84275e27a54782803f11824c2ab035fdbef40b9b3fcb66ec9"
+  },
+  {
+    "url": "https://fastify.dev/docs/latest/Reference/Server/",
+    "path": "Resources/Infrastructure/fastify-server.html",
+    "purpose": "Server reference",
+    "version": "snapshot",
+    "fetchedAt": "2026-09-22T02:25:22.312767+00:00",
+    "status": "downloaded",
+    "bytes": 378926,
+    "sha256": "ae33993556f388253cfe3b41edb9733168743b7556028cbc6481188e98e789a7"
+  },
+  {
+    "url": "https://github.com/fastify/fastify-static/raw/refs/heads/main/README.md",
+    "path": "Resources/Infrastructure/fastify-static.md",
+    "purpose": "Static hosting",
+    "version": "snapshot",
+    "fetchedAt": "2026-09-22T02:25:22.502256+00:00",
+    "status": "downloaded",
+    "bytes": 17671,
+    "sha256": "d1749c6ca839bdfb932d754206dd3e5cfb6f33af522780e607f9226cbe27257b"
+  },
+  {
+    "url": "https://vite.dev/guide/",
+    "path": "Resources/Infrastructure/vite-guide.html",
+    "purpose": "Frontend build",
+    "version": "snapshot",
+    "fetchedAt": "2026-09-22T02:25:22.563668+00:00",
+    "status": "downloaded",
+    "bytes": 89758,
+    "sha256": "ac58fe396a2000fc73118853b19ec9f722c41efc7f83ee549e3808d37fd8f095"
+  },
+  {
+    "url": "https://nodejs.org/api/sqlite.html",
+    "path": "Resources/Infrastructure/node-sqlite.html",
+    "purpose": "SQLite transactions",
+    "version": "snapshot",
+    "fetchedAt": "2026-09-22T02:25:22.715039+00:00",
+    "status": "downloaded",
+    "bytes": 266815,
+    "sha256": "dcf34be898308ebbf0f8e03aaec3f740827045ec6061786b2f140c939c59d577"
+  },
+  {
+    "url": "https://raw.githubusercontent.com/websockets/ws/master/README.md",
+    "path": "Resources/Infrastructure/ws-README.md",
+    "purpose": "WebSocket server",
+    "version": "snapshot",
+    "fetchedAt": "2026-09-22T02:25:22.866488+00:00",
+    "status": "downloaded",
+    "bytes": 15306,
+    "sha256": "bb979132f3cbff08ce47f36d041e18071f8f534d01f591c0b129ba7abf1e480e"
+  },
+  {
+    "url": "https://caddyserver.com/docs/quick-starts/reverse-proxy",
+    "path": "Resources/Infrastructure/caddy-proxy.html",
+    "purpose": "HTTPS deployment",
+    "version": "snapshot",
+    "fetchedAt": "2026-09-22T02:25:22.902570+00:00",
+    "status": "downloaded",
+    "bytes": 39071,
+    "sha256": "89168aa86a86204bd3622ba4b2052c83d22192108678d305103dd3324dccf732"
+  },
+  {
+    "url": "https://huggingface.co/convaiinnovations/laya/raw/main/README.md",
+    "path": "Resources/AI/laya-model-card.md",
+    "purpose": "Future only; no model weights",
+    "version": "snapshot",
+    "fetchedAt": "2026-09-22T02:25:22.956647+00:00",
+    "status": "downloaded",
+    "bytes": 14874,
+    "sha256": "33911629d87484754bb755d2118a38626264a9b63bc33ee30131d7564f5560ee"
+  },
+  {
+    "url": "https://registry.npmjs.org/tiktok-live-connector/-/tiktok-live-connector-2.5.0.tgz",
+    "path": "Resources/TikTok/connector-2.5.0-README.md",
+    "purpose": "Installed package reference / license",
+    "version": "2.5.0",
+    "archiveMember": "README.md",
+    "fetchedAt": "2026-09-22T02:25:23.831264+00:00",
+    "status": "downloaded",
+    "bytes": 49900,
+    "sha256": "13f626049123c7b5d1002cf82513d9534db0c4160c671f78496eaccc55cf0134"
+  },
+  {
+    "url": "https://registry.npmjs.org/tiktok-live-connector/-/tiktok-live-connector-2.5.0.tgz",
+    "path": "Resources/TikTok/connector-2.5.0-LICENSE",
+    "purpose": "Installed package reference / license",
+    "version": "2.5.0",
+    "archiveMember": "LICENSE",
+    "fetchedAt": "2026-09-22T02:25:23.847152+00:00",
+    "status": "downloaded",
+    "bytes": 37546,
+    "sha256": "dcf7980cd048cf1d9ec1177cdf73d5c3e363150653f43b8ef8eafd28c83928e2"
+  },
+  {
+    "url": "https://registry.npmjs.org/tiktok-live-connector/-/tiktok-live-connector-2.5.0.tgz",
+    "path": "Resources/TikTok/connector-2.5.0-api.d.ts",
+    "purpose": "Installed package reference / license",
+    "version": "2.5.0",
+    "archiveMember": "dist/index-DcaLUrMQ.d.ts",
+    "fetchedAt": "2026-09-22T02:25:23.873011+00:00",
+    "status": "downloaded",
+    "bytes": 60027,
+    "sha256": "778f8692f3456c093bbfecf70c18f6d41ffac709e3be4508d9d26c93a7b465ed"
+  },
+  {
+    "url": "https://registry.npmjs.org/tiktok-live-proto/-/tiktok-live-proto-0.2.4.tgz",
+    "path": "Resources/TikTok/proto-0.2.4-LICENSE",
+    "purpose": "Installed package reference / license",
+    "version": "0.2.4",
+    "archiveMember": "LICENSE",
+    "fetchedAt": "2026-09-22T02:25:23.886638+00:00",
+    "status": "downloaded",
+    "bytes": 37546,
+    "sha256": "dcf7980cd048cf1d9ec1177cdf73d5c3e363150653f43b8ef8eafd28c83928e2"
+  }
+]
