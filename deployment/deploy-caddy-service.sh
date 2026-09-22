@@ -212,7 +212,8 @@ capture_fragment
 fragment_source=$(mktemp)
 cat > "$fragment_source" <<EOF
 $SERVICE_DOMAIN {
-$static_caddy_config	handle {
+$static_caddy_config
+	handle {
 		reverse_proxy 127.0.0.1:$candidate_port
 	}
 }
