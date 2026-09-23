@@ -4,6 +4,48 @@ using Spectre.Console;
 
 internal static class ConsoleTables
 {
+    public static void RenderWorkItemDetails(IReadOnlyList<WorkItem> workItems)
+    {
+        if (workItems.Count == 0)
+        {
+            AnsiConsole.MarkupLine("[grey]No work items found.[/]");
+            return;
+        }
+
+        foreach (var workItem in workItems)
+        {
+            var details = new Grid();
+            details.AddColumn(new GridColumn().NoWrap());
+            details.AddColumn(new GridColumn());
+
+            AddDetail(details, "Type", workItem.WorkItemType);
+            AddDetail(details, "Title", workItem.Title);
+            AddDetail(details, "State", workItem.State);
+            AddDetail(details, "Reason", workItem.Reason);
+            AddDetail(details, "Assigned", FormatIdentity(workItem.AssignedTo));
+            AddDetail(details, "Area", workItem.AreaPath);
+            AddDetail(details, "Iteration", workItem.IterationPath);
+            AddDetail(details, "Created", FormatAudit(workItem.CreatedAt, workItem.CreatedBy));
+            AddDetail(details, "Changed", FormatAudit(workItem.ChangedAt, workItem.ChangedBy));
+            AddDetail(details, "Tags", FormatTags(workItem.Tags));
+            AddDetail(details, "URL", workItem.Url?.ToString());
+            AddDetail(details, "Attachments", FormatAttachments(workItem.Attachments));
+            AddDetail(details, "Relations", FormatRelations(workItem.Relations));
+            AddDetail(details, "Description", workItem.Description);
+
+            var panel = new Panel(details)
+            {
+                Header = new PanelHeader($"Work Item {workItem.Id}"),
+                Border = BoxBorder.Rounded,
+                Expand = true,
+                Padding = new Padding(1, 0, 1, 0)
+            };
+
+            AnsiConsole.Write(panel);
+            AnsiConsole.WriteLine();
+        }
+    }
+
     public static void RenderWorkItems(IReadOnlyList<WorkItem> workItems, bool needsAttention = false)
     {
         var table = new Table().Border(TableBorder.Rounded);
@@ -82,6 +124,45 @@ internal static class ConsoleTables
     };
 
     internal static string EscapeCell(string? value) => Markup.Escape(value ?? string.Empty);
+
+    private static void AddDetail(Grid grid, string label, string? value) =>
+        grid.AddRow(
+            new Markup($"[grey]{Markup.Escape(label)}[/]"),
+            new Markup(EscapeCell(string.IsNullOrWhiteSpace(value) ? "-" : value)));
+
+    private static string FormatIdentity(Identity? identity) => identity switch
+    {
+        null => "unassigned",
+        { UniqueName: { Length: > 0 } uniqueName } => $"{identity.DisplayName} ({uniqueName})",
+        _ => identity.DisplayName
+    };
+
+    private static string FormatAudit(DateTimeOffset? timestamp, Identity? identity)
+    {
+        var date = timestamp?.ToString("u").TrimEnd() ?? "-";
+        return identity is null ? date : $"{date} by {FormatIdentity(identity)}";
+    }
+
+    private static string FormatTags(IReadOnlyList<string>? tags) =>
+        tags is { Count: > 0 } ? string.Join(", ", tags) : "-";
+
+    private static string FormatAttachments(IReadOnlyList<Attachment> attachments) =>
+        attachments.Count == 0
+            ? "None"
+            : string.Join(
+                Environment.NewLine,
+                attachments.Select(attachment => string.IsNullOrWhiteSpace(attachment.Comment)
+                    ? $"{attachment.FileName}: {attachment.DownloadUrl}"
+                    : $"{attachment.FileName}: {attachment.DownloadUrl} ({attachment.Comment})"));
+
+    private static string FormatRelations(IReadOnlyList<WorkItemRelation>? relations) =>
+        relations is not { Count: > 0 }
+            ? "None"
+            : string.Join(
+                Environment.NewLine,
+                relations.Select(relation => string.IsNullOrWhiteSpace(relation.Name)
+                    ? $"{relation.Type}: {relation.Url}"
+                    : $"{relation.Name} ({relation.Type}): {relation.Url}"));
 
     private static string FormatReviewers(IReadOnlyList<PullRequestReviewer> reviewers) =>
         reviewers.Count == 0

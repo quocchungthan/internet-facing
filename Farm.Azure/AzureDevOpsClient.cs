@@ -16,7 +16,7 @@ using CoreWorkItem = Farm.Core.Domain.WorkItem;
 
 namespace Farm.Azure;
 
-public sealed class AzureDevOpsClient :
+public sealed partial class AzureDevOpsClient :
     IAzureDevOpsClient,
     IAzureDomainWorkItemClient,
     IAzureIdentityClient,
@@ -37,6 +37,7 @@ public sealed class AzureDevOpsClient :
     {
         ArgumentNullException.ThrowIfNull(settings);
         settings.Validate();
+        organizationUrl = settings.OrganizationUrl;
         project = settings.Project;
         team = settings.Team;
         terminalStates = settings.TerminalStates;
@@ -339,6 +340,7 @@ public sealed class AzureDevOpsClient :
         var workItems = await client.GetWorkItemsAsync(
             project,
             workItemIds,
+            expand: WorkItemExpand.Relations,
             cancellationToken: cancellationToken);
 
         return workItems;

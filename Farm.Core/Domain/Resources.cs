@@ -8,7 +8,22 @@ public sealed record WorkItem(
     string? WorkItemType,
     Identity? AssignedTo,
     Uri? Url,
-    IReadOnlyList<Attachment> Attachments);
+    IReadOnlyList<Attachment> Attachments,
+    string? Reason = null,
+    string? AreaPath = null,
+    string? IterationPath = null,
+    DateTimeOffset? CreatedAt = null,
+    DateTimeOffset? ChangedAt = null,
+    Identity? CreatedBy = null,
+    Identity? ChangedBy = null,
+    string? Description = null,
+    IReadOnlyList<string>? Tags = null,
+    IReadOnlyList<WorkItemRelation>? Relations = null);
+
+public sealed record WorkItemRelation(
+    string Type,
+    Uri Url,
+    string? Name);
 
 public sealed record Attachment(
     string Id,

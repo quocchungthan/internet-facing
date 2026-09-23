@@ -158,7 +158,7 @@ public static class ConsoleApp
         IWorkItemSource workItemSource = new AzureWorkItemSource(client);
         var workItems = await workItemSource.GetWorkItemsAsync(ids, cancellationToken);
 
-        ConsoleTables.RenderWorkItems(workItems);
+        ConsoleTables.RenderWorkItemDetails(workItems);
         return 0;
     }
 

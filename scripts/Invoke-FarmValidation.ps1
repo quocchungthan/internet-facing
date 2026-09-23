@@ -1,17 +1,29 @@
 param(
-    [ValidateSet('Core', 'Solution')]
+    [ValidateSet('Core', 'Chickens', 'Solution')]
     [string]$Scope = 'Solution'
 )
 
 $ErrorActionPreference = 'Stop'
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
 
-$target = if ($Scope -eq 'Core') {
-    Join-Path $repositoryRoot 'Farm.Core.Tests/Farm.Core.Tests.csproj'
-}
-else {
-    Join-Path $repositoryRoot 'PiggyFarm.slnx'
+$targets = switch ($Scope) {
+    'Core' { @('Farm.Core.Tests/Farm.Core.Tests.csproj') }
+    'Chickens' {
+        @(
+            'Farm.Core.Tests/Farm.Core.Tests.csproj',
+            'Farm.Git.Tests/Farm.Git.Tests.csproj',
+            'Farm.State.Sqlite.Tests/Farm.State.Sqlite.Tests.csproj',
+            'Farm.Sandbox.Chickens.Tests/Farm.Sandbox.Chickens.Tests.csproj'
+        )
+    }
+    default { @('PiggyFarm.slnx') }
 }
 
-& dotnet test $target --no-restore
-exit $LASTEXITCODE
+foreach ($relativeTarget in $targets) {
+    & dotnet test (Join-Path $repositoryRoot $relativeTarget) --no-restore
+    if ($LASTEXITCODE -ne 0) {
+        exit $LASTEXITCODE
+    }
+}
+
+exit 0

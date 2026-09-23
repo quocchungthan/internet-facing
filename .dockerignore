@@ -3,7 +3,13 @@
 **/bin
 **/obj
 **/node_modules
-artifacts
+**/.vs
+**/TestResults
+artifacts/*
+!artifacts/farm-sandbox-chickens/
+artifacts/farm-sandbox-chickens/*
+!artifacts/farm-sandbox-chickens/linux-x64/
+!artifacts/farm-sandbox-chickens/linux-x64/**
 .env
 .env.*
 **/.env
