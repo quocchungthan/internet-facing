@@ -76,6 +76,53 @@ public sealed class ConsoleAppTests
         }
     }
 
+    [Fact]
+    public async Task RunAsync_global_help_paths_render_identical_complete_metadata()
+    {
+        var noArgs = await CaptureStandardOutputAsync([]);
+        var helpCommand = await CaptureStandardOutputAsync(["help"]);
+        var helpFlag = await CaptureStandardOutputAsync(["--help"]);
+
+        Assert.Equal(0, noArgs.ExitCode);
+        Assert.Equal(noArgs.Output, helpCommand.Output);
+        Assert.Equal(noArgs.Output, helpFlag.Output);
+        string[] expectedForms =
+        [
+            "work-items <id> [<id> ...]",
+            "work-items assigned-to <email-or-me>",
+            "work-items needs-attention",
+            "work-items assign <id> <email-or-unique-name-or-me>",
+            "work-items unassign <id>",
+            "pull-requests approved-by-me",
+            "pull-requests assigned-to-me",
+            "pull-requests pending-review",
+            "pull-requests mine",
+            "pr-threads <pr-id>",
+            "pr-diff <pr-id>",
+            "work-item-comments <id>",
+            "work-item-relations <id>"
+        ];
+        Assert.All(expectedForms, form => Assert.Contains(form, noArgs.Output));
+        Assert.Contains("[implemented]", noArgs.Output);
+        Assert.Contains("[not implemented]", noArgs.Output);
+    }
+
+    [Fact]
+    public async Task RunAsync_work_items_help_paths_render_identical_detail_usage()
+    {
+        var helpCommand = await CaptureStandardOutputAsync(["help", "work-items"]);
+        var helpFlag = await CaptureStandardOutputAsync(["work-items", "--help"]);
+
+        Assert.Equal(0, helpCommand.ExitCode);
+        Assert.Equal(helpCommand.Output, helpFlag.Output);
+        Assert.Contains("Usage: sam work-items <id> [<id> ...]", helpCommand.Output);
+        Assert.Contains("sam work-items needs-attention", helpCommand.Output);
+        Assert.Contains("sam work-items assign <id> <email-or-unique-name-or-me>", helpCommand.Output);
+        Assert.Contains("sam work-items unassign <id>", helpCommand.Output);
+        Assert.Contains("Show full work-item detail", helpCommand.Output);
+        Assert.Contains("Status: implemented", helpCommand.Output);
+    }
+
     [Theory]
     [InlineData("--version")]
     [InlineData("-v")]
@@ -305,6 +352,21 @@ public sealed class ConsoleAppTests
             Environment.SetEnvironmentVariable("FARM_AZURE_DEVOPS_ORGANIZATION_URL", organizationUrl);
             Environment.SetEnvironmentVariable("FARM_AZURE_DEVOPS_PROJECT", project);
             Environment.SetEnvironmentVariable("FARM_AZURE_DEVOPS_PAT", pat);
+        }
+    }
+
+    private static async Task<(int ExitCode, string Output)> CaptureStandardOutputAsync(string[] args)
+    {
+        var output = new StringWriter();
+        var originalOut = System.Console.Out;
+        System.Console.SetOut(output);
+        try
+        {
+            return (await ConsoleApp.RunAsync(args), output.ToString());
+        }
+        finally
+        {
+            System.Console.SetOut(originalOut);
         }
     }
 

@@ -25,10 +25,35 @@ public sealed partial class AzureDevOpsClient :
     IAzurePullRequestClient,
     IDisposable
 {
+    internal delegate Task<IReadOnlyList<WorkItem>> WorkItemBatchLoader(
+        string project,
+        IReadOnlyList<int> ids,
+        IReadOnlyList<string> fields,
+        WorkItemExpand expand,
+        CancellationToken cancellationToken);
+
+    internal static IReadOnlyList<string> DetailedWorkItemFields { get; } = Array.AsReadOnly(
+    [
+        "System.Title",
+        "System.State",
+        "System.Reason",
+        "System.WorkItemType",
+        "System.AssignedTo",
+        "System.AreaPath",
+        "System.IterationPath",
+        "System.CreatedDate",
+        "System.ChangedDate",
+        "System.CreatedBy",
+        "System.ChangedBy",
+        "System.Description",
+        "System.Tags"
+    ]);
+
     private readonly VssConnection connection;
     private readonly string project;
     private readonly string? team;
     private readonly IReadOnlyList<string> terminalStates;
+    private readonly WorkItemBatchLoader? workItemBatchLoader;
     private WorkItemTrackingHttpClient? client;
     private ProfileHttpClient? profileClient;
     private GraphHttpClient? graphClient;
@@ -46,6 +71,13 @@ public sealed partial class AzureDevOpsClient :
 
         var credentials = new VssBasicCredential(string.Empty, settings.PersonalAccessToken);
         connection = new VssConnection(settings.OrganizationUrl, credentials);
+    }
+
+    internal AzureDevOpsClient(AzureDevOpsSettings settings, WorkItemBatchLoader workItemBatchLoader)
+        : this(settings)
+    {
+        this.workItemBatchLoader = workItemBatchLoader
+            ?? throw new ArgumentNullException(nameof(workItemBatchLoader));
     }
 
     public async Task<IReadOnlyList<AzureWorkItemDto>> GetWorkItemsAsync(
@@ -367,11 +399,24 @@ public sealed partial class AzureDevOpsClient :
             throw new ArgumentException("Work item IDs must not contain duplicates.", nameof(ids));
         }
 
+        var requestedFields = DetailedWorkItemFields;
+        const WorkItemExpand requestedExpand = WorkItemExpand.Relations;
+        if (workItemBatchLoader is not null)
+        {
+            return await workItemBatchLoader(
+                project,
+                workItemIds,
+                requestedFields,
+                requestedExpand,
+                cancellationToken);
+        }
+
         client ??= connection.GetClient<WorkItemTrackingHttpClient>();
         var workItems = await client.GetWorkItemsAsync(
             project,
             workItemIds,
-            expand: WorkItemExpand.Relations,
+            fields: requestedFields,
+            expand: requestedExpand,
             cancellationToken: cancellationToken);
 
         return workItems;

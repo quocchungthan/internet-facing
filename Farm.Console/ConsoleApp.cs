@@ -6,57 +6,109 @@ using Microsoft.VisualStudio.Services.Common;
 
 public static class ConsoleApp
 {
-    private const string ToolName = "sam";
     private const int NotImplementedExitCode = 3;
+
+    private enum ImplementationStatus
+    {
+        Implemented,
+        NotImplemented
+    }
+
+    private sealed record ToolDefinition(
+        string Name,
+        string Description,
+        IReadOnlyList<string> UsageForms);
 
     private sealed record CommandDefinition(
         string Name,
         string Description,
-        string Usage,
+        IReadOnlyList<string> UsageForms,
+        IReadOnlyList<string> Subcommands,
+        ImplementationStatus Status,
         Func<string[], CancellationToken, Task<int>> Handler);
+
+    private static readonly ToolDefinition Tool = new(
+        "sam",
+        "Work with Azure DevOps work items, pull requests, and identities.",
+        ["<command> [args]", "help [command]", "--help|-h", "--version|-v"]);
 
     private static readonly CommandDefinition[] Commands =
     [
         new(
             "work-items",
-            "Query work items, list assignment queues, or assign and unassign an item.",
-            "work-items <id> [<id> ...] | work-items assigned-to <email-or-me> | work-items needs-attention | work-items assign <id> <email-or-unique-name-or-me> | work-items unassign <id>",
+            "Show full work-item detail, list assignment queues, or assign and unassign an item.",
+            [
+                "work-items <id> [<id> ...]",
+                "work-items assigned-to <email-or-me>",
+                "work-items needs-attention",
+                "work-items assign <id> <email-or-unique-name-or-me>",
+                "work-items unassign <id>"
+            ],
+            ["assigned-to", "needs-attention", "assign", "unassign"],
+            ImplementationStatus.Implemented,
             (args, cancellationToken) => RunWorkItemsAsync(args, cancellationToken)),
         new(
             "whoami",
             "Print the current Azure DevOps identity (id, display name, unique name).",
-            "whoami",
+            ["whoami"],
+            [],
+            ImplementationStatus.Implemented,
             RunWhoAmIAsync),
         new(
             "my-groups",
             "List the Azure DevOps groups/teams the current user belongs to.",
-            "my-groups",
+            ["my-groups"],
+            [],
+            ImplementationStatus.Implemented,
             RunMyGroupsAsync),
         new(
             "pull-requests",
             "List active pull requests, or filter by approved/assigned/pending-review/mine.",
-            "pull-requests | pull-requests approved-by-me | pull-requests assigned-to-me | pull-requests pending-review | pull-requests mine",
+            [
+                "pull-requests",
+                "pull-requests approved-by-me",
+                "pull-requests assigned-to-me",
+                "pull-requests pending-review",
+                "pull-requests mine"
+            ],
+            ["approved-by-me", "assigned-to-me", "pending-review", "mine"],
+            ImplementationStatus.Implemented,
             RunPullRequestsAsync),
         new(
             "pr-threads",
             "List discussion threads on a pull request, with resolved/unresolved status.",
-            "pr-threads <pr-id>",
+            ["pr-threads <pr-id>"],
+            [],
+            ImplementationStatus.Implemented,
             RunPrThreadsAsync),
         new(
             "pr-diff",
-            "Show the file diff for a pull request. (not yet implemented)",
-            "pr-diff <pr-id>",
-            (args, _) => Task.FromResult(RunNotImplementedStub(args, "pull request ID", "pr-diff <pr-id>"))),
+            "Show the file diff for a pull request.",
+            ["pr-diff <pr-id>"],
+            [],
+            ImplementationStatus.NotImplemented,
+            (args, _) => Task.FromResult(RunNotImplementedStub(args, "pull request ID", "pr-diff"))),
         new(
             "work-item-comments",
-            "List comments/discussion on a work item. (not yet implemented)",
-            "work-item-comments <id>",
-            (args, _) => Task.FromResult(RunNotImplementedStub(args, "work item ID", "work-item-comments <id>"))),
+            "List comments/discussion on a work item.",
+            ["work-item-comments <id>"],
+            [],
+            ImplementationStatus.NotImplemented,
+            (args, _) => Task.FromResult(RunNotImplementedStub(args, "work item ID", "work-item-comments"))),
         new(
             "work-item-relations",
-            "List related items/attachments for a work item. (not yet implemented)",
-            "work-item-relations <id>",
-            (args, _) => Task.FromResult(RunNotImplementedStub(args, "work item ID", "work-item-relations <id>"))),
+            "List related items/attachments for a work item.",
+            ["work-item-relations <id>"],
+            [],
+            ImplementationStatus.NotImplemented,
+            (args, _) => Task.FromResult(RunNotImplementedStub(args, "work item ID", "work-item-relations"))),
+        new(
+            "help",
+            "Show all commands or detailed help for one command.",
+            ["help", "help <command>"],
+            [],
+            ImplementationStatus.Implemented,
+            (args, _) => Task.FromResult(RunHelp(args)))
     ];
 
     public static async Task<int> RunAsync(string[] args, CancellationToken cancellationToken = default)
@@ -82,11 +134,16 @@ public static class ConsoleApp
 
         if (IsHelpFlag(first))
         {
-            PrintHelp(Console.Out);
-            return 0;
+            if (args.Length == 1)
+            {
+                PrintHelp(Console.Out);
+                return 0;
+            }
+
+            return RunHelp(args.Skip(1).ToArray());
         }
 
-        var command = Commands.FirstOrDefault(c => c.Name == first.ToLowerInvariant());
+        var command = FindCommand(first);
         if (command is null)
         {
             Console.Error.WriteLine($"Unknown command: {first}");
@@ -170,7 +227,7 @@ public static class ConsoleApp
         if (!TryParsePositiveIds(args, "work item ID", out var ids, out var error))
         {
             Console.Error.WriteLine(error);
-            Console.Error.WriteLine("Usage: work-items <id> [<id> ...]");
+            PrintUsage(Console.Error, "work-items", "work-items <id>");
             return 2;
         }
 
@@ -191,21 +248,21 @@ public static class ConsoleApp
         if (args.Length != 2)
         {
             Console.Error.WriteLine("Exactly one positive work item ID and one non-empty assignee are required.");
-            Console.Error.WriteLine("Usage: work-items assign <id> <email-or-unique-name-or-me>");
+            PrintUsage(Console.Error, "work-items", "work-items assign");
             return 2;
         }
 
         if (!TryParseSingleId(args[..1], "work item ID", out var id, out var error))
         {
             Console.Error.WriteLine(error);
-            Console.Error.WriteLine("Usage: work-items assign <id> <email-or-unique-name-or-me>");
+            PrintUsage(Console.Error, "work-items", "work-items assign");
             return 2;
         }
 
         if (string.IsNullOrWhiteSpace(args[1]))
         {
             Console.Error.WriteLine("Exactly one non-empty assignee is required.");
-            Console.Error.WriteLine("Usage: work-items assign <id> <email-or-unique-name-or-me>");
+            PrintUsage(Console.Error, "work-items", "work-items assign");
             return 2;
         }
 
@@ -234,7 +291,7 @@ public static class ConsoleApp
         if (!TryParseSingleId(args, "work item ID", out var id, out var error))
         {
             Console.Error.WriteLine(error);
-            Console.Error.WriteLine("Usage: work-items unassign <id>");
+            PrintUsage(Console.Error, "work-items", "work-items unassign");
             return 2;
         }
 
@@ -264,7 +321,7 @@ public static class ConsoleApp
         if (args.Length != 1 || string.IsNullOrWhiteSpace(args[0]))
         {
             Console.Error.WriteLine("Exactly one assignee (email address or 'me') is required.");
-            Console.Error.WriteLine("Usage: work-items assigned-to <email-or-me>");
+            PrintUsage(Console.Error, "work-items", "work-items assigned-to");
             return 2;
         }
 
@@ -282,7 +339,7 @@ public static class ConsoleApp
         if (args.Length != 0)
         {
             Console.Error.WriteLine("whoami takes no arguments.");
-            Console.Error.WriteLine("Usage: whoami");
+            PrintUsage(Console.Error, "whoami");
             return 2;
         }
 
@@ -303,7 +360,7 @@ public static class ConsoleApp
         if (args.Length != 0)
         {
             Console.Error.WriteLine("my-groups takes no arguments.");
-            Console.Error.WriteLine("Usage: my-groups");
+            PrintUsage(Console.Error, "my-groups");
             return 2;
         }
 
@@ -322,12 +379,12 @@ public static class ConsoleApp
 
     private static async Task<int> RunPullRequestsAsync(string[] args, CancellationToken cancellationToken)
     {
-        string[] validSubcommands = ["approved-by-me", "assigned-to-me", "pending-review", "mine"];
+        var validSubcommands = GetCommand("pull-requests").Subcommands;
         var subcommand = args.Length == 1 ? args[0].ToLowerInvariant() : null;
         if (args.Length > 1 || (args.Length == 1 && !validSubcommands.Contains(subcommand)))
         {
             Console.Error.WriteLine("Unknown pull-requests arguments.");
-            Console.Error.WriteLine("Usage: pull-requests | pull-requests approved-by-me | pull-requests assigned-to-me | pull-requests pending-review | pull-requests mine");
+            PrintUsage(Console.Error, "pull-requests");
             return 2;
         }
 
@@ -353,7 +410,7 @@ public static class ConsoleApp
         if (!TryParseSingleId(args, "pull request ID", out var pullRequestId, out var error))
         {
             Console.Error.WriteLine(error);
-            Console.Error.WriteLine("Usage: pr-threads <pr-id>");
+            PrintUsage(Console.Error, "pr-threads");
             return 2;
         }
 
@@ -366,12 +423,12 @@ public static class ConsoleApp
         return 0;
     }
 
-    private static int RunNotImplementedStub(string[] args, string idLabel, string usage)
+    private static int RunNotImplementedStub(string[] args, string idLabel, string commandName)
     {
         if (!TryParseSingleId(args, idLabel, out _, out var error))
         {
             Console.Error.WriteLine(error);
-            Console.Error.WriteLine($"Usage: {usage}");
+            PrintUsage(Console.Error, commandName);
             return 2;
         }
 
@@ -423,29 +480,97 @@ public static class ConsoleApp
         Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
         ?? "0.0.0-dev";
 
-    private static void PrintVersion() => Console.WriteLine($"{ToolName} {GetVersion()}");
+    private static void PrintVersion() => Console.WriteLine($"{Tool.Name} {GetVersion()}");
 
     private static void PrintHelp(TextWriter writer)
     {
-        writer.WriteLine($"{ToolName} {GetVersion()}");
+        writer.WriteLine($"{Tool.Name} {GetVersion()}");
+        writer.WriteLine(Tool.Description);
         writer.WriteLine();
-        writer.WriteLine($"Usage: {ToolName} <command> [args] [--help|-h] [--version|-v]");
+        foreach (var (form, index) in Tool.UsageForms.Select((form, index) => (form, index)))
+        {
+            writer.WriteLine($"{(index == 0 ? "Usage:" : "      ")} {Tool.Name} {form}");
+        }
         writer.WriteLine();
         writer.WriteLine("Commands:");
         foreach (var command in Commands)
         {
-            writer.WriteLine($"  {command.Usage,-40} {command.Description}");
+            foreach (var (form, index) in command.UsageForms.Select((form, index) => (form, index)))
+            {
+                var details = index == 0 ? $"{command.Description} [{FormatStatus(command.Status)}]" : string.Empty;
+                writer.WriteLine($"  {form,-62} {details}");
+            }
         }
 
         writer.WriteLine();
-        writer.WriteLine("Run with no arguments to see this help. Use '<command> --help' for command-specific usage.");
+        writer.WriteLine("Use 'sam help <command>' or 'sam <command> --help' for command-specific usage.");
     }
 
     private static void PrintCommandHelp(CommandDefinition command)
     {
-        Console.WriteLine($"{ToolName} {GetVersion()}");
+        Console.WriteLine($"{Tool.Name} {GetVersion()}");
         Console.WriteLine();
-        Console.WriteLine($"Usage: {command.Usage}");
+        PrintUsage(Console.Out, command);
         Console.WriteLine(command.Description);
+        Console.WriteLine($"Status: {FormatStatus(command.Status)}");
     }
+
+    private static int RunHelp(string[] args)
+    {
+        if (args.Length == 0)
+        {
+            PrintHelp(Console.Out);
+            return 0;
+        }
+
+        if (args.Length != 1)
+        {
+            Console.Error.WriteLine("Help accepts at most one command name.");
+            PrintUsage(Console.Error, "help");
+            return 2;
+        }
+
+        var command = FindCommand(args[0]);
+        if (command is null)
+        {
+            Console.Error.WriteLine($"Unknown command: {args[0]}");
+            PrintHelp(Console.Error);
+            return 2;
+        }
+
+        PrintCommandHelp(command);
+        return 0;
+    }
+
+    private static CommandDefinition? FindCommand(string name) =>
+        Commands.FirstOrDefault(command => string.Equals(command.Name, name, StringComparison.OrdinalIgnoreCase));
+
+    private static CommandDefinition GetCommand(string name) =>
+        FindCommand(name) ?? throw new InvalidOperationException($"Command metadata was not found for '{name}'.");
+
+    private static void PrintUsage(TextWriter writer, string commandName, string? usagePrefix = null)
+    {
+        PrintUsage(writer, GetCommand(commandName), usagePrefix);
+    }
+
+    private static void PrintUsage(TextWriter writer, CommandDefinition command, string? usagePrefix = null)
+    {
+        var forms = usagePrefix is null
+            ? command.UsageForms
+            : command.UsageForms
+                .Where(form => form == usagePrefix || form.StartsWith($"{usagePrefix} ", StringComparison.Ordinal))
+                .ToArray();
+
+        foreach (var (form, index) in forms.Select((form, index) => (form, index)))
+        {
+            writer.WriteLine($"{(index == 0 ? "Usage:" : "      ")} {Tool.Name} {form}");
+        }
+    }
+
+    private static string FormatStatus(ImplementationStatus status) => status switch
+    {
+        ImplementationStatus.Implemented => "implemented",
+        ImplementationStatus.NotImplemented => "not implemented",
+        _ => throw new ArgumentOutOfRangeException(nameof(status), status, null)
+    };
 }

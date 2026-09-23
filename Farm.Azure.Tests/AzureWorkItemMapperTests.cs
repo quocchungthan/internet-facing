@@ -8,6 +8,22 @@ namespace Farm.Azure.Tests;
 public sealed class AzureWorkItemMapperTests
 {
     [Fact]
+    public void ToDomain_preserves_plain_text_description()
+    {
+        var workItem = new WorkItem
+        {
+            Fields = new Dictionary<string, object>
+            {
+                ["System.Description"] = "First line\r\nSecond line"
+            }
+        };
+
+        var result = AzureWorkItemMapper.ToDomain(workItem);
+
+        Assert.Equal($"First line{Environment.NewLine}Second line", result.Description);
+    }
+
+    [Fact]
     public void ToDomain_maps_known_fields_and_preserves_assigned_identity()
     {
         var createdAt = new DateTimeOffset(2026, 9, 20, 8, 30, 0, TimeSpan.Zero);

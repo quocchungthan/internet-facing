@@ -35,6 +35,22 @@ public sealed class ConsoleTablesTests
     }
 
     [Fact]
+    public void RenderWorkItemDetails_wraps_long_description_without_truncating_it()
+    {
+        var description = $"Description start {string.Join(' ', Enumerable.Repeat("detailed-content", 30))} description-end-marker";
+        var workItem = CreateWorkItem(42, "Long detail", description);
+        AnsiConsole.Record();
+        var previousOutputLength = AnsiConsole.ExportText().Length;
+
+        ConsoleTables.RenderWorkItemDetails([workItem]);
+        var output = AnsiConsole.ExportText()[previousOutputLength..];
+
+        Assert.Contains("Description start", output);
+        Assert.Contains("description-end-marker", output);
+        Assert.DoesNotContain("…", output);
+    }
+
+    [Fact]
     public void RenderWorkItems_renders_expanded_models_as_compact_rows_only()
     {
         var workItem = CreateWorkItem(42, "[red]Remote title[/]", "detail-only description");

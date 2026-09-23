@@ -26,9 +26,9 @@ Set these environment variables before running the console:
 - `FARM_AZURE_DEVOPS_TEAM` — required by `work-items needs-attention` so Azure DevOps can resolve `@CurrentIteration` in team context.
 - `FARM_AZURE_DEVOPS_TERMINAL_STATES` — optional comma-separated completed states excluded by `work-items needs-attention`; defaults to `Done,Closed,Removed`.
 
-`Farm.Console` is the project and package ID; its installed command is `sam`. Running it with no arguments prints the tool version and full command list, exiting `0`; `--help`/`-h` and `--version`/`-v` work standalone or after a command (e.g. `sam work-items --help`). Query commands render compact Spectre.Console tables. Direct work-item ID lookups render a separate detailed panel per item and remain readable when redirected. Available commands:
+`Farm.Console` is the project and package ID; its installed command is `sam`. Running it with no arguments prints the tool version and full command list, exiting `0`; `sam help`, `sam help <command>`, `--help`/`-h`, and `--version`/`-v` are supported. The command metadata rendered by `sam help` is authoritative; this README is a summary. Query commands render compact Spectre.Console tables. Direct work-item ID lookups render a separate detailed panel per item and remain readable when redirected. Available commands:
 
-- `work-items <id> [<id> ...]` — show a detailed section per Azure DevOps work item, including identity, paths, audit dates and users, plain-text description, tags, URL, attachments, and relations (fully implemented).
+- `work-items <id> [<id> ...]` — show full detail per Azure DevOps work item, including identity, paths, audit dates and users, wrapped plain-text description, tags, URL, attachments, and relations (fully implemented).
 - `work-items assigned-to <email-or-me>` — list work items assigned to the given user (unique name/email), or the current authenticated user when passed `me` (fully implemented, WIQL-based).
 - `work-items needs-attention` — list unassigned, non-terminal work items in the configured team's current iteration, using the WIQL `@CurrentIteration` macro and configurable terminal-state exclusions (fully implemented).
 - `work-items assign <id> me` — assign one work item to the current authenticated Azure DevOps identity (fully implemented).
