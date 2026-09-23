@@ -1,7 +1,12 @@
+using Farm.Core.Contracts;
+using Farm.Core.Domain;
+using Microsoft.VisualStudio.Services.Common;
+using Spectre.Console;
 using Xunit;
 
 namespace Farm.Console.Tests;
 
+[Collection("Console output")]
 public sealed class ConsoleAppTests
 {
     [Theory]
@@ -141,6 +146,89 @@ public sealed class ConsoleAppTests
         Assert.Equal(2, exitCode);
     }
 
+    [Theory]
+    [InlineData("assign")]
+    [InlineData("assign 1")]
+    [InlineData("assign 0 me")]
+    [InlineData("assign -1 person@example.com")]
+    [InlineData("assign 1 me extra")]
+    [InlineData("unassign")]
+    [InlineData("unassign 0")]
+    [InlineData("unassign -1")]
+    [InlineData("unassign 1 extra")]
+    public async Task RunAsync_work_item_mutations_reject_invalid_arguments_without_loading_configuration(
+        string arguments)
+    {
+        var exitCode = await ConsoleApp.RunAsync(["work-items", .. arguments.Split(' ')]);
+
+        Assert.Equal(2, exitCode);
+    }
+
+    [Fact]
+    public async Task RunAsync_work_item_assign_prints_confirmation_and_updated_details()
+    {
+        var workItem = CreateWorkItem();
+        var assignmentService = new StubWorkItemAssignmentService((id, assignee, _) =>
+        {
+            Assert.Equal(42, id);
+            Assert.Equal("me", assignee);
+            return Task.FromResult(workItem);
+        });
+        var output = new StringWriter();
+        var originalOut = System.Console.Out;
+        System.Console.SetOut(output);
+        AnsiConsole.Record();
+
+        try
+        {
+            var exitCode = await ConsoleApp.RunAsync(
+                ["work-items", "assign", "42", "me"],
+                assignmentService);
+
+            Assert.Equal(0, exitCode);
+            Assert.Contains("Assigned work item 42 to person@example.com.", output.ToString());
+            var details = AnsiConsole.ExportText();
+            Assert.Contains("Work Item 42", details);
+            Assert.Contains("Assignment test", details);
+            Assert.Contains("person@example.com", details);
+        }
+        finally
+        {
+            System.Console.SetOut(originalOut);
+        }
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task RunAsync_work_item_assign_returns_one_without_stack_trace_for_expected_failures(
+        bool useVssException)
+    {
+        Exception failure = useVssException
+            ? new TestVssException("Azure assignment failed.")
+            : new InvalidOperationException("Work item changed during assignment.");
+        var assignmentService = new StubWorkItemAssignmentService((_, _, _) => Task.FromException<WorkItem>(failure));
+        var error = new StringWriter();
+        var originalError = System.Console.Error;
+        System.Console.SetError(error);
+
+        try
+        {
+            var exitCode = await ConsoleApp.RunAsync(
+                ["work-items", "assign", "42", "me"],
+                assignmentService);
+
+            Assert.Equal(1, exitCode);
+            Assert.Equal($"Error: {failure.Message}{Environment.NewLine}", error.ToString());
+            Assert.DoesNotContain(nameof(ConsoleAppTests), error.ToString());
+            Assert.DoesNotContain(" at ", error.ToString());
+        }
+        finally
+        {
+            System.Console.SetError(originalError);
+        }
+    }
+
     [Fact]
     public async Task RunAsync_pull_requests_rejects_unknown_subcommand()
     {
@@ -189,6 +277,8 @@ public sealed class ConsoleAppTests
     [InlineData("pull-requests pending-review")]
     [InlineData("pull-requests mine")]
     [InlineData("work-items needs-attention")]
+    [InlineData("work-items assign 1 me")]
+    [InlineData("work-items unassign 1")]
     [InlineData("pr-threads 1")]
     public async Task RunAsync_commands_requiring_configuration_fail_cleanly_without_environment(string commandLine)
     {
@@ -217,4 +307,35 @@ public sealed class ConsoleAppTests
             Environment.SetEnvironmentVariable("FARM_AZURE_DEVOPS_PAT", pat);
         }
     }
+
+    private static WorkItem CreateWorkItem() =>
+        new(
+            42,
+            3,
+            "Assignment test",
+            "Active",
+            "Task",
+            new Identity("person-id", "Example Person", "person@example.com"),
+            new Uri("https://example.test/items/42"),
+            []);
+
+    private sealed class StubWorkItemAssignmentService(
+        Func<int, string, CancellationToken, Task<WorkItem>> assign) : IWorkItemAssignmentService
+    {
+        public Task<WorkItem> AssignAsync(
+            int id,
+            string assignee,
+            CancellationToken cancellationToken = default) =>
+            assign(id, assignee, cancellationToken);
+
+        public Task<WorkItem> UnassignAsync(int id, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+    }
+
+    private sealed class TestVssException(string message) : VssException(message);
+}
+
+[CollectionDefinition("Console output", DisableParallelization = true)]
+public sealed class ConsoleOutputCollection
+{
 }

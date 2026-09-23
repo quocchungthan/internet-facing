@@ -8,6 +8,7 @@ using Microsoft.VisualStudio.Services.Graph.Client;
 using Microsoft.VisualStudio.Services.Profile;
 using Microsoft.VisualStudio.Services.Profile.Client;
 using Microsoft.VisualStudio.Services.WebApi;
+using Microsoft.VisualStudio.Services.WebApi.Patch.Json;
 using CoreGroup = Farm.Core.Domain.Group;
 using CoreIdentity = Farm.Core.Domain.Identity;
 using CorePullRequestSummary = Farm.Core.Domain.PullRequestSummary;
@@ -19,6 +20,7 @@ namespace Farm.Azure;
 public sealed partial class AzureDevOpsClient :
     IAzureDevOpsClient,
     IAzureDomainWorkItemClient,
+    IAzureWorkItemMutationClient,
     IAzureIdentityClient,
     IAzurePullRequestClient,
     IDisposable
@@ -60,6 +62,35 @@ public sealed partial class AzureDevOpsClient :
     {
         var workItems = await GetAzureWorkItemsAsync(ids, cancellationToken);
         return workItems.Select(AzureWorkItemMapper.ToDomain).ToArray();
+    }
+
+    public async Task<WorkItem> GetWorkItemForUpdateAsync(
+        int id,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateWorkItemId(id);
+        client ??= connection.GetClient<WorkItemTrackingHttpClient>();
+        return await client.GetWorkItemAsync(
+            project,
+            id,
+            expand: WorkItemExpand.Relations,
+            cancellationToken: cancellationToken);
+    }
+
+    public async Task<WorkItem> UpdateWorkItemAsync(
+        JsonPatchDocument patch,
+        int id,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(patch);
+        ValidateWorkItemId(id);
+        client ??= connection.GetClient<WorkItemTrackingHttpClient>();
+        return await client.UpdateWorkItemAsync(
+            patch,
+            project,
+            id,
+            expand: WorkItemExpand.Relations,
+            cancellationToken: cancellationToken);
     }
 
     public async Task<IReadOnlyList<CoreWorkItem>> GetWorkItemsAssignedToAsync(
@@ -344,6 +375,14 @@ public sealed partial class AzureDevOpsClient :
             cancellationToken: cancellationToken);
 
         return workItems;
+    }
+
+    private static void ValidateWorkItemId(int id)
+    {
+        if (id <= 0)
+        {
+            throw new ArgumentException("Work item ID must be positive.", nameof(id));
+        }
     }
 
     private static string EscapeWiqlLiteral(string value) => value.Replace("'", "''");

@@ -4,6 +4,7 @@ using Xunit;
 
 namespace Farm.Console.Tests;
 
+[Collection("Console output")]
 public sealed class ConsoleTablesTests
 {
     [Fact]

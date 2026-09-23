@@ -31,6 +31,9 @@ Set these environment variables before running the console:
 - `work-items <id> [<id> ...]` — show a detailed section per Azure DevOps work item, including identity, paths, audit dates and users, plain-text description, tags, URL, attachments, and relations (fully implemented).
 - `work-items assigned-to <email-or-me>` — list work items assigned to the given user (unique name/email), or the current authenticated user when passed `me` (fully implemented, WIQL-based).
 - `work-items needs-attention` — list unassigned, non-terminal work items in the configured team's current iteration, using the WIQL `@CurrentIteration` macro and configurable terminal-state exclusions (fully implemented).
+- `work-items assign <id> me` — assign one work item to the current authenticated Azure DevOps identity (fully implemented).
+- `work-items assign <id> <email-or-unique-name>` — assign one work item to an explicit Azure DevOps identity (fully implemented).
+- `work-items unassign <id>` — remove the current assignment from one work item (fully implemented).
 - `whoami` — print the current authenticated identity: id, display name, unique name (fully implemented).
 - `my-groups` — list the groups/teams the current authenticated user belongs to (fully implemented).
 - `pull-requests` — list active pull requests in the configured project (fully implemented).
@@ -41,13 +44,15 @@ Set these environment variables before running the console:
 - `pr-threads <pr-id>` — list discussion threads on a pull request, showing status (resolved vs unresolved), comment count, and a preview of the first comment (fully implemented).
 - `pr-diff <pr-id>`, `work-item-comments <id>`, `work-item-relations <id>` — scaffolded commands that validate their arguments but exit `3` with a "not yet implemented" message, since the backing Farm.Azure/Farm.Core clients don't exist yet.
 
-Show detailed work items with `dotnet run --project Farm.Console -- work-items 123 456`. List compact reports with `dotnet run --project Farm.Console -- work-items assigned-to me` or `dotnet run --project Farm.Console -- work-items needs-attention`. Credentials are never stored in source files.
+Show detailed work items with `dotnet run --project Farm.Console -- work-items 123 456`. List compact reports with `dotnet run --project Farm.Console -- work-items assigned-to me` or `dotnet run --project Farm.Console -- work-items needs-attention`. Mutate assignment with `dotnet run --project Farm.Console -- work-items assign 123 me`, `dotnet run --project Farm.Console -- work-items assign 123 person@example.com`, or `dotnet run --project Farm.Console -- work-items unassign 123`. Successful mutations print a concise confirmation and the full updated work-item detail. Credentials are never stored in source files.
 
-The PAT configured via `FARM_AZURE_DEVOPS_PAT` needs these scopes, least-privilege:
+The PAT configured via `FARM_AZURE_DEVOPS_PAT` needs these Azure DevOps PAT UI scopes, least-privilege (OAuth scope identifiers are included for clarity):
 
-- **Work Items (Read)** — `work-items`, `work-items assigned-to`, `work-items needs-attention`.
-- **Identity (Read)** — `whoami`, `my-groups`, and PR reviewer resolution (including group membership for `assigned-to-me`/`pending-review`).
-- **Code (Read)** — `pull-requests`, `pull-requests approved-by-me`, `assigned-to-me`, `pending-review`, `mine`, `pr-threads`.
+- **User profile (Read)** (`vso.profile`) — required by `whoami` and by `work-items assign <id> me` to resolve the authenticated user's profile.
+- **Identity (Read)** (`vso.identity`) — required by `my-groups` and PR reviewer/group resolution, including group membership for `pull-requests assigned-to-me` and `pull-requests pending-review`.
+- **Work Items (Read)** (`vso.work`) — read-only use of `work-items`, `work-items assigned-to`, and `work-items needs-attention`.
+- **Work Items (Read & write)** (`vso.work_write`) — required instead when using `work-items assign` or `work-items unassign`; it also covers the read-only work-item commands.
+- **Code (Read)** (`vso.code`) — `pull-requests`, `pull-requests approved-by-me`, `pull-requests assigned-to-me`, `pull-requests pending-review`, `pull-requests mine`, and `pr-threads`.
 
 CI publishes `Farm.Console` as a real NuGet package to GitHub Packages (`https://nuget.pkg.github.com/<owner>/index.json`) on every push to `main`, in addition to an ephemeral `farm-console-tool` build artifact. GitHub Packages requires authentication even for reads (public visibility does not exempt the NuGet feed), so add the source with a personal access token that has the `read:packages` scope, then install `sam` as a regular global .NET tool:
 
@@ -65,7 +70,7 @@ To upgrade to a newer published version: `dotnet tool update --global Farm.Conso
 
 The console is not exposed by the Farm web application.
 
-Run `powershell -ExecutionPolicy Bypass -File scripts/Invoke-FarmValidation.ps1 -Scope Core` for Core-only validation, or omit `-Scope` to validate the full solution.
+Run `powershell -ExecutionPolicy Bypass -File scripts/Invoke-FarmValidation.ps1 -Scope Core` for Core-only validation, or omit `-Scope` to validate the full solution. Add `-AuditPackages` to audit direct and transitive NuGet dependencies for known vulnerabilities after tests pass.
 
 ## Farm.Sandbox.Chickens
 

@@ -19,9 +19,9 @@ public static class ConsoleApp
     [
         new(
             "work-items",
-            "Query work items by ID, list work items assigned to a user, or list unassigned items needing attention.",
-            "work-items <id> [<id> ...] | work-items assigned-to <email-or-me> | work-items needs-attention",
-            RunWorkItemsAsync),
+            "Query work items, list assignment queues, or assign and unassign an item.",
+            "work-items <id> [<id> ...] | work-items assigned-to <email-or-me> | work-items needs-attention | work-items assign <id> <email-or-unique-name-or-me> | work-items unassign <id>",
+            (args, cancellationToken) => RunWorkItemsAsync(args, cancellationToken)),
         new(
             "whoami",
             "Print the current Azure DevOps identity (id, display name, unique name).",
@@ -60,6 +60,12 @@ public static class ConsoleApp
     ];
 
     public static async Task<int> RunAsync(string[] args, CancellationToken cancellationToken = default)
+        => await RunAsync(args, assignmentService: null, cancellationToken);
+
+    internal static async Task<int> RunAsync(
+        string[] args,
+        IWorkItemAssignmentService? assignmentService,
+        CancellationToken cancellationToken = default)
     {
         if (args.Length == 0)
         {
@@ -111,7 +117,9 @@ public static class ConsoleApp
 
         try
         {
-            return await command.Handler(rest, cancellation.Token);
+            return command.Name == "work-items" && assignmentService is not null
+                ? await RunWorkItemsAsync(rest, cancellation.Token, assignmentService)
+                : await command.Handler(rest, cancellation.Token);
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
         {
@@ -134,8 +142,21 @@ public static class ConsoleApp
         }
     }
 
-    private static async Task<int> RunWorkItemsAsync(string[] args, CancellationToken cancellationToken)
+    private static async Task<int> RunWorkItemsAsync(
+        string[] args,
+        CancellationToken cancellationToken,
+        IWorkItemAssignmentService? assignmentService = null)
     {
+        if (args.Length > 0 && string.Equals(args[0], "assign", StringComparison.OrdinalIgnoreCase))
+        {
+            return await RunWorkItemAssignAsync(args.Skip(1).ToArray(), cancellationToken, assignmentService);
+        }
+
+        if (args.Length > 0 && string.Equals(args[0], "unassign", StringComparison.OrdinalIgnoreCase))
+        {
+            return await RunWorkItemUnassignAsync(args.Skip(1).ToArray(), cancellationToken);
+        }
+
         if (args.Length > 0 && string.Equals(args[0], "assigned-to", StringComparison.OrdinalIgnoreCase))
         {
             return await RunWorkItemsAssignedToAsync(args.Skip(1).ToArray(), cancellationToken);
@@ -159,6 +180,71 @@ public static class ConsoleApp
         var workItems = await workItemSource.GetWorkItemsAsync(ids, cancellationToken);
 
         ConsoleTables.RenderWorkItemDetails(workItems);
+        return 0;
+    }
+
+    private static async Task<int> RunWorkItemAssignAsync(
+        string[] args,
+        CancellationToken cancellationToken,
+        IWorkItemAssignmentService? assignmentService = null)
+    {
+        if (args.Length != 2)
+        {
+            Console.Error.WriteLine("Exactly one positive work item ID and one non-empty assignee are required.");
+            Console.Error.WriteLine("Usage: work-items assign <id> <email-or-unique-name-or-me>");
+            return 2;
+        }
+
+        if (!TryParseSingleId(args[..1], "work item ID", out var id, out var error))
+        {
+            Console.Error.WriteLine(error);
+            Console.Error.WriteLine("Usage: work-items assign <id> <email-or-unique-name-or-me>");
+            return 2;
+        }
+
+        if (string.IsNullOrWhiteSpace(args[1]))
+        {
+            Console.Error.WriteLine("Exactly one non-empty assignee is required.");
+            Console.Error.WriteLine("Usage: work-items assign <id> <email-or-unique-name-or-me>");
+            return 2;
+        }
+
+        if (assignmentService is null)
+        {
+            var settings = AzureDevOpsSettingsLoader.LoadFromEnvironment();
+            using var client = new AzureDevOpsClient(settings);
+            return await AssignAsync(new AzureWorkItemAssignmentService(client));
+        }
+
+        return await AssignAsync(assignmentService);
+
+        async Task<int> AssignAsync(IWorkItemAssignmentService service)
+        {
+            var workItem = await service.AssignAsync(id, args[1], cancellationToken);
+
+            var assignedTo = workItem.AssignedTo?.UniqueName ?? workItem.AssignedTo?.DisplayName ?? args[1];
+            Console.WriteLine($"Assigned work item {id} to {assignedTo}.");
+            ConsoleTables.RenderWorkItemDetails([workItem]);
+            return 0;
+        }
+    }
+
+    private static async Task<int> RunWorkItemUnassignAsync(string[] args, CancellationToken cancellationToken)
+    {
+        if (!TryParseSingleId(args, "work item ID", out var id, out var error))
+        {
+            Console.Error.WriteLine(error);
+            Console.Error.WriteLine("Usage: work-items unassign <id>");
+            return 2;
+        }
+
+        var settings = AzureDevOpsSettingsLoader.LoadFromEnvironment();
+        using var client = new AzureDevOpsClient(settings);
+        IWorkItemAssignmentService assignmentService = new AzureWorkItemAssignmentService(client);
+        var workItem = await assignmentService.UnassignAsync(id, cancellationToken);
+
+        Console.WriteLine($"Unassigned work item {id}.");
+        ConsoleTables.RenderWorkItemDetails([workItem]);
         return 0;
     }
 

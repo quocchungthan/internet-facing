@@ -18,6 +18,18 @@ public interface IWorkItemSource
         CancellationToken cancellationToken = default);
 }
 
+public interface IWorkItemAssignmentService
+{
+    Task<WorkItem> AssignAsync(
+        int id,
+        string assignee,
+        CancellationToken cancellationToken = default);
+
+    Task<WorkItem> UnassignAsync(
+        int id,
+        CancellationToken cancellationToken = default);
+}
+
 public interface IPullRequestSource
 {
     Task<IReadOnlyList<PullRequestSummary>> ListActiveAsync(

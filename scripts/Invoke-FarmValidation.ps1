@@ -1,6 +1,7 @@
 param(
     [ValidateSet('Core', 'Chickens', 'Solution')]
-    [string]$Scope = 'Solution'
+    [string]$Scope = 'Solution',
+    [switch]$AuditPackages
 )
 
 $ErrorActionPreference = 'Stop'
@@ -23,6 +24,15 @@ foreach ($relativeTarget in $targets) {
     & dotnet test (Join-Path $repositoryRoot $relativeTarget) --no-restore
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE
+    }
+}
+
+if ($AuditPackages) {
+    foreach ($relativeTarget in $targets) {
+        & dotnet list (Join-Path $repositoryRoot $relativeTarget) package --vulnerable --include-transitive --no-restore
+        if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+        }
     }
 }
 
