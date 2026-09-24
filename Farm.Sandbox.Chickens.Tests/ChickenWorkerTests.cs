@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Farm.Core.Chickens;
 using Microsoft.Extensions.Logging;
 using Xunit;
@@ -33,10 +34,15 @@ public sealed class ChickenWorkerTests
             redactor,
             SensitiveContentScanner.Empty,
             new CapturingLogger<ChickenRunner>());
-        var worker = new ChickenWorker(runner, options, redactor, logger);
+        var worker = new ChickenWorker(
+            runner,
+            options,
+            redactor,
+            new ChickenStatusWriter(Path.Combine(Path.GetTempPath(), $"status-{Guid.NewGuid():N}.json"), redactor),
+            logger);
 
         await worker.StartAsync(CancellationToken.None);
-        await logger.WaitForLogAsync(TimeSpan.FromSeconds(5));
+        await logger.WaitForRedactedLogAsync(TimeSpan.FromSeconds(5));
         await worker.StopAsync(CancellationToken.None);
 
         var captured = string.Join(Environment.NewLine, logger.Entries.SelectMany(entry =>
@@ -44,6 +50,32 @@ public sealed class ChickenWorkerTests
         Assert.Contains("[REDACTED]", captured);
         Assert.All(Secrets, secret => Assert.DoesNotContain(secret, captured, StringComparison.Ordinal));
         Assert.All(logger.Entries, entry => Assert.Null(entry.Exception));
+        Assert.Contains(logger.Entries, entry => entry.EventId.Name == "cycle_failed");
+    }
+
+    [Fact]
+    public async Task Cancellation_persists_stopped_status()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"status-{Guid.NewGuid():N}.json");
+        var options = new ChickenOptions { ArtifactsPath = Path.GetTempPath(), StatusPath = path, SchedulePeriod = TimeSpan.FromHours(1), RunImmediately = false };
+        var redactor = SensitiveDataRedactor.Empty;
+        var runner = new ChickenRunner(
+            new ThrowingContextSource("unused"), new UnusedWorkspaceManager(), new UnusedBrain(), new UnusedAttemptStore(), options,
+            redactor, SensitiveContentScanner.Empty, new CapturingLogger<ChickenRunner>());
+        var worker = new ChickenWorker(runner, options, redactor, new ChickenStatusWriter(path, redactor), new CapturingLogger<ChickenWorker>());
+
+        await worker.StartAsync(CancellationToken.None);
+        for (var attempt = 0; attempt < 50 && !File.Exists(path); attempt++)
+        {
+            await Task.Delay(10);
+        }
+        Assert.True(File.Exists(path));
+        await worker.StopAsync(CancellationToken.None);
+
+        var status = JsonSerializer.Deserialize<ChickenStatusSnapshot>(await File.ReadAllTextAsync(path), new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        Assert.Equal("stopped", status!.ServiceStatus);
+        Assert.NotNull(status.LastHeartbeatAt);
+        File.Delete(path);
     }
 
     private sealed class ThrowingContextSource(string message) : IReviewContextSource
@@ -85,6 +117,7 @@ public sealed class ChickenWorkerTests
     private sealed class CapturingLogger<T> : ILogger<T>
     {
         private readonly TaskCompletionSource firstLog = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource redactedLog = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public List<LogEntry> Entries { get; } = [];
 
@@ -99,12 +132,17 @@ public sealed class ChickenWorkerTests
             Exception? exception,
             Func<TState, Exception?, string> formatter)
         {
-            Entries.Add(new LogEntry(formatter(state, exception), exception));
+            Entries.Add(new LogEntry(formatter(state, exception), exception, eventId));
             firstLog.TrySetResult();
+            if (formatter(state, exception).Contains("[REDACTED]", StringComparison.Ordinal))
+            {
+                redactedLog.TrySetResult();
+            }
         }
 
         public Task WaitForLogAsync(TimeSpan timeout) => firstLog.Task.WaitAsync(timeout);
+        public Task WaitForRedactedLogAsync(TimeSpan timeout) => redactedLog.Task.WaitAsync(timeout);
     }
 
-    private sealed record LogEntry(string Message, Exception? Exception);
+    private sealed record LogEntry(string Message, Exception? Exception, EventId EventId);
 }

@@ -9,7 +9,7 @@ using Microsoft.Extensions.Hosting;
 using System.Text;
 
 var chickenOptions = ChickenOptions.FromEnvironment();
-var statePath = ChickenOptions.Required("FARM_CHICKENS_STATE_PATH");
+var statePath = chickenOptions.StatePath;
 var repositoryPath = ChickenOptions.Required("FARM_CHICKENS_REPOSITORY_PATH");
 var cachePath = ChickenOptions.Required("FARM_CHICKENS_CACHE_PATH");
 var worktreesPath = ChickenOptions.Required("FARM_CHICKENS_WORKTREES_PATH");
@@ -22,12 +22,13 @@ var gitCredential = string.IsNullOrEmpty(gitAuthToken) ? $":{azurePat}" : $"{git
 var httpExtraHeader = $"AUTHORIZATION: Basic {Convert.ToBase64String(Encoding.UTF8.GetBytes(gitCredential))}";
 var redactor = new SensitiveDataRedactor([azurePat, copilotToken, gitAuthToken, gitCredential, httpExtraHeader]);
 var contentScanner = new SensitiveContentScanner([azurePat, copilotToken, gitAuthToken, gitCredential, httpExtraHeader]);
-using var processLock = new ProcessLock(ChickenOptions.Required("FARM_CHICKENS_LOCK_PATH"));
+using var processLock = new ProcessLock(chickenOptions.LockPath);
 
 var builder = Host.CreateApplicationBuilder(args);
 builder.Services.AddSingleton(chickenOptions);
 builder.Services.AddSingleton<ISensitiveDataRedactor>(redactor);
 builder.Services.AddSingleton<ISensitiveContentScanner>(contentScanner);
+builder.Services.AddSingleton(new ChickenStatusWriter(chickenOptions.StatusPath, redactor));
 builder.Services.AddSingleton(new AzureDevOpsSettings
 {
     OrganizationUrl = new Uri(ChickenOptions.Required("FARM_AZURE_DEVOPS_ORGANIZATION_URL")),

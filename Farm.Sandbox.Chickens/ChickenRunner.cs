@@ -12,21 +12,40 @@ public sealed class ChickenRunner(
     ChickenOptions options,
     ISensitiveDataRedactor redactor,
     ISensitiveContentScanner contentScanner,
-    ILogger<ChickenRunner> logger)
+    ILogger<ChickenRunner> logger,
+    ChickenStatusWriter? statusWriter = null)
 {
     private readonly string ownerId = $"{Environment.MachineName}:{Environment.ProcessId}:{Guid.NewGuid():N}";
 
-    public async Task RunOnceAsync(CancellationToken cancellationToken)
+    public async Task<ChickenCycleResult> RunOnceAsync(CancellationToken cancellationToken)
     {
         var currentUserId = await contextSource.GetCurrentUserIdAsync(cancellationToken);
         var candidates = await contextSource.GetCandidatesAsync(cancellationToken);
+        var completed = 0;
+        var deferred = 0;
+        var failed = 0;
         foreach (var candidate in candidates)
         {
-            await ProcessCandidateAsync(candidate, currentUserId, cancellationToken);
+            logger.LogInformation(ChickenLogEvents.CandidateDiscovered, "candidate_discovered pull_request_id={PullRequestId}", candidate.PullRequestId);
+            var result = await ProcessCandidateAsync(candidate, currentUserId, cancellationToken);
+            switch (result)
+            {
+                case CandidateResult.Completed:
+                    completed++;
+                    break;
+                case CandidateResult.Deferred:
+                    deferred++;
+                    break;
+                case CandidateResult.Failed:
+                    failed++;
+                    break;
+            }
         }
+
+        return new ChickenCycleResult(candidates.Count, completed, deferred, failed);
     }
 
-    private async Task ProcessCandidateAsync(
+    private async Task<CandidateResult> ProcessCandidateAsync(
         ReviewCandidate candidate,
         string currentUserId,
         CancellationToken cancellationToken)
@@ -38,8 +57,8 @@ public sealed class ChickenRunner(
             options.QuietPeriod);
         if (!eligibility.IsEligible)
         {
-            logger.LogInformation("PR {PullRequestId} deferred: {Reason}.", candidate.PullRequestId, eligibility.Reason);
-            return;
+            logger.LogInformation(ChickenLogEvents.CandidateDeferred, "candidate_deferred pull_request_id={PullRequestId} reason={Reason}", candidate.PullRequestId, eligibility.Reason);
+            return CandidateResult.Deferred;
         }
 
         var key = new AttemptKey(
@@ -52,27 +71,38 @@ public sealed class ChickenRunner(
         var lease = await attempts.TryAcquireLeaseAsync(key, ownerId, options.LeaseDuration, cancellationToken);
         if (lease is null)
         {
-            return;
+            logger.LogInformation(ChickenLogEvents.CandidateDeferred, "candidate_deferred pull_request_id={PullRequestId} reason=lease_unavailable", candidate.PullRequestId);
+            return CandidateResult.Deferred;
+        }
+
+        logger.LogInformation(ChickenLogEvents.LeaseAcquired, "lease_acquired pull_request_id={PullRequestId}", candidate.PullRequestId);
+        if (statusWriter is not null)
+        {
+            await statusWriter.RecordCandidateAsync(candidate.PullRequestId, eligibility.Fingerprint.Value, cancellationToken);
         }
 
         using var execution = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var renewal = RenewLeaseAsync(lease, execution);
         var leaseCompleted = false;
+        var result = CandidateResult.Failed;
         try
         {
             leaseCompleted = await ExecuteAsync(candidate, eligibility.Fingerprint, lease, execution.Token);
+            result = leaseCompleted ? CandidateResult.Completed : CandidateResult.Failed;
         }
         catch (ReviewDeferredException exception)
         {
-            logger.LogWarning("PR {PullRequestId} deferred: {Reason}", candidate.PullRequestId, redactor.Redact(exception.Message));
+            logger.LogWarning(ChickenLogEvents.CandidateDeferred, "candidate_deferred pull_request_id={PullRequestId} reason={Reason}", candidate.PullRequestId, redactor.Redact(exception.Message));
             await WriteTerminalOutcomeAsync(
                 candidate, eligibility.Fingerprint, ReviewOutcomeKind.Deferred, exception, cancellationToken);
+            result = CandidateResult.Deferred;
         }
         catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
-            logger.LogError("PR {PullRequestId} failed: {Error}", candidate.PullRequestId, redactor.Redact(exception.ToString()));
+            logger.LogError(ChickenLogEvents.CandidateFailed, "candidate_failed pull_request_id={PullRequestId} error={Error}", candidate.PullRequestId, redactor.Redact(exception.ToString()));
             await WriteTerminalOutcomeAsync(
                 candidate, eligibility.Fingerprint, ReviewOutcomeKind.Failed, exception, cancellationToken);
+            result = CandidateResult.Failed;
         }
         finally
         {
@@ -86,9 +116,28 @@ public sealed class ChickenRunner(
                 if (!leaseCompleted)
                 {
                     await attempts.ReleaseAsync(lease, CancellationToken.None);
+                    logger.LogInformation(ChickenLogEvents.LeaseReleased, "lease_released pull_request_id={PullRequestId}", candidate.PullRequestId);
+                }
+                if (statusWriter is not null)
+                {
+                    await statusWriter.ClearCurrentCandidateAsync(CancellationToken.None);
                 }
             }
         }
+
+        if (result == CandidateResult.Failed)
+        {
+            logger.LogError(ChickenLogEvents.CandidateFailed, "candidate_failed pull_request_id={PullRequestId} reason=review_outcome", candidate.PullRequestId);
+        }
+
+        return result;
+    }
+
+    private enum CandidateResult
+    {
+        Completed,
+        Deferred,
+        Failed
     }
 
     private async Task<bool> ExecuteAsync(
@@ -102,14 +151,18 @@ public sealed class ChickenRunner(
         Directory.CreateDirectory(artifactDirectory);
 
         var context = await contextSource.GetContextAsync(candidate, cancellationToken);
+        logger.LogInformation(ChickenLogEvents.ContextFetched, "context_fetched pull_request_id={PullRequestId} work_item_count={WorkItemCount}", candidate.PullRequestId, context.WorkItems.Count);
         await WriteJsonAsync(Path.Combine(artifactDirectory, "context.json"), context, cancellationToken);
         RepositoryWorkspace? workspace = null;
         try
         {
             workspace = await workspaces.PrepareAsync(candidate, fingerprint, cancellationToken);
+            logger.LogInformation(workspace.HasRebaseConflicts ? ChickenLogEvents.RebaseConflict : ChickenLogEvents.RebaseCompleted, "{EventName} pull_request_id={PullRequestId}", workspace.HasRebaseConflicts ? ChickenLogEvents.RebaseConflict.Name : ChickenLogEvents.RebaseCompleted.Name, candidate.PullRequestId);
+            logger.LogInformation(ChickenLogEvents.CopilotStarted, "copilot_started pull_request_id={PullRequestId}", candidate.PullRequestId);
             var brainOutcome = await brain.ResolveAsync(
                 new CopilotReviewRequest(context, workspace, CopilotOverrideLoader.DefaultPurpose, artifactDirectory),
                 cancellationToken);
+            logger.LogInformation(ChickenLogEvents.CopilotCompleted, "copilot_completed pull_request_id={PullRequestId} outcome={Outcome}", candidate.PullRequestId, brainOutcome.Kind);
 
             var readiness = await workspaces.VerifyReadyAsync(workspace, cancellationToken);
             var patch = readiness.Succeeded
@@ -118,6 +171,7 @@ public sealed class ChickenRunner(
             var validation = readiness.Succeeded
                 ? await workspaces.ValidateAsync(workspace, cancellationToken)
                 : readiness;
+            logger.LogInformation(ChickenLogEvents.ValidationCompleted, "validation_completed pull_request_id={PullRequestId} succeeded={Succeeded} exit_code={ExitCode}", candidate.PullRequestId, validation.Succeeded, validation.ExitCode);
             await WriteTextAsync(Path.Combine(artifactDirectory, "changes.patch"), patch, cancellationToken);
             await WriteTextAsync(Path.Combine(artifactDirectory, "validation.txt"), validation.Output, cancellationToken);
 
@@ -127,6 +181,7 @@ public sealed class ChickenRunner(
                 var publication = await workspaces.CommitAndPushAsync(
                     workspace, candidate, fingerprint, cancellationToken);
                 await WriteJsonAsync(Path.Combine(artifactDirectory, "publication.json"), publication, cancellationToken);
+                logger.LogInformation(publication.Succeeded && publication.Pushed ? ChickenLogEvents.PushCompleted : ChickenLogEvents.PushRejected, "{EventName} pull_request_id={PullRequestId} pushed={Pushed} summary={Summary}", publication.Succeeded && publication.Pushed ? ChickenLogEvents.PushCompleted.Name : ChickenLogEvents.PushRejected.Name, candidate.PullRequestId, publication.Pushed, redactor.Redact(publication.Summary));
                 outcome = publication.Succeeded && publication.Pushed
                     ? outcome with
                     {
@@ -203,6 +258,7 @@ public sealed class ChickenRunner(
                 await Task.Delay(interval, execution.Token);
                 lease = await attempts.RenewLeaseAsync(lease, options.LeaseDuration, execution.Token)
                     ?? throw new InvalidOperationException("Attempt lease ownership was lost during execution.");
+                logger.LogInformation(ChickenLogEvents.LeaseRenewed, "lease_renewed pull_request_id={PullRequestId}", lease.Key.PullRequestId);
             }
         }
         catch (OperationCanceledException) when (execution.IsCancellationRequested)
