@@ -1,11 +1,9 @@
-FROM mcr.microsoft.com/dotnet/sdk:10.0-bookworm-slim
+FROM mcr.microsoft.com/dotnet/sdk:10.0-noble
 
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends ca-certificates git tini tzdata \
     && rm -rf /var/lib/apt/lists/* \
-    && groupadd --gid 1654 chickens \
-    && useradd --uid 1654 --gid chickens --create-home --shell /usr/sbin/nologin chickens \
-    && install --directory --owner=chickens --group=chickens \
+    && install --directory --owner=1654 --group=1654 \
         /workspace/repository \
         /workspace/artifacts \
         /workspace/state \
@@ -23,7 +21,7 @@ ENV DOTNET_CLI_HOME=/workspace/cache/dotnet \
     HOME=/workspace/cache/home \
     NUGET_PACKAGES=/workspace/cache/nuget
 
-COPY --chown=chickens:chickens artifacts/farm-sandbox-chickens/linux-x64/ ./
+COPY --chown=1654:1654 artifacts/farm-sandbox-chickens/linux-x64/ ./
 
 USER 1654:1654
 
