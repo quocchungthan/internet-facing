@@ -73,6 +73,12 @@ public sealed record WorkItemAttachment(string Name, Uri DownloadUrl, string? Co
 
 public sealed record ReviewContext(ReviewCandidate Candidate, IReadOnlyList<WorkItemContext> WorkItems);
 
+public sealed record ReviewCandidateSkip(int PullRequestId, string Reason);
+
+public sealed record ReviewCandidateDiscoveryResult(
+    IReadOnlyList<ReviewCandidate> Candidates,
+    IReadOnlyList<ReviewCandidateSkip> SkippedCandidates);
+
 public sealed record FeedbackFingerprint(string Value)
 {
     public static FeedbackFingerprint Create(IEnumerable<FeedbackThread> threads, string? excludedAuthorId = null)
@@ -200,7 +206,7 @@ public sealed record CopilotReviewRequest(ReviewContext Context, RepositoryWorks
 public interface IReviewContextSource
 {
     Task<string> GetCurrentUserIdAsync(CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<ReviewCandidate>> GetCandidatesAsync(CancellationToken cancellationToken = default);
+    Task<ReviewCandidateDiscoveryResult> GetCandidatesAsync(CancellationToken cancellationToken = default);
     Task<ReviewContext> GetContextAsync(ReviewCandidate candidate, CancellationToken cancellationToken = default);
 }
 

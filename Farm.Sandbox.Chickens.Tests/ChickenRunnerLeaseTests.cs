@@ -55,8 +55,8 @@ public sealed class ChickenRunnerLeaseTests : IDisposable
     private sealed class ContextSource(ReviewCandidate candidate) : IReviewContextSource
     {
         public Task<string> GetCurrentUserIdAsync(CancellationToken cancellationToken = default) => Task.FromResult("author");
-        public Task<IReadOnlyList<ReviewCandidate>> GetCandidatesAsync(CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<ReviewCandidate>>([candidate]);
+        public Task<ReviewCandidateDiscoveryResult> GetCandidatesAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(new ReviewCandidateDiscoveryResult([candidate], []));
         public Task<ReviewContext> GetContextAsync(ReviewCandidate value, CancellationToken cancellationToken = default) =>
             Task.FromResult(new ReviewContext(value, []));
     }

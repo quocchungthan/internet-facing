@@ -14,7 +14,7 @@ public sealed partial class AzureDevOpsClient : IReviewContextSource
     public async Task<string> GetCurrentUserIdAsync(CancellationToken cancellationToken = default) =>
         (await GetCurrentUserAsync(cancellationToken)).Id;
 
-    public async Task<IReadOnlyList<ReviewCandidate>> GetCandidatesAsync(CancellationToken cancellationToken = default)
+    public async Task<ReviewCandidateDiscoveryResult> GetCandidatesAsync(CancellationToken cancellationToken = default)
     {
         var currentUser = await GetCurrentUserAsync(cancellationToken);
         gitClient ??= connection.GetClient<GitHttpClient>();
@@ -28,22 +28,48 @@ public sealed partial class AzureDevOpsClient : IReviewContextSource
             cancellationToken: cancellationToken);
 
         var candidates = new List<ReviewCandidate>(pullRequests.Count);
+        var skippedCandidates = new List<ReviewCandidateSkip>();
         foreach (var pullRequest in pullRequests)
         {
-            var threads = await gitClient.GetThreadsAsync(
-                project,
-                pullRequest.Repository.Id.ToString(),
-                pullRequest.PullRequestId,
-                cancellationToken: cancellationToken);
-            var workItemRefs = await gitClient.GetPullRequestWorkItemRefsAsync(
-                project,
-                pullRequest.Repository.Id,
-                pullRequest.PullRequestId,
-                cancellationToken: cancellationToken);
-            candidates.Add(MapCandidate(pullRequest, threads, workItemRefs, organizationUrl, project));
+            if (pullRequest.Repository is null)
+            {
+                skippedCandidates.Add(new(pullRequest.PullRequestId, "repository_metadata_missing"));
+                continue;
+            }
+
+            try
+            {
+                var threads = await gitClient.GetThreadsAsync(
+                    project,
+                    pullRequest.Repository.Id.ToString(),
+                    pullRequest.PullRequestId,
+                    cancellationToken: cancellationToken);
+                var workItemRefs = await gitClient.GetPullRequestWorkItemRefsAsync(
+                    project,
+                    pullRequest.Repository.Id,
+                    pullRequest.PullRequestId,
+                    cancellationToken: cancellationToken);
+                if (TryMapCandidate(pullRequest, threads, workItemRefs, organizationUrl, project, out var candidate, out var reason) &&
+                    candidate is not null)
+                {
+                    candidates.Add(candidate);
+                }
+                else
+                {
+                    skippedCandidates.Add(new(pullRequest.PullRequestId, reason));
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception)
+            {
+                skippedCandidates.Add(new(pullRequest.PullRequestId, "candidate_context_failed"));
+            }
         }
 
-        return candidates;
+        return new ReviewCandidateDiscoveryResult(candidates, skippedCandidates);
     }
 
     public async Task<ReviewContext> GetContextAsync(
@@ -73,15 +99,23 @@ public sealed partial class AzureDevOpsClient : IReviewContextSource
         Uri organizationUrl,
         string project)
     {
-        var repositoryUrl = pullRequest.Repository.RemoteUrl ?? pullRequest.Repository.WebUrl;
-        if (!Uri.TryCreate(repositoryUrl, UriKind.Absolute, out var repositoryUri))
-        {
-            throw new InvalidOperationException($"Pull request {pullRequest.PullRequestId} has no absolute repository URL.");
-        }
+        ArgumentNullException.ThrowIfNull(pullRequest);
+        ArgumentNullException.ThrowIfNull(pullRequest.Repository);
+
+        var repositoryUri = ResolveRepositoryUrl(
+            pullRequest.Repository,
+            organizationUrl,
+            project,
+            pullRequest.PullRequestId,
+            "target");
 
         var sourceRepository = pullRequest.ForkSource?.Repository ?? pullRequest.Repository;
-        var sourceRepositoryUrl = sourceRepository.RemoteUrl ?? sourceRepository.WebUrl;
-        _ = Uri.TryCreate(sourceRepositoryUrl, UriKind.Absolute, out var sourceRepositoryUri);
+        var sourceRepositoryUri = TryResolveRepositoryUrl(sourceRepository, organizationUrl, project);
+
+        if (pullRequest.ForkSource is not null && sourceRepositoryUri is null)
+        {
+            throw new InvalidOperationException($"Pull request {pullRequest.PullRequestId} has insufficient source repository metadata.");
+        }
 
         var headSha = RequireFullCommitSha(
             pullRequest.LastMergeSourceCommit?.CommitId, pullRequest.PullRequestId, "source head");
@@ -109,6 +143,102 @@ public sealed partial class AzureDevOpsClient : IReviewContextSource
             sourceRepositoryUri);
     }
 
+    internal static bool TryMapCandidate(
+        GitPullRequest pullRequest,
+        IReadOnlyList<GitPullRequestCommentThread> threads,
+        IReadOnlyList<Microsoft.VisualStudio.Services.WebApi.ResourceRef> workItemRefs,
+        Uri organizationUrl,
+        string project,
+        out ReviewCandidate? candidate) =>
+        TryMapCandidate(pullRequest, threads, workItemRefs, organizationUrl, project, out candidate, out _);
+
+    internal static bool TryMapCandidate(
+        GitPullRequest pullRequest,
+        IReadOnlyList<GitPullRequestCommentThread> threads,
+        IReadOnlyList<Microsoft.VisualStudio.Services.WebApi.ResourceRef> workItemRefs,
+        Uri organizationUrl,
+        string project,
+        out ReviewCandidate? candidate,
+        out string reason)
+    {
+        if (pullRequest.Repository is null ||
+            TryResolveRepositoryUrl(pullRequest.Repository, organizationUrl, project) is null)
+        {
+            candidate = null;
+            reason = "repository_metadata_missing";
+            return false;
+        }
+
+        if (pullRequest.ForkSource is not null &&
+            (pullRequest.ForkSource.Repository is null ||
+             TryResolveRepositoryUrl(pullRequest.ForkSource.Repository, organizationUrl, project) is null))
+        {
+            candidate = null;
+            reason = "repository_metadata_missing";
+            return false;
+        }
+
+        try
+        {
+            candidate = MapCandidate(pullRequest, threads, workItemRefs, organizationUrl, project);
+            reason = string.Empty;
+            return true;
+        }
+        catch (Exception)
+        {
+            candidate = null;
+            reason = "candidate_mapping_failed";
+            return false;
+        }
+    }
+
+    private static Uri ResolveRepositoryUrl(
+        GitRepository repository,
+        Uri organizationUrl,
+        string project,
+        int pullRequestId,
+        string repositoryRole)
+    {
+        return TryResolveRepositoryUrl(repository, organizationUrl, project)
+            ?? throw new InvalidOperationException(
+                $"Pull request {pullRequestId} has insufficient {repositoryRole} repository metadata.");
+    }
+
+    private static Uri? TryResolveRepositoryUrl(
+        GitRepository? repository,
+        Uri organizationUrl,
+        string project)
+    {
+        if (repository is null)
+        {
+            return null;
+        }
+
+        foreach (var value in new[] { repository.RemoteUrl, repository.WebUrl })
+        {
+            if (Uri.TryCreate(value, UriKind.Absolute, out var absoluteUri))
+            {
+                return absoluteUri;
+            }
+        }
+
+        var repositoryPath = !string.IsNullOrWhiteSpace(repository.Name)
+            ? repository.Name
+            : repository.Id == Guid.Empty ? null : repository.Id.ToString();
+        if (string.IsNullOrWhiteSpace(repositoryPath))
+        {
+            return null;
+        }
+
+        var basePath = organizationUrl.AbsoluteUri.TrimEnd('/');
+        return Uri.TryCreate(
+            $"{basePath}/{Uri.EscapeDataString(project)}/_git/{Uri.EscapeDataString(repositoryPath)}",
+            UriKind.Absolute,
+            out var derivedUri)
+            ? derivedUri
+            : null;
+    }
+
     private static string RequireFullCommitSha(string? value, int pullRequestId, string name)
     {
         if (value is null || !FullCommitSha().IsMatch(value))
@@ -119,6 +249,7 @@ public sealed partial class AzureDevOpsClient : IReviewContextSource
 
         return value;
     }
+
 
     public static FeedbackThread MapThread(GitPullRequestCommentThread thread, string? leftCommitId, string? rightCommitId)
     {

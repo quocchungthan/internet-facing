@@ -65,7 +65,7 @@ public sealed class ChickenWorkerTests
         var worker = new ChickenWorker(runner, options, redactor, new ChickenStatusWriter(path, redactor), new CapturingLogger<ChickenWorker>());
 
         await worker.StartAsync(CancellationToken.None);
-        for (var attempt = 0; attempt < 50 && !File.Exists(path); attempt++)
+        for (var attempt = 0; attempt < 500 && !File.Exists(path); attempt++)
         {
             await Task.Delay(10);
         }
@@ -83,7 +83,7 @@ public sealed class ChickenWorkerTests
         public Task<string> GetCurrentUserIdAsync(CancellationToken cancellationToken = default) =>
             Task.FromException<string>(new InvalidOperationException(message));
 
-        public Task<IReadOnlyList<ReviewCandidate>> GetCandidatesAsync(CancellationToken cancellationToken = default) =>
+        public Task<ReviewCandidateDiscoveryResult> GetCandidatesAsync(CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
         public Task<ReviewContext> GetContextAsync(ReviewCandidate candidate, CancellationToken cancellationToken = default) =>

@@ -9,6 +9,7 @@ internal static class ChickenLogEvents
     internal static readonly EventId CandidateDiscovered = new(1010, "candidate_discovered");
     internal static readonly EventId CandidateDeferred = new(1011, "candidate_deferred");
     internal static readonly EventId CandidateFailed = new(1012, "candidate_failed");
+    internal static readonly EventId CandidateSkipped = new(1013, "candidate_skipped");
     internal static readonly EventId LeaseAcquired = new(1020, "lease_acquired");
     internal static readonly EventId LeaseReleased = new(1021, "lease_released");
     internal static readonly EventId LeaseRenewed = new(1022, "lease_renewed");

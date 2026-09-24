@@ -35,6 +35,8 @@ try {
         Remove-Item $publishDirectory -Recurse -Force
     }
 
+    Invoke-CheckedCommand 'dotnet' @('clean', $solutionPath, '--configuration', 'Debug')
+    Invoke-CheckedCommand 'dotnet' @('clean', $solutionPath, '--configuration', 'Release')
     Invoke-CheckedCommand 'dotnet' @('restore', $solutionPath)
     Invoke-CheckedCommand 'powershell.exe' @(
         '-NoProfile',

@@ -92,6 +92,74 @@ public sealed class AzureReviewContextSourceTests
         Assert.Equal(new Uri("https://fork.example.test/repo"), candidate.SourceRepositoryUrl);
     }
 
+    [Fact]
+    public void MapCandidate_derives_escaped_target_repository_url_when_absolute_urls_are_missing()
+    {
+        var pullRequest = PullRequest(new string('a', 40), new string('b', 40));
+        pullRequest.Repository.RemoteUrl = null;
+        pullRequest.Repository.WebUrl = null;
+        pullRequest.Repository.Name = "repo/name";
+
+        var candidate = AzureDevOpsClient.MapCandidate(
+            pullRequest, [], [], new Uri("https://dev.azure.com/example"), "Project / One");
+
+        Assert.Equal(
+            new Uri("https://dev.azure.com/example/Project%20%2F%20One/_git/repo%2Fname"),
+            candidate.RepositoryUrl);
+    }
+
+    [Fact]
+    public void MapCandidate_derives_fork_source_url_separately_from_target_url()
+    {
+        var pullRequest = PullRequest(new string('a', 40), new string('b', 40));
+        pullRequest.Repository.RemoteUrl = null;
+        pullRequest.Repository.WebUrl = null;
+        pullRequest.ForkSource = new GitForkRef
+        {
+            Repository = new GitRepository
+            {
+                Id = Guid.NewGuid(),
+                Name = "fork/repo"
+            }
+        };
+
+        var candidate = AzureDevOpsClient.MapCandidate(
+            pullRequest, [], [], new Uri("https://dev.azure.com/example"), "Project");
+
+        Assert.Equal(new Uri("https://dev.azure.com/example/Project/_git/repo"), candidate.RepositoryUrl);
+        Assert.Equal(new Uri("https://dev.azure.com/example/Project/_git/fork%2Frepo"), candidate.SourceRepositoryUrl);
+    }
+
+    [Fact]
+    public void TryMapCandidate_skips_malformed_candidate_without_blocking_valid_candidate()
+    {
+        var malformed = PullRequest(new string('a', 40), null);
+        var valid = PullRequest(new string('a', 40), new string('b', 40));
+
+        Assert.False(AzureDevOpsClient.TryMapCandidate(
+            malformed, [], [], new Uri("https://dev.azure.com/example"), "Project", out _));
+        Assert.True(AzureDevOpsClient.TryMapCandidate(
+            valid, [], [], new Uri("https://dev.azure.com/example"), "Project", out var candidate));
+        Assert.NotNull(candidate);
+    }
+
+    [Fact]
+    public void TryMapCandidate_returns_stable_skip_reason_for_missing_repository_metadata()
+    {
+        var pullRequest = PullRequest(new string('a', 40), new string('b', 40));
+        pullRequest.Repository.Name = null;
+        pullRequest.Repository.Id = Guid.Empty;
+        pullRequest.Repository.RemoteUrl = null;
+        pullRequest.Repository.WebUrl = null;
+
+        var mapped = AzureDevOpsClient.TryMapCandidate(
+            pullRequest, [], [], new Uri("https://dev.azure.com/example"), "Project", out var candidate, out var reason);
+
+        Assert.False(mapped);
+        Assert.Null(candidate);
+        Assert.Equal("repository_metadata_missing", reason);
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("abc")]

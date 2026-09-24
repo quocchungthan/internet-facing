@@ -20,7 +20,17 @@ public sealed class ChickenRunner(
     public async Task<ChickenCycleResult> RunOnceAsync(CancellationToken cancellationToken)
     {
         var currentUserId = await contextSource.GetCurrentUserIdAsync(cancellationToken);
-        var candidates = await contextSource.GetCandidatesAsync(cancellationToken);
+        var discovery = await contextSource.GetCandidatesAsync(cancellationToken);
+        foreach (var skipped in discovery.SkippedCandidates)
+        {
+            logger.LogWarning(
+                ChickenLogEvents.CandidateSkipped,
+                "candidate_skipped pull_request_id={PullRequestId} reason={Reason}",
+                skipped.PullRequestId,
+                skipped.Reason);
+        }
+
+        var candidates = discovery.Candidates;
         var completed = 0;
         var deferred = 0;
         var failed = 0;
