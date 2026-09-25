@@ -17,11 +17,10 @@ var safeProcessEnvironment = ChickenOptions.LoadSafeProcessEnvironment();
 var azurePat = ChickenOptions.Required("FARM_AZURE_DEVOPS_PAT");
 var gitAuthToken = Environment.GetEnvironmentVariable("FARM_CHICKENS_GIT_AUTH_TOKEN")?.Trim();
 var gitAuthUser = Environment.GetEnvironmentVariable("FARM_CHICKENS_GIT_AUTH_USER")?.Trim() ?? "x-access-token";
-var copilotToken = Environment.GetEnvironmentVariable("GITHUB_TOKEN")?.Trim();
 var gitCredential = string.IsNullOrEmpty(gitAuthToken) ? $":{azurePat}" : $"{gitAuthUser}:{gitAuthToken}";
 var httpExtraHeader = $"AUTHORIZATION: Basic {Convert.ToBase64String(Encoding.UTF8.GetBytes(gitCredential))}";
-var redactor = new SensitiveDataRedactor([azurePat, copilotToken, gitAuthToken, gitCredential, httpExtraHeader]);
-var contentScanner = new SensitiveContentScanner([azurePat, copilotToken, gitAuthToken, gitCredential, httpExtraHeader]);
+var redactor = new SensitiveDataRedactor([azurePat, gitAuthToken, gitCredential, httpExtraHeader]);
+var contentScanner = new SensitiveContentScanner([azurePat, gitAuthToken, gitCredential, httpExtraHeader]);
 using var processLock = new ProcessLock(chickenOptions.LockPath);
 
 var builder = Host.CreateApplicationBuilder(args);
@@ -55,7 +54,6 @@ builder.Services.AddSingleton<IRepositoryWorkspaceManager>(new GitWorkspaceManag
 builder.Services.AddSingleton<IReviewBrain>(new CopilotReviewBrain(new CopilotReviewOptions
 {
     Model = Environment.GetEnvironmentVariable("FARM_CHICKENS_COPILOT_MODEL") ?? "auto",
-    GitHubToken = copilotToken,
     ResourcesRootPath = Environment.GetEnvironmentVariable("FARM_CHICKENS_COPILOT_RESOURCES_PATH"),
     PromptFilePath = Environment.GetEnvironmentVariable("FARM_CHICKENS_COPILOT_PROMPT_PATH"),
     AgentName = Environment.GetEnvironmentVariable("FARM_CHICKENS_COPILOT_AGENT"),

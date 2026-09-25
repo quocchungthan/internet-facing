@@ -3,7 +3,6 @@ namespace Farm.Copilot;
 public sealed class CopilotReviewOptions
 {
     public string Model { get; init; } = "auto";
-    public string? GitHubToken { get; init; }
     public string? ResourcesRootPath { get; init; }
     public string? PromptFilePath { get; init; }
     public string? AgentName { get; init; }

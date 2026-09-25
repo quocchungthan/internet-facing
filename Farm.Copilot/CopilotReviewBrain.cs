@@ -6,6 +6,9 @@ using GitHub.Copilot.Rpc;
 
 namespace Farm.Copilot;
 
+// GitHub.Copilot.SDK's native runtime (vendored at runtimes/<RID>/native/copilot in the
+// publish output) is an SDK host spawned/controlled over stdio below, not a standalone CLI
+// (no --help/auth/login subcommands; only --server/--headless/--port/--host/--stdio).
 public sealed class CopilotReviewBrain(CopilotReviewOptions options) : IReviewBrain
 {
     public async Task<ReviewOutcome> ResolveAsync(
@@ -36,7 +39,12 @@ public sealed class CopilotReviewBrain(CopilotReviewOptions options) : IReviewBr
         Connection = RuntimeConnection.ForStdio(),
         WorkingDirectory = worktreePath,
         Environment = RestrictedProcessEnvironment.Create(options.SafeProcessEnvironment),
-        UseLoggedInUser = string.IsNullOrWhiteSpace(options.GitHubToken)
+        // UseLoggedInUser makes the SDK use the gh CLI's persisted login session in the cache
+        // volume. One-time (re)setup:
+        //   docker compose -f deployment/farm-sandbox-chickens.compose.yml --env-file .env run --rm -it \
+        //     --entrypoint gh -e GITHUB_TOKEN= -e HOME=/workspace/cache/home -u 1654:1654 \
+        //     farm-sandbox-chickens auth login --hostname github.com --git-protocol https --web
+        UseLoggedInUser = true
     };
 
     internal SessionConfig BuildSessionConfig(string worktreePath, string purpose)
@@ -45,7 +53,6 @@ public sealed class CopilotReviewBrain(CopilotReviewOptions options) : IReviewBr
         {
             SessionId = $"farm-chicken-{Guid.NewGuid():N}",
             Model = options.Model,
-            GitHubToken = options.GitHubToken?.Trim(),
             WorkingDirectory = worktreePath,
             SystemMessage = new SystemMessageConfig { Mode = SystemMessageMode.Append, Content = purpose },
             OnPermissionRequest = (request, _) => Task.FromResult(DecidePermission(request, worktreePath))

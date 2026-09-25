@@ -24,7 +24,6 @@ public sealed class CopilotEnvironmentTests
 
             var brain = new CopilotReviewBrain(new CopilotReviewOptions
             {
-                GitHubToken = sentinel,
                 SafeProcessEnvironment = new Dictionary<string, string>
                 {
                     ["FEATURE_FLAG"] = "enabled",
@@ -39,7 +38,8 @@ public sealed class CopilotEnvironmentTests
             Assert.DoesNotContain("HTTPS_PROXY", client.Environment!.Keys, StringComparer.OrdinalIgnoreCase);
             Assert.Equal("enabled", client.Environment!["FEATURE_FLAG"]);
             Assert.Null(client.GitHubToken);
-            Assert.Equal(sentinel, session.GitHubToken);
+            Assert.True(client.UseLoggedInUser);
+            Assert.StartsWith("farm-chicken-", session.SessionId);
         }
         finally
         {
