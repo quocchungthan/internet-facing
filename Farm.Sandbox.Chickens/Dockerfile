@@ -12,6 +12,11 @@ RUN apt-get update \
         /workspace/agent-overrides \
     && git config --system --add safe.directory '*'
 
+# Trust the corporate TLS-inspecting proxy CA (Cisco Umbrella) so outbound HTTPS calls
+# from within the sandbox (e.g. Copilot CLI model resolution) don't fail with UnknownIssuer.
+COPY deployment/cisco-umbrella-root-ca.crt /usr/local/share/ca-certificates/cisco-umbrella-root-ca.crt
+RUN update-ca-certificates
+
 WORKDIR /app
 
 ENV DOTNET_CLI_HOME=/workspace/cache/dotnet \

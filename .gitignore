@@ -10,3 +10,7 @@ MailBox/runtime/
 MailBox/secrets/
 Farm/wwwroot/hanging-post/
 artifacts/
+
+# Environment-specific corporate proxy CA - regenerate with scripts/Export-CorporateRootCA.ps1
+deployment/*.crt
+deployment/*.pem

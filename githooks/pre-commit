@@ -43,6 +43,12 @@ while IFS= read -r file; do
             ;;
     esac
 
+    case "$file" in
+        deployment/*.crt|deployment/*.pem)
+            report "$file" "environment-specific CA cert under deployment/ (regenerate locally with scripts/Export-CorporateRootCA.ps1, do not commit)"
+            ;;
+    esac
+
     added_lines=$(git diff --cached -U0 -- "$file" | grep -E '^\+' | grep -Ev '^\+\+\+')
     [ -z "$added_lines" ] && continue
 
