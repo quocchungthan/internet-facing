@@ -9,7 +9,8 @@ RUN apt-get update \
         /workspace/state \
         /workspace/cache \
         /workspace/worktrees \
-        /workspace/agent-overrides
+        /workspace/agent-overrides \
+    && git config --system --add safe.directory '*'
 
 WORKDIR /app
 

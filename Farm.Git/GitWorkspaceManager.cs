@@ -35,7 +35,7 @@ public sealed class GitWorkspaceManager(GitWorkspaceOptions options) : IReposito
         var inside = await RunAsync(seedPath, "git", ["rev-parse", "--is-inside-work-tree"], cancellationToken);
         if (inside.ExitCode != 0 || !inside.Output.Trim().Equals("true", StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException($"Mounted seed is not a Git work tree: {seedPath}");
+            throw new InvalidOperationException($"Mounted seed is not a Git work tree: {seedPath}{Environment.NewLine}{inside.Output}");
         }
 
         var cacheRoot = Path.GetFullPath(options.CachePath);

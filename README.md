@@ -10,6 +10,10 @@ This repository is a .NET solution for deploying open-source services and plugin
 
 The solution entry point is `PiggyFarm.slnx`. Use `scripts/Invoke-FarmValidation.ps1` for repository validation and add `-AuditPackages` for the NuGet vulnerability audit.
 
+## Git hooks
+
+Shared hooks live in `githooks/` (not `.git/hooks`, since `.git` isn't versioned). After cloning, run `scripts/Install-GitHooks.ps1` once to activate them via `core.hooksPath`. The `pre-commit` hook scans staged changes for likely secrets (API keys, private keys, tokens, `.env` files, embedded credentials) and blocks the commit if found; bypass a false positive with `git commit --no-verify`.
+
 ## Caddy ingress
 
 The main branch owns the shared Caddy ingress baseline. Install Caddy on the VPS as a systemd service, place `deployment/caddy/Caddyfile` at `/etc/caddy/Caddyfile`, and create `/etc/caddy/sites`. The base file imports `/etc/caddy/sites/*.caddy`; each `sub/*` deployment owns only its own domain fragment.
