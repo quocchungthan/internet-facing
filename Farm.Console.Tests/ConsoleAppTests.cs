@@ -93,6 +93,9 @@ public sealed class ConsoleAppTests
             "work-items needs-attention",
             "work-items assign <id> <email-or-unique-name-or-me>",
             "work-items unassign <id>",
+            "work-items comment <id> <text>",
+            "work-items comment <id> --file <markdown-file>",
+            "work-items update-description <id> <markdown-file>",
             "pull-requests approved-by-me",
             "pull-requests assigned-to-me",
             "pull-requests pending-review",
@@ -119,6 +122,8 @@ public sealed class ConsoleAppTests
         Assert.Contains("sam work-items needs-attention", helpCommand.Output);
         Assert.Contains("sam work-items assign <id> <email-or-unique-name-or-me>", helpCommand.Output);
         Assert.Contains("sam work-items unassign <id>", helpCommand.Output);
+        Assert.Contains("sam work-items comment <id> <text>", helpCommand.Output);
+        Assert.Contains("sam work-items update-description <id> <markdown-file>", helpCommand.Output);
         Assert.Contains("Show full work-item detail", helpCommand.Output);
         Assert.Contains("Status: implemented", helpCommand.Output);
     }
@@ -242,6 +247,52 @@ public sealed class ConsoleAppTests
         finally
         {
             System.Console.SetOut(originalOut);
+        }
+    }
+
+    [Fact]
+    public async Task RunAsync_work_item_comment_file_reads_local_markdown_and_calls_service()
+    {
+        var filePath = Path.Combine(Path.GetTempPath(), $"sam-comment-{Guid.NewGuid():N}.md");
+        await File.WriteAllTextAsync(filePath, "**Comment from disk**");
+        var service = new StubWorkItemCommentService();
+        try
+        {
+            var exitCode = await ConsoleApp.RunAsync(
+                ["work-items", "comment", "42", "--file", filePath],
+                assignmentService: null,
+                commentService: service);
+
+            Assert.Equal(0, exitCode);
+            Assert.Equal(42, service.Id);
+            Assert.Equal("**Comment from disk**", service.Text);
+        }
+        finally
+        {
+            File.Delete(filePath);
+        }
+    }
+
+    [Fact]
+    public async Task RunAsync_work_item_update_description_reads_local_markdown_and_calls_service()
+    {
+        var filePath = Path.Combine(Path.GetTempPath(), $"sam-description-{Guid.NewGuid():N}.md");
+        await File.WriteAllTextAsync(filePath, "# New description");
+        var service = new StubWorkItemDescriptionService();
+        try
+        {
+            var exitCode = await ConsoleApp.RunAsync(
+                ["work-items", "update-description", "42", filePath],
+                assignmentService: null,
+                descriptionService: service);
+
+            Assert.Equal(0, exitCode);
+            Assert.Equal(42, service.Id);
+            Assert.Equal("# New description", service.Description);
+        }
+        finally
+        {
+            File.Delete(filePath);
         }
     }
 
@@ -392,6 +443,34 @@ public sealed class ConsoleAppTests
 
         public Task<WorkItem> UnassignAsync(int id, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
+    }
+
+    private sealed class StubWorkItemCommentService : IWorkItemCommentService
+    {
+        public int Id { get; private set; }
+
+        public string? Text { get; private set; }
+
+        public Task AddCommentAsync(int id, string text, CancellationToken cancellationToken = default)
+        {
+            Id = id;
+            Text = text;
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class StubWorkItemDescriptionService : IWorkItemDescriptionService
+    {
+        public int Id { get; private set; }
+
+        public string? Description { get; private set; }
+
+        public Task UpdateDescriptionAsync(int id, string description, CancellationToken cancellationToken = default)
+        {
+            Id = id;
+            Description = description;
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class TestVssException(string message) : VssException(message);

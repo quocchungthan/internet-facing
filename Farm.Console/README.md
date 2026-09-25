@@ -33,7 +33,7 @@ Credentials are loaded from the environment and are never stored in source files
 - User profile Read (`vso.profile`) for `whoami` and assignment to `me`.
 - Identity Read (`vso.identity`) for `my-groups` and reviewer/group resolution.
 - Work Items Read (`vso.work`) for read-only work-item commands.
-- Work Items Read & write (`vso.work_write`) instead when using assign or unassign.
+- Work Items Read & write (`vso.work_write`) instead when using assign, unassign, comment, or update-description.
 - Code Read (`vso.code`) for pull-request and thread commands.
 
 ## Commands
@@ -48,6 +48,9 @@ Implemented command families include:
 - `work-items assign <id> me`
 - `work-items assign <id> <email-or-unique-name>`
 - `work-items unassign <id>`
+- `work-items comment <id> <text>`
+- `work-items comment <id> --file <markdown-file>`
+- `work-items update-description <id> <markdown-file>`
 - `whoami`
 - `my-groups`
 - `pull-requests`
@@ -70,6 +73,9 @@ sam work-items needs-attention
 sam work-items assign 123 me
 sam work-items assign 123 person@example.com
 sam work-items unassign 123
+sam work-items comment 123 "Investigated the issue; the fix is ready for review."
+sam work-items comment 123 --file .\notes\comment.md
+sam work-items update-description 123 .\notes\description.md
 sam whoami
 sam pull-requests pending-review
 ```

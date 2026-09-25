@@ -30,6 +30,22 @@ public interface IWorkItemAssignmentService
         CancellationToken cancellationToken = default);
 }
 
+public interface IWorkItemCommentService
+{
+    Task AddCommentAsync(
+        int id,
+        string text,
+        CancellationToken cancellationToken = default);
+}
+
+public interface IWorkItemDescriptionService
+{
+    Task UpdateDescriptionAsync(
+        int id,
+        string description,
+        CancellationToken cancellationToken = default);
+}
+
 public interface IPullRequestSource
 {
     Task<IReadOnlyList<PullRequestSummary>> ListActiveAsync(

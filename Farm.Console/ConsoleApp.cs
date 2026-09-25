@@ -36,15 +36,18 @@ public static class ConsoleApp
     [
         new(
             "work-items",
-            "Show full work-item detail, list assignment queues, or assign and unassign an item.",
+            "Show full work-item detail, assign, comment on, or replace the description of an item.",
             [
                 "work-items <id> [<id> ...]",
                 "work-items assigned-to <email-or-me>",
                 "work-items needs-attention",
                 "work-items assign <id> <email-or-unique-name-or-me>",
-                "work-items unassign <id>"
+                "work-items unassign <id>",
+                "work-items comment <id> <text>",
+                "work-items comment <id> --file <markdown-file>",
+                "work-items update-description <id> <markdown-file>"
             ],
-            ["assigned-to", "needs-attention", "assign", "unassign"],
+            ["assigned-to", "needs-attention", "assign", "unassign", "comment", "update-description"],
             ImplementationStatus.Implemented,
             (args, cancellationToken) => RunWorkItemsAsync(args, cancellationToken)),
         new(
@@ -117,7 +120,9 @@ public static class ConsoleApp
     internal static async Task<int> RunAsync(
         string[] args,
         IWorkItemAssignmentService? assignmentService,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IWorkItemCommentService? commentService = null,
+        IWorkItemDescriptionService? descriptionService = null)
     {
         if (args.Length == 0)
         {
@@ -174,8 +179,9 @@ public static class ConsoleApp
 
         try
         {
-            return command.Name == "work-items" && assignmentService is not null
-                ? await RunWorkItemsAsync(rest, cancellation.Token, assignmentService)
+            return command.Name == "work-items"
+                && (assignmentService is not null || commentService is not null || descriptionService is not null)
+                ? await RunWorkItemsAsync(rest, cancellation.Token, assignmentService, commentService, descriptionService)
                 : await command.Handler(rest, cancellation.Token);
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
@@ -187,6 +193,8 @@ public static class ConsoleApp
             or InvalidOperationException
             or UriFormatException
             or FormatException
+            or IOException
+            or UnauthorizedAccessException
             or HttpRequestException
             or VssException)
         {
@@ -202,7 +210,9 @@ public static class ConsoleApp
     private static async Task<int> RunWorkItemsAsync(
         string[] args,
         CancellationToken cancellationToken,
-        IWorkItemAssignmentService? assignmentService = null)
+        IWorkItemAssignmentService? assignmentService = null,
+        IWorkItemCommentService? commentService = null,
+        IWorkItemDescriptionService? descriptionService = null)
     {
         if (args.Length > 0 && string.Equals(args[0], "assign", StringComparison.OrdinalIgnoreCase))
         {
@@ -212,6 +222,16 @@ public static class ConsoleApp
         if (args.Length > 0 && string.Equals(args[0], "unassign", StringComparison.OrdinalIgnoreCase))
         {
             return await RunWorkItemUnassignAsync(args.Skip(1).ToArray(), cancellationToken);
+        }
+
+        if (args.Length > 0 && string.Equals(args[0], "comment", StringComparison.OrdinalIgnoreCase))
+        {
+            return await RunWorkItemCommentAsync(args.Skip(1).ToArray(), cancellationToken, commentService);
+        }
+
+        if (args.Length > 0 && string.Equals(args[0], "update-description", StringComparison.OrdinalIgnoreCase))
+        {
+            return await RunWorkItemDescriptionAsync(args.Skip(1).ToArray(), cancellationToken, descriptionService);
         }
 
         if (args.Length > 0 && string.Equals(args[0], "assigned-to", StringComparison.OrdinalIgnoreCase))
@@ -237,6 +257,86 @@ public static class ConsoleApp
         var workItems = await workItemSource.GetWorkItemsAsync(ids, cancellationToken);
 
         ConsoleTables.RenderWorkItemDetails(workItems);
+        return 0;
+    }
+
+    private static async Task<int> RunWorkItemCommentAsync(
+        string[] args,
+        CancellationToken cancellationToken,
+        IWorkItemCommentService? commentService)
+    {
+        if (!TryParseSingleId(args[..Math.Min(args.Length, 1)], "work item ID", out var id, out var error))
+        {
+            Console.Error.WriteLine(error);
+            PrintUsage(Console.Error, "work-items", "work-items comment");
+            return 2;
+        }
+
+        string text;
+        if (args.Length == 2 && !string.IsNullOrWhiteSpace(args[1]))
+        {
+            text = args[1];
+        }
+        else if (args.Length == 3 && string.Equals(args[1], "--file", StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.IsNullOrWhiteSpace(args[2]))
+            {
+                Console.Error.WriteLine("A Markdown file path is required after --file.");
+                PrintUsage(Console.Error, "work-items", "work-items comment");
+                return 2;
+            }
+
+            text = await File.ReadAllTextAsync(args[2], cancellationToken);
+        }
+        else
+        {
+            Console.Error.WriteLine("A non-empty comment text or --file <markdown-file> is required.");
+            PrintUsage(Console.Error, "work-items", "work-items comment");
+            return 2;
+        }
+
+        if (commentService is null)
+        {
+            var settings = AzureDevOpsSettingsLoader.LoadFromEnvironment();
+            using var client = new AzureDevOpsClient(settings);
+            await new AzureWorkItemCommentService(client).AddCommentAsync(id, text, cancellationToken);
+        }
+        else
+        {
+            await commentService.AddCommentAsync(id, text, cancellationToken);
+        }
+
+        Console.WriteLine($"Added comment to work item {id}.");
+        return 0;
+    }
+
+    private static async Task<int> RunWorkItemDescriptionAsync(
+        string[] args,
+        CancellationToken cancellationToken,
+        IWorkItemDescriptionService? descriptionService)
+    {
+        if (!TryParseSingleId(args[..Math.Min(args.Length, 1)], "work item ID", out var id, out var error)
+            || args.Length != 2
+            || string.IsNullOrWhiteSpace(args[1]))
+        {
+            Console.Error.WriteLine(error ?? "Exactly one Markdown file path is required.");
+            PrintUsage(Console.Error, "work-items", "work-items update-description");
+            return 2;
+        }
+
+        var description = await File.ReadAllTextAsync(args[1], cancellationToken);
+        if (descriptionService is null)
+        {
+            var settings = AzureDevOpsSettingsLoader.LoadFromEnvironment();
+            using var client = new AzureDevOpsClient(settings);
+            await new AzureWorkItemDescriptionService(client).UpdateDescriptionAsync(id, description, cancellationToken);
+        }
+        else
+        {
+            await descriptionService.UpdateDescriptionAsync(id, description, cancellationToken);
+        }
+
+        Console.WriteLine($"Updated description for work item {id}.");
         return 0;
     }
 

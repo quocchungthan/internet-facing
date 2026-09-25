@@ -21,6 +21,7 @@ public sealed partial class AzureDevOpsClient :
     IAzureDevOpsClient,
     IAzureDomainWorkItemClient,
     IAzureWorkItemMutationClient,
+    IAzureWorkItemCommentClient,
     IAzureIdentityClient,
     IAzurePullRequestClient,
     IDisposable
@@ -122,6 +123,21 @@ public sealed partial class AzureDevOpsClient :
             project,
             id,
             expand: WorkItemExpand.Relations,
+            cancellationToken: cancellationToken);
+    }
+
+    public async Task AddWorkItemCommentAsync(
+        int id,
+        string text,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateWorkItemId(id);
+        ArgumentException.ThrowIfNullOrWhiteSpace(text);
+        client ??= connection.GetClient<WorkItemTrackingHttpClient>();
+        await client.AddCommentAsync(
+            new CommentCreate { Text = text },
+            project,
+            id,
             cancellationToken: cancellationToken);
     }
 
