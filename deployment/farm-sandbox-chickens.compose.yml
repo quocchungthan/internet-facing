@@ -41,7 +41,8 @@ services:
       - ${FARM_CHICKENS_STATE_HOST_PATH:?set FARM_CHICKENS_STATE_HOST_PATH}:${FARM_CHICKENS_STATE_CONTAINER_PATH:-/workspace/state}
       - ${FARM_CHICKENS_CACHE_HOST_PATH:?set FARM_CHICKENS_CACHE_HOST_PATH}:/workspace/cache
       - ${FARM_CHICKENS_WORKTREES_HOST_PATH:?set FARM_CHICKENS_WORKTREES_HOST_PATH}:${FARM_CHICKENS_WORKTREES_CONTAINER_PATH:-/workspace/worktrees}
-      - ${FARM_CHICKENS_AGENT_OVERRIDES_HOST_PATH:?set FARM_CHICKENS_AGENT_OVERRIDES_HOST_PATH}:${FARM_CHICKENS_AGENT_OVERRIDES_CONTAINER_PATH:-/workspace/agent-overrides}:ro
+      # rw (not :ro): Copilot session.create writes a skill/instruction discovery cache into ConfigDirectory
+      - ${FARM_CHICKENS_AGENT_OVERRIDES_HOST_PATH:?set FARM_CHICKENS_AGENT_OVERRIDES_HOST_PATH}:${FARM_CHICKENS_AGENT_OVERRIDES_CONTAINER_PATH:-/workspace/agent-overrides}
     user: "1654:1654"
     init: true
     restart: unless-stopped
