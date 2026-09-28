@@ -6,7 +6,7 @@ Replaces previous custom-built storage implementation (`Shed`) with official, pr
 
 ## GitHub workflows
 
-The storage deploy and backup workflows use the `hostkey-server` environment. Configure these environment secrets:
+The storage deploy workflow uses the `hostkey-server` environment. Configure these environment secrets:
 
 - `VPS_HOST`, `VPS_PORT`, `VPS_USER`, `VPS_SSH_KEY`, `VPS_KNOWN_HOSTS`
 
@@ -14,7 +14,7 @@ Configure this environment variable:
 
 - `STORAGE_DEPLOY_DIR`, an absolute VPS path such as `/srv/storage`
 
-The backup workflow leaves the archive on the VPS and prints an `scp` command for manual copy-out. It does not upload a GitHub artifact.
+Backups run from `backup-all.yml` on `main`. It saves `.env`, `docker-compose.yml`, the Seafile `data/` tree (conf, `seafile-data`, `seahub-data`; no logs) and a `mariadb-dump` of all databases into `/var/backups/eldervibe/eldervibe-backup-<UTC>.zip`. The raw `mysql/` directory is not copied. Restore steps are in `RESTORE.md` inside the archive. The archive stays on the VPS and is not uploaded as a GitHub artifact.
 
 ---
 
