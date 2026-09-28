@@ -123,6 +123,7 @@ jobs:
               client_secret="$(printf '%s' "$entry" | jq -r '.clientSecret // empty')"
               redirect_uri="$(printf '%s' "$entry" | jq -r '.redirectUri // empty')"
               post_logout_redirect_uri="$(printf '%s' "$entry" | jq -r '.postLogoutRedirectUri // empty')"
+              require_pkce="$(printf '%s' "$entry" | jq -r 'if has("requirePkce") then (.requirePkce | tostring) else empty end')"
 
               for field_name in client_index client_id display_name client_secret redirect_uri post_logout_redirect_uri; do
                 value="${!field_name}"
@@ -133,8 +134,12 @@ jobs:
               done
               # Each JSON entry targets an explicit client slot so unrelated clients are left untouched.
               [[ "$client_index" =~ ^[0-9]+$ ]] || { echo "::error::OIDC client entry $i is missing a numeric index." >&2; exit 1; }
-              if [[ -z "$client_id" && -z "$redirect_uri" && -z "$display_name" && -z "$client_secret" && -z "$post_logout_redirect_uri" ]]; then
+              if [[ -z "$client_id" && -z "$redirect_uri" && -z "$display_name" && -z "$client_secret" && -z "$post_logout_redirect_uri" && -z "$require_pkce" ]]; then
                 echo "::error::OIDC client entry $i has no fields to update." >&2
+                exit 1
+              fi
+              if [[ -n "$require_pkce" && "$require_pkce" != "true" && "$require_pkce" != "false" ]]; then
+                echo "::error::OIDC client entry $i has a non-boolean requirePkce." >&2
                 exit 1
               fi
 
@@ -143,6 +148,7 @@ jobs:
                 [[ -n "$display_name" ]] && printf 'IdentityApp__OidcClients__%d__DisplayName=%s\n' "$client_index" "$display_name"
                 [[ -n "$client_secret" ]] && printf 'IdentityApp__OidcClients__%d__ClientSecret=%s\n' "$client_index" "$client_secret"
                 [[ -n "$redirect_uri" ]] && printf 'IdentityApp__OidcClients__%d__RedirectUris__0=%s\n' "$client_index" "$redirect_uri"
+                [[ -n "$require_pkce" ]] && printf 'IdentityApp__OidcClients__%d__RequirePkce=%s\n' "$client_index" "$require_pkce"
                 [[ -n "$post_logout_redirect_uri" ]] && printf 'IdentityApp__OidcClients__%d__PostLogoutRedirectUris__0=%s\n' "$client_index" "$post_logout_redirect_uri"
               } >> "$updates_file"
             done

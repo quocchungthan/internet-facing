@@ -37,7 +37,8 @@ builder.Services.AddOpenIddict()
         options.SetAuthorizationEndpointUris("/connect/authorize");
         options.SetTokenEndpointUris("/connect/token");
         options.SetUserInfoEndpointUris("/connect/userinfo");
-        options.AllowAuthorizationCodeFlow().RequireProofKeyForCodeExchange();
+        // PKCE is enforced per client through descriptor requirements (see SeedOidcClientsAsync).
+        options.AllowAuthorizationCodeFlow();
         options.RegisterScopes(OpenIddictConstants.Scopes.OpenId, OpenIddictConstants.Scopes.Profile, OpenIddictConstants.Scopes.Email);
 
         if (builder.Environment.IsDevelopment())
@@ -77,44 +78,16 @@ builder.Services.AddAuthentication(options =>
     options.DefaultSignInScheme = "IdentityCookies";
     options.DefaultChallengeScheme = "GitHub";
 })
-.AddPolicyScheme("IdentityCookies", null, options =>
+.AddCookie("IdentityCookies", options =>
 {
-    options.ForwardDefaultSelector = context =>
-        context.Request.Host.Host.Equals("identity.eldervibe.dev", StringComparison.OrdinalIgnoreCase)
-            ? "CanonicalCookie"
-            : "LegacyCookie";
-})
-.AddCookie("LegacyCookie", options =>
-{
-    options.Cookie.Name = "shuneo.identity";
+    // New name so host-only cookies issued before the shared domain was applied cannot outlive logout.
+    options.Cookie.Name = "eldervibe.sso";
     var configuredDomain = builder.Configuration["IdentityApp:CookieDomain"];
     if (!string.IsNullOrWhiteSpace(configuredDomain) && !configuredDomain.Equals("localhost", StringComparison.OrdinalIgnoreCase))
     {
         options.Cookie.Domain = configuredDomain;
     }
 
-    options.Cookie.HttpOnly = true;
-    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-    options.Cookie.SameSite = SameSiteMode.Lax;
-    options.ExpireTimeSpan = TimeSpan.FromDays(persistentLoginDays);
-    options.Cookie.MaxAge = options.ExpireTimeSpan;
-    options.SlidingExpiration = true;
-    options.LoginPath = "/auth/login";
-    options.Events.OnRedirectToLogin = context =>
-    {
-        if (context.Request.Path.StartsWithSegments("/api"))
-        {
-            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-            return Task.CompletedTask;
-        }
-
-        context.Response.Redirect(context.RedirectUri);
-        return Task.CompletedTask;
-    };
-})
-.AddCookie("CanonicalCookie", options =>
-{
-    options.Cookie.Name = "eldervibe.identity";
     options.Cookie.HttpOnly = true;
     options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
     options.Cookie.SameSite = SameSiteMode.Lax;
@@ -256,6 +229,10 @@ static async Task SeedOidcClientsAsync(IServiceProvider services, IEnumerable<Oi
             OpenIddictConstants.Permissions.Scopes.Profile,
             OpenIddictConstants.Permissions.Scopes.Email
         ]);
+        if (!isConfidential || client.RequirePkce)
+        {
+            descriptor.Requirements.Add(OpenIddictConstants.Requirements.Features.ProofKeyForCodeExchange);
+        }
 
         var existingApplication = await manager.FindByClientIdAsync(client.ClientId);
         if (existingApplication is null)
@@ -264,8 +241,7 @@ static async Task SeedOidcClientsAsync(IServiceProvider services, IEnumerable<Oi
         }
         else
         {
-            // client_type is not mutable in-place for existing rows in every OpenIddict version;
-            // UpdateAsync re-applies the descriptor (including the new secret hash) to the existing entity.
+            // UpdateAsync re-applies the whole descriptor (client type, secret hash, requirements) to the existing entity.
             await manager.UpdateAsync(existingApplication, descriptor);
         }
     }

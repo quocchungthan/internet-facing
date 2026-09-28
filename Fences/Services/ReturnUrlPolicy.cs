@@ -5,7 +5,7 @@ namespace Fences.Services;
 
 public sealed class ReturnUrlPolicy(IOptionsMonitor<IdentityAppOptions> optionsMonitor)
 {
-    private const string DefaultMainDomainUrl = "https://shuneo.com";
+    private const string DefaultMainDomainUrl = "https://eldervibe.dev";
 
     public string ResolveSafeReturnUrl(string? returnUrl)
     {
