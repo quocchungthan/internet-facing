@@ -409,6 +409,10 @@ Chạy lại `sudo certbot renew --dry-run` sau khi tạo hook.
 
 ## 14. Backup và vận hành
 
+Backup định kỳ (cấu hình, mật khẩu, khóa, chứng chỉ; không gồm thư) do workflow
+`backup-all.yml` trên `main` đảm nhận; xem `RESTORE.md` trong archive để khôi phục.
+Cách thủ công dưới đây chỉ dùng khi cần bản sao có cả thư.
+
 Với mô hình Nginx chạy trên host, không dùng `python3 scripts/manage.py backup`
 trong phiên bản hiện tại: lệnh đó gọi `docker compose up -d` và có thể bật luôn
 container `proxy`, gây tranh port 80/443. Backup thủ công nhất quán như sau:
