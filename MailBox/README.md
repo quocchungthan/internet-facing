@@ -101,7 +101,7 @@ Bỏ `--mailbox` để cấp toàn bộ hộp thư hiện có trên server. Có 
 }
 ```
 
-Đăng ký `mailbox` làm OIDC client trên Fences (xem `Fences/README.md`) rồi đặt các biến môi trường cho service `web` trong `.env`: `OAUTH_CLIENT_ID`, `OAUTH_CLIENT_SECRET`, và tùy chọn `OAUTH_ISSUER`/`OAUTH_REDIRECT_URL` nếu khác giá trị mặc định (`https://identity.eldervibe.dev` và `https://<MAIL_HOSTNAME>/auth/github/callback`). Redirect URI đăng ký trên Fences phải khớp chính xác với `OAUTH_REDIRECT_URL`.
+Đăng ký `mail` (nhãn subdomain `mail.eldervibe.dev`) làm OIDC client confidential trên Fences (xem `Fences/README.md`) với redirect URI `https://mail.eldervibe.dev/auth/github/callback`, rồi đặt các biến môi trường cho service `web` trong `.env`: `OAUTH_CLIENT_SECRET` (bắt buộc), và tùy chọn `OAUTH_CLIENT_ID` (mặc định `mail`), `OAUTH_ISSUER`/`OAUTH_REDIRECT_URL` nếu khác giá trị mặc định (`https://identity.eldervibe.dev` và `https://<MAIL_HOSTNAME>/auth/github/callback`). Redirect URI đăng ký trên Fences phải khớp chính xác với `OAUTH_REDIRECT_URL`.
 
 Vì đăng nhập GitHub tự lấy mật khẩu IMAP từ `secrets/accounts.json`, hộp thư tạo thủ công bằng `creds create` (như ví dụ Chung dưới đây) cần được thêm thủ công vào cả `secrets/accounts.json` (địa chỉ → mật khẩu) và `secrets/managed_accounts.json` (GitHub email → danh sách địa chỉ) để đăng nhập qua web hoạt động.
 

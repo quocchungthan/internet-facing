@@ -38,7 +38,7 @@ ADDRESS = re.compile(r"[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9
 # Management login: GitHub via Fences (identity.eldervibe.dev); mailbox access is granted
 # per GitHub account through the hardcoded secrets/managed_accounts.json map, not a password form.
 OAUTH_ISSUER = os.environ.get('OAUTH_ISSUER', 'https://identity.eldervibe.dev').rstrip('/')
-OAUTH_CLIENT_ID = os.environ.get('OAUTH_CLIENT_ID', '')
+OAUTH_CLIENT_ID = os.environ.get('OAUTH_CLIENT_ID', 'mail')
 OAUTH_CLIENT_SECRET = os.environ.get('OAUTH_CLIENT_SECRET', '')
 OAUTH_REDIRECT_URL = os.environ.get('OAUTH_REDIRECT_URL', f'https://{HOST}/auth/github/callback')
 MANAGED_ACCOUNTS_PATH = Path('secrets/managed_accounts.json')
