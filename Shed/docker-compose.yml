@@ -33,7 +33,7 @@ services:
       - SEAFILE_ADMIN_PASSWORD=${SEAFILE_ADMIN_PASSWORD:-admin_secret}
       - SEAFILE_SERVER_LETSENCRYPT=false
       - SEAFILE_SERVER_HOSTNAME=${SERVICE_DOMAIN:-storage.eldervibe.dev}
-      - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:-seafile}
+      - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:-storage}
       - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-}
       - OAUTH_REDIRECT_URL=${OAUTH_REDIRECT_URL:-https://storage.eldervibe.dev/oauth/callback/}
       - OAUTH_AUTHORIZATION_URL=${OAUTH_AUTHORIZATION_URL:-https://identity.eldervibe.dev/connect/authorize}
