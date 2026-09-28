@@ -41,15 +41,15 @@ The backup workflow leaves the archive on the VPS and prints an `scp` command fo
 To authenticate Seafile users via `identity.eldervibe.dev`:
 
 1. **Register Seafile client in Fences (`sub/identity`)**:
-   - Client ID: `seafile`
-   - Client Secret: `<generated-secret>`
+   - Client ID: `storage` (the subdomain label)
+   - Client Secret: `<generated-secret>` (confidential client; PKCE optional)
    - Redirect URI: `https://storage.eldervibe.dev/oauth/callback/`
    - Scopes: `openid`, `profile`, `email`
 
 2. **Configure Seahub** (reads from environment variables via container):
    Pass environment variables in `/srv/storage/.env` or docker-compose:
    ```bash
-   OAUTH_CLIENT_ID=seafile
+   OAUTH_CLIENT_ID=storage
    OAUTH_CLIENT_SECRET=<generated-secret>
    OAUTH_REDIRECT_URL=https://storage.eldervibe.dev/oauth/callback/
    OAUTH_AUTHORIZATION_URL=https://identity.eldervibe.dev/connect/authorize
@@ -62,7 +62,7 @@ To authenticate Seafile users via `identity.eldervibe.dev`:
    import os
 
    ENABLE_OAUTH = os.environ.get('ENABLE_OAUTH', 'True').lower() in ('true', '1', 't')
-   OAUTH_CLIENT_ID = os.environ.get('OAUTH_CLIENT_ID', 'seafile')
+   OAUTH_CLIENT_ID = os.environ.get('OAUTH_CLIENT_ID', 'storage')
    OAUTH_CLIENT_SECRET = os.environ.get('OAUTH_CLIENT_SECRET', '')
    OAUTH_REDIRECT_URL = os.environ.get('OAUTH_REDIRECT_URL', 'https://storage.eldervibe.dev/oauth/callback/')
    OAUTH_AUTHORIZATION_URL = os.environ.get('OAUTH_AUTHORIZATION_URL', 'https://identity.eldervibe.dev/connect/authorize')
