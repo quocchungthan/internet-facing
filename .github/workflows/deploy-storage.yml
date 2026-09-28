@@ -75,7 +75,7 @@ jobs:
           STORAGE_DOMAIN: ${{ vars.STORAGE_DOMAIN || 'storage.eldervibe.dev' }}
           STORAGE_UPSTREAM_PORT: ${{ vars.STORAGE_UPSTREAM_PORT || '8080' }}
           STORAGE_TIME_ZONE: ${{ vars.STORAGE_TIME_ZONE || 'Asia/Ho_Chi_Minh' }}
-          STORAGE_OAUTH_CLIENT_ID: ${{ vars.STORAGE_OAUTH_CLIENT_ID || 'seafile' }}
+          STORAGE_OAUTH_CLIENT_ID: ${{ vars.STORAGE_OAUTH_CLIENT_ID || 'storage' }}
           STORAGE_OAUTH_REDIRECT_URL: ${{ vars.STORAGE_OAUTH_REDIRECT_URL || 'https://storage.eldervibe.dev/oauth/callback/' }}
           STORAGE_OAUTH_AUTHORIZATION_URL: ${{ vars.STORAGE_OAUTH_AUTHORIZATION_URL || 'https://identity.eldervibe.dev/connect/authorize' }}
           STORAGE_OAUTH_TOKEN_URL: ${{ vars.STORAGE_OAUTH_TOKEN_URL || 'https://identity.eldervibe.dev/connect/token' }}
