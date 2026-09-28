@@ -120,6 +120,7 @@ jobs:
               client_secret="$(printf '%s' "$entry" | jq -r '.clientSecret // empty')"
               redirect_uri="$(printf '%s' "$entry" | jq -r '.redirectUri // empty')"
               post_logout_redirect_uri="$(printf '%s' "$entry" | jq -r '.postLogoutRedirectUri // empty')"
+              require_pkce="$(printf '%s' "$entry" | jq -r 'if has("requirePkce") then (.requirePkce | tostring) else empty end')"
 
               for field_name in client_id display_name client_secret redirect_uri post_logout_redirect_uri; do
                 value="${!field_name}"
@@ -132,12 +133,17 @@ jobs:
                 echo "::error::OIDC client $i is missing required clientId or redirectUri." >&2
                 exit 1
               fi
+              if [[ -n "$require_pkce" && "$require_pkce" != "true" && "$require_pkce" != "false" ]]; then
+                echo "::error::OIDC client $i has a non-boolean requirePkce." >&2
+                exit 1
+              fi
 
               printf 'IdentityApp__OidcClients__%d__ClientId=%s\n' "$i" "$client_id"
               [[ -n "$display_name" ]] && printf 'IdentityApp__OidcClients__%d__DisplayName=%s\n' "$i" "$display_name"
               # Leave clientSecret unset in the JSON entry to register a public PKCE client instead of a confidential one.
               [[ -n "$client_secret" ]] && printf 'IdentityApp__OidcClients__%d__ClientSecret=%s\n' "$i" "$client_secret"
               printf 'IdentityApp__OidcClients__%d__RedirectUris__0=%s\n' "$i" "$redirect_uri"
+              [[ "$require_pkce" == "true" ]] && printf 'IdentityApp__OidcClients__%d__RequirePkce=true\n' "$i"
               [[ -n "$post_logout_redirect_uri" ]] && printf 'IdentityApp__OidcClients__%d__PostLogoutRedirectUris__0=%s\n' "$i" "$post_logout_redirect_uri"
             done
           } > "$runtime_env_file"

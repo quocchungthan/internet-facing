@@ -3,7 +3,7 @@ namespace Fences.Models;
 public sealed class IdentityAppOptions
 {
     public string SharedThemeBaseUrl { get; init; } = "https://eldervibe.dev/api/styles";
-    public string DefaultReturnUrl { get; init; } = "https://shuneo.com";
+    public string DefaultReturnUrl { get; init; } = "https://eldervibe.dev";
     public string BrandName { get; init; } = "Shuneo";
     public string? CookieDomain { get; init; }
     public string DataProtectionKeysPath { get; init; } = "App_Data/keys";
@@ -26,6 +26,8 @@ public sealed class OidcClientOptions
     public string DisplayName { get; init; } = string.Empty;
     // Non-empty secret registers a confidential client instead of a public one.
     public string? ClientSecret { get; init; }
+    // Public clients always require PKCE; this forces it for a confidential client too.
+    public bool RequirePkce { get; init; }
     public List<string> RedirectUris { get; init; } = [];
     public List<string> PostLogoutRedirectUris { get; init; } = [];
 }
