@@ -1,0 +1,135 @@
+name: Backup All Services
+
+on:
+  schedule:
+    # Same cadence as the former backup-storage.yml, the only scheduled backup (daily 02:00 UTC).
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup-all-production
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: Back up every service on the VPS into one archive
+    runs-on: ubuntu-latest
+    environment: hostkey-server
+    timeout-minutes: 180
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Validate backup script
+        run: bash -n scripts/backup-all.sh
+
+      - name: Configure SSH
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          for name in VPS_HOST VPS_USER VPS_SSH_KEY VPS_KNOWN_HOSTS; do
+            [[ -n "${!name:-}" ]] || { echo "::error::Missing secret $name in environment hostkey-server"; exit 1; }
+          done
+          mkdir -p "$HOME/.ssh"
+          chmod 700 "$HOME/.ssh"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+          printf '%s\n' "$VPS_SSH_KEY" > "$HOME/.ssh/id_deploy"
+          chmod 600 "$HOME/.ssh/id_deploy"
+
+      - name: Run backup on VPS
+        id: run
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          MAILBOX_DEPLOY_DIR: ${{ vars.MAILBOX_DEPLOY_DIR }}
+          STORAGE_DEPLOY_DIR: ${{ vars.STORAGE_DEPLOY_DIR }}
+          AFFINE_DEPLOY_DIR: ${{ vars.AFFINE_DEPLOY_DIR }}
+          BACKUP_GIT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          port="${VPS_PORT:-22}"
+          ssh_opts=(-i "$HOME/.ssh/id_deploy" -p "$port" -o BatchMode=yes -o StrictHostKeyChecking=yes -o ServerAliveInterval=30)
+
+          # Unset variables fall back to the defaults inside scripts/backup-all.sh.
+          remote_env="BACKUP_GIT_SHA=$BACKUP_GIT_SHA"
+          for name in MAILBOX_DEPLOY_DIR STORAGE_DEPLOY_DIR AFFINE_DEPLOY_DIR; do
+            value="${!name:-}"
+            [[ -z "$value" ]] && continue
+            if [[ ! "$value" =~ ^/[A-Za-z0-9._/-]+$ || "$value" == "/" ]]; then
+              echo "::error::Variable $name must be an absolute path."
+              exit 1
+            fi
+            remote_env+=" $name=$value"
+          done
+
+          remote_script="$(ssh "${ssh_opts[@]}" "$VPS_USER@$VPS_HOST" 'umask 077; mktemp /tmp/backup-all.XXXXXX')"
+          [[ "$remote_script" =~ ^/tmp/backup-all\.[A-Za-z0-9]{6}$ ]] || { echo "::error::Unexpected remote temp path."; exit 1; }
+          ssh "${ssh_opts[@]}" "$VPS_USER@$VPS_HOST" "cat > '$remote_script'" < scripts/backup-all.sh
+
+          set +e
+          ssh "${ssh_opts[@]}" "$VPS_USER@$VPS_HOST" \
+            "if [ \"\$(id -u)\" -eq 0 ]; then env $remote_env bash '$remote_script'; else sudo -n env $remote_env bash '$remote_script'; fi; rc=\$?; rm -f '$remote_script'; exit \$rc" \
+            > backup_result.txt
+          rc=$?
+          set -e
+
+          cat backup_result.txt
+          field() { grep -m1 "^$1=" backup_result.txt | cut -d= -f2- || true; }
+          {
+            echo "path=$(field BACKUP_PATH)"
+            echo "size=$(field BACKUP_SIZE)"
+            echo "sha256=$(field BACKUP_SHA256)"
+            echo "included=$(field BACKUP_INCLUDED)"
+            echo "missing=$(field BACKUP_MISSING)"
+            echo "failed=$(field BACKUP_FAILED)"
+          } >> "$GITHUB_OUTPUT"
+
+          if [[ "$rc" -ne 0 ]]; then
+            echo "::error::scripts/backup-all.sh exited with $rc on the VPS (2 = archive written but some items failed; see warnings above)."
+            exit "$rc"
+          fi
+
+      - name: Write job summary
+        if: ${{ always() }}
+        env:
+          ARCHIVE_PATH: ${{ steps.run.outputs.path }}
+          ARCHIVE_SIZE: ${{ steps.run.outputs.size }}
+          ARCHIVE_SHA: ${{ steps.run.outputs.sha256 }}
+          INCLUDED: ${{ steps.run.outputs.included }}
+          MISSING: ${{ steps.run.outputs.missing }}
+          FAILED: ${{ steps.run.outputs.failed }}
+        run: |
+          set -euo pipefail
+          stamp="—"
+          if [[ "${ARCHIVE_PATH:-}" =~ eldervibe-backup-([0-9]{8}T[0-9]{6}Z) ]]; then
+            stamp="${BASH_REMATCH[1]}"
+          fi
+          cat >> "$GITHUB_STEP_SUMMARY" <<EOF
+          ## eldervibe backup
+
+          | Item | Value |
+          |---|---|
+          | Archive on VPS | \`${ARCHIVE_PATH:-(not created)}\` |
+          | Size | ${ARCHIVE_SIZE:-—} |
+          | SHA-256 | \`${ARCHIVE_SHA:-—}\` |
+          | Timestamp (UTC) | \`$stamp\` |
+          | Items included | ${INCLUDED:-—} |
+          | Items missing (service not installed / path absent) | ${MISSING:-—} |
+          | Items failed | ${FAILED:-—} |
+
+          **Restore:** see \`RESTORE.md\` inside the archive (per-item original path, path in archive, owner/mode and restore commands).
+
+          The archive stays on the VPS (root-only, mode 600, newest 7 kept) and is not uploaded as an artifact.
+          It contains private keys and passwords; encrypt it before copying it off the VPS:
+          \`scp -P <port> <user>@<host>:${ARCHIVE_PATH:-<archive>} ./\`
+          EOF

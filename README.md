@@ -22,6 +22,10 @@ Allow inbound TCP ports 80 and 443 and point managed DNS records at the VPS. Cad
 
 Farm deployments start a candidate container on an unused loopback port, require a local HTTP response, validate, and reload Caddy before switching traffic. The previous container remains running until the switch succeeds. Static Vite output is extracted into `/var/lib/caddy/farm/hanging-post/releases`; Caddy serves only `/hanging-post/assets/*` and `/hanging-post/favicon.svg` directly.
 
+## Backups
+
+One workflow backs up every service: `.github/workflows/backup-all.yml` (daily 02:00 UTC and `workflow_dispatch`) runs `scripts/backup-all.sh` on the VPS as root. It writes a single root-only archive `/var/backups/eldervibe/eldervibe-backup-<UTC timestamp>.zip` (newest 7 kept) with Caddy, Farm, Fences, MailBox/Maddy, Seafile and AFFiNE config, credentials, certificates, data and DB dumps. Logs and mail content are excluded. `RESTORE.md` at the archive root maps every item to its original VPS path and lists the restore steps. The job summary shows the archive path, size and SHA-256.
+
 ### Non-root deployment user
 
 `VPS_USER` may be a dedicated non-root deploy user with Docker daemon access through the `docker` group. When direct Docker access is unavailable, deployment falls back to passwordless `sudo -n docker`.

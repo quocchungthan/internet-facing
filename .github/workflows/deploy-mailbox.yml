@@ -470,7 +470,7 @@ jobs:
           **D. Recurring operations (not run by CI)**
           - Certificate renewal cron as root (README section 9):
             \`17 3 * * * cd $DEPLOY_DIR && /usr/bin/python3 scripts/manage.py renew >> /var/log/shuneo-mail-renew.log 2>&1\`
-          - Backups (README section 10): \`python3 scripts/manage.py backup\`, then copy the archive off the VPS.
+          - Backups: run the **Backup All Services** workflow (\`backup-all.yml\`); restore steps are in \`RESTORE.md\` inside the archive.
           - Deliverability check: send to/from Gmail and confirm SPF, DKIM and DMARC PASS in *Show original*.
 
           **E. Never touched by this workflow**
