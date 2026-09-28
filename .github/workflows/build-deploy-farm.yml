@@ -6,9 +6,6 @@ on:
       - main
     paths:
       - Farm/**
-      - Farm.Azure/**
-      - Farm.Console/**
-      - Farm.Core/**
       - Farm.HangingPost/**
       - .github/workflows/build-deploy-farm.yml
       - .github/workflows/reusable-deploy-service.yml
@@ -59,17 +56,6 @@ jobs:
       - name: Publish Farm web application
         run: dotnet publish Farm/Farm.csproj --configuration Release --no-restore --output artifacts/farm-web /p:UseAppHost=false
 
-      - name: Pack Farm console dnx tool
-        run: dotnet pack Farm.Console/Farm.Console.csproj --configuration Release --no-build --output artifacts/farm-console-tool /p:PackageVersion=0.1.0-ci.${{ github.run_number }}
-
-      - name: Publish Farm console tool to GitHub Packages
-        run: |
-          set -euo pipefail
-          dotnet nuget push artifacts/farm-console-tool/*.nupkg \
-            --source https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json \
-            --api-key "${{ secrets.GITHUB_TOKEN }}" \
-            --skip-duplicate
-
       - name: Build Farm Docker image
         run: docker build --pull --tag eldervibe-farm:${{ github.sha }} --file Farm/Dockerfile .
 
@@ -84,13 +70,6 @@ jobs:
         with:
           name: farm-web-publish
           path: artifacts/farm-web
-          if-no-files-found: error
-
-      - name: Upload Farm console tool
-        uses: actions/upload-artifact@v4
-        with:
-          name: farm-console-tool
-          path: artifacts/farm-console-tool/*.nupkg
           if-no-files-found: error
 
       - name: Upload Farm Docker image

@@ -4,8 +4,6 @@ This repository is a .NET solution for deploying open-source services and plugin
 
 ## Projects
 
-- [Farm.Console](Farm.Console/README.md) is the Azure DevOps CLI and .NET tool, installed as `sam`.
-- [Farm.Sandbox.Chickens](Farm.Sandbox.Chickens/README.md) is the scheduled Azure DevOps review-feedback worker and its container deployment.
 - [Fences](Fences/README.md) documents the identity service and its persistent runtime requirements.
 
 The solution entry point is `PiggyFarm.slnx`. Use `scripts/Invoke-FarmValidation.ps1` for repository validation and add `-AuditPackages` for the NuGet vulnerability audit.
