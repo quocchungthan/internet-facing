@@ -174,7 +174,7 @@ jobs:
           echo "Reloading Caddy service..."
           as_root systemctl reload caddy
           echo "Caddy reloaded successfully."
-REMOTE
+          REMOTE
 
       - name: Verify Caddy service state and ingress
         if: ${{ !(inputs.dry_run) }}
@@ -185,9 +185,9 @@ REMOTE
           DOMAIN: ${{ inputs.domain || 'lingobridge.eldervibe.dev' }}
         run: |
           set -euo pipefail
-          ssh -p "$VPS_PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes "$VPS_USER@$VPS_HOST" "bash -s" <<REMOTE
+          ssh -p "$VPS_PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes "$VPS_USER@$VPS_HOST" "bash -s" <<'REMOTE'
           set -euo pipefail
-          as_root() { if [[ "\$EUID" -eq 0 ]]; then "\$@"; else sudo -n -- "\$@"; fi; }
+          as_root() { if [[ "$EUID" -eq 0 ]]; then "$@"; else sudo -n -- "$@"; fi; }
 
           echo "Checking Caddy status..."
           as_root systemctl is-active caddy
@@ -199,7 +199,7 @@ REMOTE
       - name: Deployment Summary
         env:
           DOMAIN: ${{ inputs.domain || 'lingobridge.eldervibe.dev' }}
-          UPSTREAM_PORT: ${{ inputs.upstream_port || '5080' }}
+          UPSTREAM_PORT: ${{ inputs.upstream_port || '9999' }}
           DRY_RUN: ${{ inputs.dry_run || false }}
         run: |
           {
