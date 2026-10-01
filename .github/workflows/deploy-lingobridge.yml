@@ -100,7 +100,7 @@ jobs:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_PORT: ${{ secrets.VPS_PORT || '22' }}
           VPS_USER: ${{ secrets.VPS_USER }}
-          UPSTREAM_PORT: ${{ inputs.upstream_port || '5080' }}
+          UPSTREAM_PORT: ${{ inputs.upstream_port || '9999' }}
         run: |
           set -euo pipefail
           ssh -p "$VPS_PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes "$VPS_USER@$VPS_HOST" "bash -s" <<REMOTE
@@ -124,7 +124,7 @@ jobs:
           VPS_PORT: ${{ secrets.VPS_PORT || '22' }}
           VPS_USER: ${{ secrets.VPS_USER }}
           DOMAIN: ${{ inputs.domain || 'lingobridge.eldervibe.dev' }}
-          UPSTREAM_PORT: ${{ inputs.upstream_port || '5080' }}
+          UPSTREAM_PORT: ${{ inputs.upstream_port || '9999' }}
         run: |
           set -euo pipefail
           site_config="deployment/caddy/sites/$DOMAIN.caddy"
@@ -138,41 +138,43 @@ jobs:
           fi
 
           echo "Deploying Caddy fragment for $DOMAIN (upstream 127.0.0.1:$UPSTREAM_PORT)..."
-          cat "$site_config" | ssh -p "$VPS_PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes "$VPS_USER@$VPS_HOST" "bash -s" <<REMOTE
+          b64_content="$(base64 -w0 "$site_config")"
+          ssh -p "$VPS_PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes "$VPS_USER@$VPS_HOST" \
+            "DOMAIN='$DOMAIN' B64='$b64_content' bash -s" <<'REMOTE'
           set -euo pipefail
-          as_root() { if [[ "\$EUID" -eq 0 ]]; then "\$@"; else sudo -n -- "\$@"; fi; }
+          as_root() { if [[ "$EUID" -eq 0 ]]; then "$@"; else sudo -n -- "$@"; fi; }
 
           as_root install -d -m 0755 /etc/caddy/sites
-          tmp_file="/etc/caddy/sites/.$DOMAIN.caddy.tmp.\$\$"
+          tmp_file="/etc/caddy/sites/.$DOMAIN.caddy.tmp.$$"
           target_file="/etc/caddy/sites/$DOMAIN.caddy"
-          backup_file="/etc/caddy/sites/.$DOMAIN.caddy.bak.\$\$"
+          backup_file="/etc/caddy/sites/.$DOMAIN.caddy.bak.$$"
 
-          as_root bash -c "cat > '\$tmp_file'"
-          as_root chmod 0644 "\$tmp_file"
+          printf '%s' "$B64" | base64 -d | as_root tee "$tmp_file" >/dev/null
+          as_root chmod 0644 "$tmp_file"
 
-          if [[ -f "\$target_file" ]]; then
-            as_root cp "\$target_file" "\$backup_file"
+          if [[ -f "$target_file" ]]; then
+            as_root cp "$target_file" "$backup_file"
           fi
 
-          as_root mv "\$tmp_file" "\$target_file"
+          as_root mv "$tmp_file" "$target_file"
 
           echo "Validating Caddy configuration..."
           if ! as_root caddy validate --config /etc/caddy/Caddyfile; then
             echo "::error::Caddy validation failed! Rolling back..."
-            if [[ -f "\$backup_file" ]]; then
-              as_root mv "\$backup_file" "\$target_file"
+            if [[ -f "$backup_file" ]]; then
+              as_root mv "$backup_file" "$target_file"
             else
-              as_root rm -f "\$target_file"
+              as_root rm -f "$target_file"
             fi
             exit 1
           fi
 
-          as_root rm -f "\$backup_file"
+          as_root rm -f "$backup_file"
 
           echo "Reloading Caddy service..."
           as_root systemctl reload caddy
           echo "Caddy reloaded successfully."
-          REMOTE
+REMOTE
 
       - name: Verify Caddy service state and ingress
         if: ${{ !(inputs.dry_run) }}
