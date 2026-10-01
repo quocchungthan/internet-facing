@@ -24,6 +24,9 @@ if ([string]::IsNullOrWhiteSpace($TargetAppDir)) {
 $SubmodulePath = [System.IO.Path]::GetFullPath($SubmodulePath)
 $TargetAppDir = [System.IO.Path]::GetFullPath($TargetAppDir)
 $apiDir = Join-Path $SubmodulePath "backend\src\Translation.Api"
+$infrastructureProject = Join-Path $SubmodulePath "backend\src\Translation.Infrastructure\Translation.Infrastructure.csproj"
+$apiProject = Join-Path $apiDir "Translation.Api.csproj"
+$migrationBundlePath = Join-Path $TargetAppDir "Translation.Migrations.exe"
 $clientDir = Join-Path $SubmodulePath "client"
 
 function Test-IsAdministrator {
@@ -78,25 +81,37 @@ if (-not (Test-Path $apiDir)) {
 }
 
 $secretsOutput = & dotnet user-secrets list --project "$apiDir" 2>&1
-$secretsText = ($secretsOutput | Out-String)
+if ($LASTEXITCODE -ne 0) {
+    throw "Could not read user-secrets for Translation.Api. Run the deployment from the account that owns the configured secrets."
+}
+
+$secretValues = @{}
+foreach ($line in $secretsOutput) {
+    if ("$line" -match '^\s*(?<key>[^=]+?)\s*=\s*(?<value>.*)$') {
+        $secretValues[$Matches.key.Trim()] = $Matches.value
+    }
+}
+
 $requiredKeys = @(
     "ConnectionStrings:Default",
     "Engine:ApiKey",
-    "Auth:SigningKey"
+    "Auth:SigningKey",
+    "Auth:ClientUrl"
 )
 
 $missingSecrets = @()
 foreach ($key in $requiredKeys) {
-    if ($secretsText -notmatch [regex]::Escape($key)) {
+    if (-not $secretValues.ContainsKey($key) -or [string]::IsNullOrWhiteSpace($secretValues[$key])) {
         $missingSecrets += $key
     }
 }
 
 if ($missingSecrets.Count -gt 0) {
-    Write-Warning "Missing required user secret(s) in Translation.Api:"
+    Write-Host "Missing required user secret(s) in Translation.Api:" -ForegroundColor Red
     foreach ($mKey in $missingSecrets) {
         Write-Host "  dotnet user-secrets set `"$mKey`" `"<value>`" --project src/Translation.Api" -ForegroundColor Yellow
     }
+    throw "Configure the required secrets, then rerun deployment."
 } else {
     Write-Host "User secrets verified." -ForegroundColor Green
 }
