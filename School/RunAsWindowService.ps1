@@ -4,6 +4,7 @@ param(
     [string]$TargetAppDir = "",
     [string]$ServiceName = "SchoolBoardService",
     [int]$BackendPort = 5080,
+    [int]$RemotePort = 9999,
     [string]$RemoteHost = "eldervibe",
     [string]$Domain = "lingobridge.eldervibe.dev",
     [switch]$SkipSubmoduleUpdate,
@@ -47,7 +48,8 @@ Write-Host " SchoolBoard Deployment & Windows Service Pipeline" -ForegroundColor
 Write-Host " Submodule Path : $SubmodulePath" -ForegroundColor Gray
 Write-Host " Target App Dir : $TargetAppDir" -ForegroundColor Gray
 Write-Host " Service Name   : $ServiceName" -ForegroundColor Gray
-Write-Host " Backend Port   : $BackendPort" -ForegroundColor Gray
+Write-Host " Backend Port   : $BackendPort (local)" -ForegroundColor Gray
+Write-Host " Remote Port    : $RemotePort (VPS)" -ForegroundColor Gray
 Write-Host " Remote Host    : $RemoteHost" -ForegroundColor Gray
 Write-Host "==========================================================" -ForegroundColor Cyan
 
@@ -499,13 +501,13 @@ if (-not $SkipService) {
 # Step 7: SSH Tunnel to Remote (eldervibe)
 # ---------------------------------------------------------------------------
 if (-not $SkipTunnel) {
-    Write-Host "`n[Step 7] Checking SSH Reverse Tunnel to $RemoteHost (Port $BackendPort)..." -ForegroundColor Cyan
+    Write-Host "`n[Step 7] Checking SSH Reverse Tunnel to $RemoteHost (VPS Port $RemotePort -> Local Port $BackendPort)..." -ForegroundColor Cyan
 
     $tunnelRunning = $false
     try {
         $processes = Get-CimInstance Win32_Process -Filter "Name = 'ssh.exe'" -ErrorAction SilentlyContinue
         foreach ($proc in $processes) {
-            if ($proc.CommandLine -and $proc.CommandLine -match [regex]::Escape("$BackendPort") -and $proc.CommandLine -match [regex]::Escape($RemoteHost)) {
+            if ($proc.CommandLine -and $proc.CommandLine -match [regex]::Escape("$RemotePort") -and $proc.CommandLine -match [regex]::Escape($RemoteHost)) {
                 $tunnelRunning = $true
                 break
             }
@@ -514,18 +516,18 @@ if (-not $SkipTunnel) {
         $tunnelRunning = $false
     }
 
-    $tunnelCmd = "ssh -f -N -R ${BackendPort}:localhost:${BackendPort} $RemoteHost"
+    $tunnelCmd = "ssh -N -v -R ${RemotePort}:127.0.0.1:${BackendPort} $RemoteHost"
 
     if ($tunnelRunning) {
-        Write-Host "SSH reverse tunnel to $RemoteHost on port $BackendPort is already running." -ForegroundColor Green
+        Write-Host "SSH reverse tunnel to $RemoteHost (port $RemotePort) is already running." -ForegroundColor Green
     } else {
         Write-Host "SSH reverse tunnel is not currently active." -ForegroundColor Yellow
-        Write-Host "Starting SSH tunnel with command: $tunnelCmd" -ForegroundColor Yellow
+        Write-Host "Tunnel command: $tunnelCmd" -ForegroundColor Yellow
 
         $sshCmd = Get-Command "ssh" -ErrorAction SilentlyContinue
         if ($sshCmd) {
             try {
-                Start-Process -FilePath "ssh" -ArgumentList "-f", "-N", "-R", "${BackendPort}:localhost:${BackendPort}", $RemoteHost -ErrorAction Stop
+                Start-Process -FilePath "ssh" -ArgumentList "-f", "-N", "-R", "${RemotePort}:127.0.0.1:${BackendPort}", $RemoteHost -ErrorAction Stop
                 Write-Host "SSH reverse tunnel process initiated." -ForegroundColor Green
             } catch {
                 Write-Warning "Failed to start SSH tunnel automatically: $_"
@@ -551,7 +553,7 @@ if ($RegisterCaddy) {
     if ($sshCmd) {
         $caddyFragment = @"
 $Domain {
-	reverse_proxy 127.0.0.1:$BackendPort
+	reverse_proxy 127.0.0.1:$RemotePort
 }
 "@
         try {
