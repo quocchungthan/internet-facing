@@ -1,0 +1,216 @@
+name: Deploy LingoBridge Ingress
+
+on:
+  push:
+    branches:
+      - 'sub/lingobridge'
+    paths:
+      - '.github/workflows/deploy-lingobridge.yml'
+      - 'deployment/caddy/sites/lingobridge.eldervibe.dev.caddy'
+  workflow_dispatch:
+    inputs:
+      domain:
+        description: 'Public domain name'
+        required: false
+        default: 'lingobridge.eldervibe.dev'
+        type: string
+      upstream_port:
+        description: 'Local upstream port forwarded via SSH reverse tunnel on VPS'
+        required: false
+        default: '5080'
+        type: string
+      dry_run:
+        description: 'Run preflight checks only and skip Caddy configuration update'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-lingobridge-ingress-production
+  cancel-in-progress: false
+
+jobs:
+  deploy-ingress:
+    name: Deploy Caddy Ingress
+    runs-on: ubuntu-latest
+    environment: hostkey-server
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Check required GitHub secrets
+        id: secret-check
+        shell: bash
+        env:
+          S_VPS_HOST: ${{ secrets.VPS_HOST }}
+          S_VPS_USER: ${{ secrets.VPS_USER }}
+          S_VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          S_VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          missing=()
+          [[ -n "${S_VPS_HOST:-}" ]]        || missing+=("secret VPS_HOST")
+          [[ -n "${S_VPS_USER:-}" ]]        || missing+=("secret VPS_USER")
+          [[ -n "${S_VPS_SSH_KEY:-}" ]]     || missing+=("secret VPS_SSH_KEY")
+          [[ -n "${S_VPS_KNOWN_HOSTS:-}" ]] || missing+=("secret VPS_KNOWN_HOSTS")
+
+          if [[ ${#missing[@]} -gt 0 ]]; then
+            echo "::error::Missing required repository secrets: ${missing[*]}"
+            exit 1
+          fi
+
+      - name: Configure SSH
+        env:
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.ssh"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+          eval "$(ssh-agent -s)"
+          ssh-add - <<< "$VPS_SSH_KEY"
+          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
+
+      - name: Check DNS resolution
+        id: dns-check
+        shell: bash
+        env:
+          DOMAIN: ${{ inputs.domain || 'lingobridge.eldervibe.dev' }}
+        run: |
+          set -euo pipefail
+          if ! command -v dig >/dev/null 2>&1; then
+            sudo apt-get update -qq && sudo apt-get install -y -qq dnsutils >/dev/null
+          fi
+
+          echo "Resolving DNS for $DOMAIN..."
+          a_record="$(dig +short A "$DOMAIN" | tail -n1 || true)"
+          echo "Resolved A record: ${a_record:-(none)}"
+          if [[ -z "$a_record" ]]; then
+            echo "::warning::Domain '$DOMAIN' does not resolve to an A record yet. Automatic TLS issuance by Caddy may fail until DNS is configured."
+          fi
+          echo "resolved_ip=$a_record" >> "$GITHUB_OUTPUT"
+
+      - name: Check VPS connectivity and upstream tunnel state
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT || '22' }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          UPSTREAM_PORT: ${{ inputs.upstream_port || '5080' }}
+        run: |
+          set -euo pipefail
+          ssh -p "$VPS_PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes "$VPS_USER@$VPS_HOST" "bash -s" <<REMOTE
+          set -euo pipefail
+          echo "=== VPS System Information ==="
+          uname -a
+          echo "Caddy version: \$(caddy version 2>/dev/null || echo 'Caddy not found')"
+
+          echo "=== Checking Upstream Tunnel Port ($UPSTREAM_PORT) on 127.0.0.1 ==="
+          if ss -tulpn | grep -q ":$UPSTREAM_PORT "; then
+            echo "Port $UPSTREAM_PORT is active and listening (SSH reverse tunnel is connected)."
+          else
+            echo "::notice::Port $UPSTREAM_PORT is currently not listening on the VPS. Ensure the local Windows service and SSH reverse tunnel (ssh -f -N -R $UPSTREAM_PORT:localhost:$UPSTREAM_PORT eldervibe) are running on the host machine."
+          fi
+          REMOTE
+
+      - name: Deploy Caddy site configuration
+        if: ${{ !(inputs.dry_run) }}
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT || '22' }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          DOMAIN: ${{ inputs.domain || 'lingobridge.eldervibe.dev' }}
+          UPSTREAM_PORT: ${{ inputs.upstream_port || '5080' }}
+        run: |
+          set -euo pipefail
+          site_config="deployment/caddy/sites/$DOMAIN.caddy"
+          if [[ ! -f "$site_config" ]]; then
+            echo "Site config file '$site_config' not found in workspace, generating on-the-fly..."
+            mkdir -p deployment/caddy/sites
+            printf '%s\n' \
+              "$DOMAIN {" \
+              "    reverse_proxy 127.0.0.1:$UPSTREAM_PORT" \
+              "}" > "$site_config"
+          fi
+
+          echo "Deploying Caddy fragment for $DOMAIN (upstream 127.0.0.1:$UPSTREAM_PORT)..."
+          cat "$site_config" | ssh -p "$VPS_PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes "$VPS_USER@$VPS_HOST" "bash -s" <<REMOTE
+          set -euo pipefail
+          as_root() { if [[ "\$EUID" -eq 0 ]]; then "\$@"; else sudo -n -- "\$@"; fi; }
+
+          as_root install -d -m 0755 /etc/caddy/sites
+          tmp_file="/etc/caddy/sites/.$DOMAIN.caddy.tmp.\$\$"
+          target_file="/etc/caddy/sites/$DOMAIN.caddy"
+          backup_file="/etc/caddy/sites/.$DOMAIN.caddy.bak.\$\$"
+
+          as_root bash -c "cat > '\$tmp_file'"
+          as_root chmod 0644 "\$tmp_file"
+
+          if [[ -f "\$target_file" ]]; then
+            as_root cp "\$target_file" "\$backup_file"
+          fi
+
+          as_root mv "\$tmp_file" "\$target_file"
+
+          echo "Validating Caddy configuration..."
+          if ! as_root caddy validate --config /etc/caddy/Caddyfile; then
+            echo "::error::Caddy validation failed! Rolling back..."
+            if [[ -f "\$backup_file" ]]; then
+              as_root mv "\$backup_file" "\$target_file"
+            else
+              as_root rm -f "\$target_file"
+            fi
+            exit 1
+          fi
+
+          as_root rm -f "\$backup_file"
+
+          echo "Reloading Caddy service..."
+          as_root systemctl reload caddy
+          echo "Caddy reloaded successfully."
+          REMOTE
+
+      - name: Verify Caddy service state and ingress
+        if: ${{ !(inputs.dry_run) }}
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT || '22' }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          DOMAIN: ${{ inputs.domain || 'lingobridge.eldervibe.dev' }}
+        run: |
+          set -euo pipefail
+          ssh -p "$VPS_PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes "$VPS_USER@$VPS_HOST" "bash -s" <<REMOTE
+          set -euo pipefail
+          as_root() { if [[ "\$EUID" -eq 0 ]]; then "\$@"; else sudo -n -- "\$@"; fi; }
+
+          echo "Checking Caddy status..."
+          as_root systemctl is-active caddy
+
+          echo "Installed Caddy site fragments:"
+          ls -la /etc/caddy/sites/
+          REMOTE
+
+      - name: Deployment Summary
+        env:
+          DOMAIN: ${{ inputs.domain || 'lingobridge.eldervibe.dev' }}
+          UPSTREAM_PORT: ${{ inputs.upstream_port || '5080' }}
+          DRY_RUN: ${{ inputs.dry_run || false }}
+        run: |
+          {
+            echo "## LingoBridge Ingress Deployment"
+            echo
+            echo "| Parameter | Value |"
+            echo "|---|---|"
+            echo "| Public Domain | \`$DOMAIN\` |"
+            echo "| Upstream Port | \`$UPSTREAM_PORT\` (via SSH reverse tunnel) |"
+            echo "| Dry Run | \`$DRY_RUN\` |"
+            echo
+            echo "### Hybrid Architecture"
+            echo "- **Application Service**: Runs on the Windows machine as Windows Service (\`SchoolBoardService\`) on port \`$UPSTREAM_PORT\`."
+            echo "- **Network Bridge**: SSH reverse tunnel (\`ssh -f -N -R $UPSTREAM_PORT:localhost:$UPSTREAM_PORT eldervibe\`) exposes port \`$UPSTREAM_PORT\` onto the Ubuntu VPS."
+            echo "- **Public Ingress**: Caddy on Ubuntu VPS terminates TLS and reverse proxies \`https://$DOMAIN\` to \`127.0.0.1:$UPSTREAM_PORT\`."
+          } >> "$GITHUB_STEP_SUMMARY"
