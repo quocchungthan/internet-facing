@@ -5,10 +5,12 @@ param(
     [string]$ServiceName = "SchoolBoardService",
     [int]$BackendPort = 5080,
     [string]$RemoteHost = "eldervibe",
+    [string]$Domain = "lingobridge.eldervibe.dev",
     [switch]$SkipSubmoduleUpdate,
     [switch]$SkipBuild,
     [switch]$SkipTunnel,
-    [switch]$SkipService
+    [switch]$SkipService,
+    [switch]$RegisterCaddy
 )
 
 $ErrorActionPreference = "Stop"
@@ -328,25 +330,29 @@ $productionSettings = [ordered]@{
 if (-not (Test-Path $productionSettingsPath)) {
     New-Item -ItemType File -Path $productionSettingsPath | Out-Null
 }
-$productionSettingsAcl = New-Object System.Security.AccessControl.FileSecurity
-$productionSettingsAcl.SetAccessRuleProtection($true, $false)
-$allowedSids = @(
-    "S-1-5-18",
-    "S-1-5-32-544",
-    [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
-) | Select-Object -Unique
-foreach ($sid in $allowedSids) {
-    $identity = New-Object System.Security.Principal.SecurityIdentifier($sid)
-    $rule = New-Object System.Security.AccessControl.FileSystemAccessRule(
-        $identity,
-        [System.Security.AccessControl.FileSystemRights]::FullControl,
-        [System.Security.AccessControl.AccessControlType]::Allow
-    )
-    $productionSettingsAcl.AddAccessRule($rule)
+try {
+    $productionSettingsAcl = Get-Acl $productionSettingsPath
+    $productionSettingsAcl.SetAccessRuleProtection($true, $false)
+    $allowedSids = @(
+        "S-1-5-18",
+        "S-1-5-32-544",
+        [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+    ) | Select-Object -Unique
+    foreach ($sid in $allowedSids) {
+        $identity = New-Object System.Security.Principal.SecurityIdentifier($sid)
+        $rule = New-Object System.Security.AccessControl.FileSystemAccessRule(
+            $identity,
+            [System.Security.AccessControl.FileSystemRights]::FullControl,
+            [System.Security.AccessControl.AccessControlType]::Allow
+        )
+        $productionSettingsAcl.AddAccessRule($rule)
+    }
+    Set-Acl -Path $productionSettingsPath -AclObject $productionSettingsAcl
+} catch {
+    Write-Warning "Could not restrict ACL on '$productionSettingsPath': $_"
 }
-Set-Acl -Path $productionSettingsPath -AclObject $productionSettingsAcl
 $productionSettings | ConvertTo-Json -Depth 5 | Set-Content -Path $productionSettingsPath -Encoding UTF8
-Write-Host "Wrote production secrets to '$productionSettingsPath' with access limited to the deployment account, SYSTEM, and Administrators." -ForegroundColor Green
+Write-Host "Wrote production secrets to '$productionSettingsPath'." -ForegroundColor Green
 
 if ($publishStagingDir -ne $TargetAppDir) {
     $serviceBeforeDeployment = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
@@ -534,6 +540,34 @@ if (-not $SkipTunnel) {
     }
 } else {
     Write-Host "`n[Step 7] Skipping SSH Tunnel check (-SkipTunnel specified)." -ForegroundColor Yellow
+}
+
+# ---------------------------------------------------------------------------
+# Step 8: Register / Validate Caddy Ingress on Remote (eldervibe)
+# ---------------------------------------------------------------------------
+if ($RegisterCaddy) {
+    Write-Host "`n[Step 8] Registering Caddy Ingress for '$Domain' on '$RemoteHost'..." -ForegroundColor Cyan
+    $sshCmd = Get-Command "ssh" -ErrorAction SilentlyContinue
+    if ($sshCmd) {
+        $caddyFragment = @"
+$Domain {
+	reverse_proxy 127.0.0.1:$BackendPort
+}
+"@
+        try {
+            $remoteScript = "cat > /tmp/$Domain.caddy && (if [ `$EUID -eq 0 ]; then cp /tmp/$Domain.caddy /etc/caddy/sites/$Domain.caddy && caddy validate --config /etc/caddy/Caddyfile && systemctl reload caddy; else sudo cp /tmp/$Domain.caddy /etc/caddy/sites/$Domain.caddy && sudo caddy validate --config /etc/caddy/Caddyfile && sudo systemctl reload caddy; fi) && rm -f /tmp/$Domain.caddy"
+            $caddyFragment | & ssh -o BatchMode=yes $RemoteHost "bash -c '$remoteScript'"
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "Caddy reverse proxy for '$Domain' registered and reloaded on '$RemoteHost'." -ForegroundColor Green
+            } else {
+                Write-Warning "Failed to register Caddy reverse proxy on '$RemoteHost' (exit code $LASTEXITCODE)."
+            }
+        } catch {
+            Write-Warning "Error configuring Caddy on remote host '$RemoteHost': $_"
+        }
+    } else {
+        Write-Warning "OpenSSH client not found to configure Caddy on remote host."
+    }
 }
 
 if ($publishStagingDir -ne $TargetAppDir -and (Test-Path $publishStagingDir)) {
