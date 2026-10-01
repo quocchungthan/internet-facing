@@ -62,8 +62,8 @@ while IFS= read -r file; do
     check_pattern "$file" 'AIza[0-9A-Za-z_-]{35}' 'Google API key'
     check_pattern "$file" 'sk-[A-Za-z0-9]{20,}' 'Generic secret key (sk-...)'
     check_pattern "$file" 'sk-ant-[A-Za-z0-9_-]{20,}' 'Anthropic secret key'
-    check_pattern "$file" '(api|access|secret)[_-]?key[[:space:]]*[:=][[:space:]]*.{16,}' 'Generic API/secret key assignment'
-    check_pattern "$file" '(password|passwd|pwd)[[:space:]]*[:=][[:space:]]*[^[:space:]]{6,}' 'Hardcoded password assignment'
+    check_pattern "$file" '(api|access|secret)[_-]?key[[:space:]]*[:=][[:space:]]*[^$[:space:]].{15,}' 'Generic API/secret key assignment'
+    check_pattern "$file" '(password|passwd|pwd)[[:space:]]*[:=][[:space:]]*[^$[:space:]].{5,}' 'Hardcoded password assignment'
     check_pattern "$file" '[A-Za-z0-9+/]{6,}:[^[:space:]@]{6,}@[A-Za-z0-9.-]+(:[0-9]+)?/' 'Connection string with embedded credentials'
     check_pattern "$file" 'eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}' 'JWT-looking token'
 done
