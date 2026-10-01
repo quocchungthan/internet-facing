@@ -185,12 +185,31 @@ if (-not $SkipBuild) {
             New-Item -ItemType Directory -Path $TargetAppDir -Force | Out-Null
         }
 
+        Write-Host "Restoring pinned .NET tools..." -ForegroundColor Yellow
+        & dotnet tool restore --add-source https://api.nuget.org/v3/index.json
+        if ($LASTEXITCODE -ne 0) {
+            throw "dotnet tool restore failed with exit code $LASTEXITCODE"
+        }
+
         Write-Host "Running dotnet publish to '$TargetAppDir'..." -ForegroundColor Yellow
         & dotnet publish -c Release -o "$TargetAppDir" --source https://api.nuget.org/v3/index.json
         if ($LASTEXITCODE -ne 0) {
             throw "dotnet publish failed with exit code $LASTEXITCODE"
         }
         Write-Host "Backend publish completed successfully." -ForegroundColor Green
+
+        Write-Host "Creating Windows EF migration bundle..." -ForegroundColor Yellow
+        $previousRestoreSources = $env:RestoreSources
+        try {
+            $env:RestoreSources = "https://api.nuget.org/v3/index.json"
+            & dotnet ef migrations bundle --no-build --configuration Release --project "$infrastructureProject" --startup-project "$apiProject" --self-contained --target-runtime win-x64 --output "$migrationBundlePath" --force
+            if ($LASTEXITCODE -ne 0) {
+                throw "EF migration bundle creation failed with exit code $LASTEXITCODE"
+            }
+        } finally {
+            $env:RestoreSources = $previousRestoreSources
+        }
+        Write-Host "EF migration bundle created at '$migrationBundlePath'." -ForegroundColor Green
     } finally {
         Pop-Location
     }
@@ -222,6 +241,7 @@ if (-not $SkipBuild) {
             Write-Warning "Could not update Urls in '$targetAppSettings': $_"
         }
     }
+
 } else {
     Write-Host "`n[Step 2-4] Skipping Build and Bundling (-SkipBuild specified)." -ForegroundColor Yellow
 }
