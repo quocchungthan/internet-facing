@@ -17,7 +17,7 @@ on:
       upstream_port:
         description: 'Local upstream port forwarded via SSH reverse tunnel on VPS'
         required: false
-        default: '5080'
+        default: '9999'
         type: string
       dry_run:
         description: 'Run preflight checks only and skip Caddy configuration update'
@@ -113,7 +113,7 @@ jobs:
           if ss -tulpn | grep -q ":$UPSTREAM_PORT "; then
             echo "Port $UPSTREAM_PORT is active and listening (SSH reverse tunnel is connected)."
           else
-            echo "::notice::Port $UPSTREAM_PORT is currently not listening on the VPS. Ensure the local Windows service and SSH reverse tunnel (ssh -f -N -R $UPSTREAM_PORT:localhost:$UPSTREAM_PORT eldervibe) are running on the host machine."
+            echo "::notice::Port $UPSTREAM_PORT is currently not listening on the VPS. Ensure the local Windows service and SSH reverse tunnel (ssh -N -v -R $UPSTREAM_PORT:127.0.0.1:5080 eldervibe) are running on the host machine."
           fi
           REMOTE
 
@@ -210,7 +210,7 @@ jobs:
             echo "| Dry Run | \`$DRY_RUN\` |"
             echo
             echo "### Hybrid Architecture"
-            echo "- **Application Service**: Runs on the Windows machine as Windows Service (\`SchoolBoardService\`) on port \`$UPSTREAM_PORT\`."
-            echo "- **Network Bridge**: SSH reverse tunnel (\`ssh -f -N -R $UPSTREAM_PORT:localhost:$UPSTREAM_PORT eldervibe\`) exposes port \`$UPSTREAM_PORT\` onto the Ubuntu VPS."
+            echo "- **Application Service**: Runs on the Windows machine as Windows Service (\`SchoolBoardService\`) on port \`5080\`."
+            echo "- **Network Bridge**: SSH reverse tunnel (\`ssh -N -v -R $UPSTREAM_PORT:127.0.0.1:5080 eldervibe\`) exposes port \`$UPSTREAM_PORT\` onto the Ubuntu VPS."
             echo "- **Public Ingress**: Caddy on Ubuntu VPS terminates TLS and reverse proxies \`https://$DOMAIN\` to \`127.0.0.1:$UPSTREAM_PORT\`."
           } >> "$GITHUB_STEP_SUMMARY"

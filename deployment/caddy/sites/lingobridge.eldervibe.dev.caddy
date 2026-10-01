@@ -1,3 +1,3 @@
 lingobridge.eldervibe.dev {
-	reverse_proxy 127.0.0.1:5080
+	reverse_proxy 127.0.0.1:9999
 }
