@@ -26,7 +26,12 @@ $TargetAppDir = [System.IO.Path]::GetFullPath($TargetAppDir)
 $apiDir = Join-Path $SubmodulePath "backend\src\Translation.Api"
 $infrastructureProject = Join-Path $SubmodulePath "backend\src\Translation.Infrastructure\Translation.Infrastructure.csproj"
 $apiProject = Join-Path $apiDir "Translation.Api.csproj"
-$migrationBundlePath = Join-Path $TargetAppDir "Translation.Migrations.exe"
+$publishStagingDir = if ($SkipBuild) {
+    $TargetAppDir
+} else {
+    Join-Path $env:TEMP ("SchoolBoard-publish-" + [guid]::NewGuid().ToString("N"))
+}
+$migrationBundlePath = Join-Path $publishStagingDir "Translation.Migrations.exe"
 $clientDir = Join-Path $SubmodulePath "client"
 
 function Test-IsAdministrator {
@@ -191,8 +196,8 @@ if (-not $SkipBuild) {
             throw "dotnet tool restore failed with exit code $LASTEXITCODE"
         }
 
-        Write-Host "Running dotnet publish to '$TargetAppDir'..." -ForegroundColor Yellow
-        & dotnet publish -c Release -o "$TargetAppDir" --source https://api.nuget.org/v3/index.json
+        Write-Host "Running dotnet publish to staging directory '$publishStagingDir'..." -ForegroundColor Yellow
+        & dotnet publish -c Release -o "$publishStagingDir" --source https://api.nuget.org/v3/index.json
         if ($LASTEXITCODE -ne 0) {
             throw "dotnet publish failed with exit code $LASTEXITCODE"
         }
@@ -218,7 +223,7 @@ if (-not $SkipBuild) {
     # Step 4: Bundle Frontend into Backend (wwwroot)
     # ---------------------------------------------------------------------------
     Write-Host "`n[Step 4] Bundling Frontend into Backend wwwroot..." -ForegroundColor Cyan
-    $wwwrootDir = Join-Path $TargetAppDir "wwwroot"
+    $wwwrootDir = Join-Path $publishStagingDir "wwwroot"
     if (-not (Test-Path $wwwrootDir)) {
         New-Item -ItemType Directory -Path $wwwrootDir -Force | Out-Null
     }
@@ -227,23 +232,179 @@ if (-not $SkipBuild) {
     Copy-Item -Path "$distDir\*" -Destination $wwwrootDir -Recurse -Force
     Write-Host "Frontend assets copied to '$wwwrootDir'." -ForegroundColor Green
 
-    # Ensure appsettings.json in target directory configures the desired backend listening port
-    $targetAppSettings = Join-Path $TargetAppDir "appsettings.json"
-    if (Test-Path $targetAppSettings) {
+    # Ensure the staged appsettings.json configures the desired backend listening port.
+    $stagedAppSettings = Join-Path $publishStagingDir "appsettings.json"
+    if (Test-Path $stagedAppSettings) {
         try {
-            $settingsJson = Get-Content $targetAppSettings -Raw | ConvertFrom-Json
+            $settingsJson = Get-Content $stagedAppSettings -Raw | ConvertFrom-Json
             if (-not $settingsJson.Urls -or $settingsJson.Urls -ne "http://127.0.0.1:$BackendPort") {
                 $settingsJson | Add-Member -Name "Urls" -Value "http://127.0.0.1:$BackendPort" -MemberType NoteProperty -Force
-                $settingsJson | ConvertTo-Json -Depth 10 | Set-Content $targetAppSettings -Encoding UTF8
-                Write-Host "Configured listening Urls in '$targetAppSettings' to 'http://127.0.0.1:$BackendPort'." -ForegroundColor Green
+                $settingsJson | ConvertTo-Json -Depth 10 | Set-Content $stagedAppSettings -Encoding UTF8
+                Write-Host "Configured listening Urls in '$stagedAppSettings' to 'http://127.0.0.1:$BackendPort'." -ForegroundColor Green
             }
         } catch {
-            Write-Warning "Could not update Urls in '$targetAppSettings': $_"
+            throw "Could not configure the staged API listening URL: $_"
         }
     }
 
 } else {
     Write-Host "`n[Step 2-4] Skipping Build and Bundling (-SkipBuild specified)." -ForegroundColor Yellow
+}
+
+if (-not (Test-Path $TargetAppDir)) {
+    throw "Published application directory not found at '$TargetAppDir'. Remove -SkipBuild or publish the API before continuing."
+}
+if (-not (Test-Path $migrationBundlePath)) {
+    throw "EF migration bundle not found at '$migrationBundlePath'. Remove -SkipBuild and rerun deployment to build it."
+}
+
+$productionSettingsPath = Join-Path $TargetAppDir "appsettings.Production.json"
+$redisConnection = if ($secretValues.ContainsKey("ConnectionStrings:Redis")) {
+    $secretValues["ConnectionStrings:Redis"]
+} else {
+    "localhost:6379"
+}
+$engineUrl = if ($secretValues.ContainsKey("Engine:Url")) {
+    $secretValues["Engine:Url"]
+} else {
+    "http://localhost:7443"
+}
+if ([string]::IsNullOrWhiteSpace($redisConnection)) {
+    $redisConnection = "localhost:6379"
+}
+if ([string]::IsNullOrWhiteSpace($engineUrl)) {
+    $engineUrl = "http://localhost:7443"
+}
+$hasEmailHost = $secretValues.ContainsKey("Email:Host") -and -not [string]::IsNullOrWhiteSpace($secretValues["Email:Host"])
+$emailPort = if ($secretValues.ContainsKey("Email:Port") -and -not [string]::IsNullOrWhiteSpace($secretValues["Email:Port"])) {
+    $parsedPort = 0
+    if (-not [int]::TryParse($secretValues["Email:Port"], [ref]$parsedPort) -or $parsedPort -lt 1 -or $parsedPort -gt 65535) {
+        throw "Email:Port must be a valid TCP port from 1 to 65535."
+    }
+    $parsedPort
+} elseif ($hasEmailHost) {
+    587
+} else {
+    1025
+}
+$emailEnableSsl = if ($secretValues.ContainsKey("Email:EnableSsl") -and -not [string]::IsNullOrWhiteSpace($secretValues["Email:EnableSsl"])) {
+    $parsedEnableSsl = $false
+    if (-not [bool]::TryParse($secretValues["Email:EnableSsl"], [ref]$parsedEnableSsl)) {
+        throw "Email:EnableSsl must be true or false."
+    }
+    $parsedEnableSsl
+} else {
+    $hasEmailHost
+}
+$emailSettings = [ordered]@{
+    Host = if ($hasEmailHost) { $secretValues["Email:Host"] } else { "localhost" }
+    Port = $emailPort
+    EnableSsl = $emailEnableSsl
+}
+$hasSmtpUser = $secretValues.ContainsKey("Email:UserName") -and -not [string]::IsNullOrWhiteSpace($secretValues["Email:UserName"])
+$hasSmtpPassword = $secretValues.ContainsKey("Email:Password") -and -not [string]::IsNullOrWhiteSpace($secretValues["Email:Password"])
+if ($hasSmtpUser -ne $hasSmtpPassword) {
+    throw "Configure both Email:UserName and Email:Password, or neither."
+}
+if ($hasSmtpUser) {
+    $emailSettings.UserName = $secretValues["Email:UserName"]
+    $emailSettings.Password = $secretValues["Email:Password"]
+}
+$productionSettings = [ordered]@{
+    ConnectionStrings = [ordered]@{
+        Default = $secretValues["ConnectionStrings:Default"]
+        Redis = $redisConnection
+    }
+    Engine = [ordered]@{
+        Url = $engineUrl
+        ApiKey = $secretValues["Engine:ApiKey"]
+    }
+    Auth = [ordered]@{
+        SigningKey = $secretValues["Auth:SigningKey"]
+        ClientUrl = $secretValues["Auth:ClientUrl"]
+    }
+    Email = $emailSettings
+}
+if (-not (Test-Path $productionSettingsPath)) {
+    New-Item -ItemType File -Path $productionSettingsPath | Out-Null
+}
+$productionSettingsAcl = New-Object System.Security.AccessControl.FileSecurity
+$productionSettingsAcl.SetAccessRuleProtection($true, $false)
+$allowedSids = @(
+    "S-1-5-18",
+    "S-1-5-32-544",
+    [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+) | Select-Object -Unique
+foreach ($sid in $allowedSids) {
+    $identity = New-Object System.Security.Principal.SecurityIdentifier($sid)
+    $rule = New-Object System.Security.AccessControl.FileSystemAccessRule(
+        $identity,
+        [System.Security.AccessControl.FileSystemRights]::FullControl,
+        [System.Security.AccessControl.AccessControlType]::Allow
+    )
+    $productionSettingsAcl.AddAccessRule($rule)
+}
+Set-Acl -Path $productionSettingsPath -AclObject $productionSettingsAcl
+$productionSettings | ConvertTo-Json -Depth 5 | Set-Content -Path $productionSettingsPath -Encoding UTF8
+Write-Host "Wrote production secrets to '$productionSettingsPath' with access limited to the deployment account, SYSTEM, and Administrators." -ForegroundColor Green
+
+if ($publishStagingDir -ne $TargetAppDir) {
+    $serviceBeforeDeployment = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
+    if ($serviceBeforeDeployment -and $serviceBeforeDeployment.Status -ne [System.ServiceProcess.ServiceControllerStatus]::Stopped) {
+        if ($SkipService) {
+            throw "Service '$ServiceName' is running and -SkipService was specified. Stop it manually or rerun without -SkipService before replacing deployed binaries."
+        }
+        if (-not (Test-IsAdministrator)) {
+            throw "Service '$ServiceName' must be stopped before replacing locked binaries. Rerun this script from an elevated PowerShell prompt."
+        }
+    }
+}
+
+# ---------------------------------------------------------------------------
+# Step 4.5: Apply Production Database Migrations
+# ---------------------------------------------------------------------------
+Write-Host "`n[Step 4.5] Applying Production Database Migrations..." -ForegroundColor Cyan
+$previousAspNetCoreEnvironment = $env:ASPNETCORE_ENVIRONMENT
+$previousDotnetEnvironment = $env:DOTNET_ENVIRONMENT
+$previousConnectionString = $env:ConnectionStrings__Default
+try {
+    $env:ASPNETCORE_ENVIRONMENT = "Production"
+    $env:DOTNET_ENVIRONMENT = "Production"
+    $env:ConnectionStrings__Default = $secretValues["ConnectionStrings:Default"]
+    Push-Location $TargetAppDir
+    try {
+        & $migrationBundlePath
+        if ($LASTEXITCODE -ne 0) {
+            throw "EF migration bundle failed with exit code $LASTEXITCODE. The API service has not been restarted."
+        }
+    } finally {
+        Pop-Location
+    }
+} finally {
+    $env:ASPNETCORE_ENVIRONMENT = $previousAspNetCoreEnvironment
+    $env:DOTNET_ENVIRONMENT = $previousDotnetEnvironment
+    $env:ConnectionStrings__Default = $previousConnectionString
+}
+Write-Host "Production database migrations applied successfully." -ForegroundColor Green
+
+# ---------------------------------------------------------------------------
+# Step 4.6: Replace Published Files
+# ---------------------------------------------------------------------------
+if ($publishStagingDir -ne $TargetAppDir) {
+    Write-Host "`n[Step 4.6] Stopping the service and installing staged files..." -ForegroundColor Cyan
+    $existingService = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
+    if ($existingService -and $existingService.Status -ne [System.ServiceProcess.ServiceControllerStatus]::Stopped) {
+        if (-not (Test-IsAdministrator)) {
+            throw "Service '$ServiceName' must be stopped before replacing locked binaries. Rerun this script from an elevated PowerShell prompt."
+        }
+
+        Stop-Service -Name $ServiceName -ErrorAction Stop
+        $existingService = Get-Service -Name $ServiceName
+        $existingService.WaitForStatus([System.ServiceProcess.ServiceControllerStatus]::Stopped, [TimeSpan]::FromSeconds(30))
+    }
+
+    Copy-Item -Path (Join-Path $publishStagingDir "*") -Destination $TargetAppDir -Recurse -Force
+    Write-Host "Published API and frontend files installed in '$TargetAppDir'." -ForegroundColor Green
 }
 
 # ---------------------------------------------------------------------------
@@ -312,9 +473,16 @@ if (-not $SkipService) {
             Write-Host "Run the following command from an elevated PowerShell prompt:" -ForegroundColor Yellow
             Write-Host "  Restart-Service -Name `"$ServiceName`"" -ForegroundColor Yellow
         } else {
-            Write-Host "Restarting service '$ServiceName'..." -ForegroundColor Yellow
-            Restart-Service -Name $ServiceName
-            Write-Host "Service '$ServiceName' restarted successfully." -ForegroundColor Green
+            $serviceStatus = (Get-Service -Name $ServiceName).Status
+            if ($serviceStatus -eq [System.ServiceProcess.ServiceControllerStatus]::Stopped) {
+                Write-Host "Starting service '$ServiceName'..." -ForegroundColor Yellow
+                Start-Service -Name $ServiceName
+                Write-Host "Service '$ServiceName' started successfully." -ForegroundColor Green
+            } else {
+                Write-Host "Restarting service '$ServiceName'..." -ForegroundColor Yellow
+                Restart-Service -Name $ServiceName
+                Write-Host "Service '$ServiceName' restarted successfully." -ForegroundColor Green
+            }
         }
     }
 } else {
@@ -366,6 +534,10 @@ if (-not $SkipTunnel) {
     }
 } else {
     Write-Host "`n[Step 7] Skipping SSH Tunnel check (-SkipTunnel specified)." -ForegroundColor Yellow
+}
+
+if ($publishStagingDir -ne $TargetAppDir -and (Test-Path $publishStagingDir)) {
+    Remove-Item -LiteralPath $publishStagingDir -Recurse -Force
 }
 
 Write-Host "`nDeployment and setup process completed." -ForegroundColor Green
