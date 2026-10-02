@@ -1,15 +1,13 @@
-/* CANONICAL SOURCE: Farm/scss/shared/variables.scss
-   Shared design tokens for the PiggyFarm / eldervibe.dev apps.
-   Harmonized with LingoBridge styling (emerald accents, zinc neutrals, dark/light mode).
-   Compiled to Farm/wwwroot/css/shared/variables.css. Edit only SCSS source. */
 /* ==========================================================================
    Design Tokens - Harmonized with LingoBridge Design System
    Precision emerald accents, architectural zinc neutrals, light & dark mode.
    ========================================================================== */
+
 :root {
   /* Typography */
   --font-sans: 'Geist Variable', 'Geist', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-mono: 'Geist Mono Variable', 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
   /* Neutrals (Zinc/Slate Architectural Scale - Light) */
   --color-canvas: #fafafa;
   --color-raised: #ffffff;
@@ -23,6 +21,7 @@
   --color-line-hover: #d4d4d8;
   --color-line-strong: #d4d4d8;
   --color-line-contrast: #cbd5e1;
+
   /* Accent (Precision Emerald - LingoBridge Signature) */
   --color-accent: #059669;
   --color-accent-hover: #047857;
@@ -32,6 +31,7 @@
   --color-accent-softer: rgba(5, 150, 105, 0.04);
   --color-accent-border: rgba(5, 150, 105, 0.22);
   --color-focus-ring: rgba(5, 150, 105, 0.35);
+
   /* Status Colors */
   --color-danger: #b91c1c;
   --color-danger-bg: rgba(185, 28, 28, 0.08);
@@ -41,17 +41,20 @@
   --color-success-bg: rgba(5, 150, 105, 0.08);
   --color-success-line: rgba(5, 150, 105, 0.22);
   --color-warning: #d97706;
+
   /* Shadows & Elevation */
   --shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.03), 0 4px 16px -2px rgb(0 0 0 / 0.05);
   --shadow-lift: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 20px 32px -12px rgb(5 150 105 / 0.18);
   --shadow-soft: 0 1px 3px rgba(0, 0, 0, 0.04), 0 6px 12px -2px rgba(0, 0, 0, 0.03);
   --card-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+
   /* Button Tokens */
   --btn-bg: #059669;
   --btn-bg-hover: #047857;
   --btn-shadow: inset 0 1px 0 rgb(255 255 255 / 0.2), 0 1px 3px rgb(5 150 105 / 0.35);
   --btn-shadow-hover: inset 0 1px 0 rgb(255 255 255 / 0.25), 0 4px 14px -3px rgb(5 150 105 / 0.45);
   --btn-soft-shadow: 0 1px 2px rgb(24 24 27 / 0.04);
+
   /* Spacing Scale */
   --space-1: 4px;
   --space-2: 8px;
@@ -62,6 +65,7 @@
   --space-8: 32px;
   --space-10: 40px;
   --space-12: 48px;
+
   /* Radius Scale */
   --radius-xs: 4px;
   --radius-sm: 6px;
@@ -70,6 +74,7 @@
   --radius-xl: 16px;
   --radius-2xl: 20px;
   --radius-round: 9999px;
+
   /* Shared App Compatibility Aliases */
   --ev-color-ink: var(--color-ink);
   --ev-color-accent: var(--color-accent);
@@ -95,6 +100,7 @@
   --ev-color-danger-bg: var(--color-danger-bg);
   --ev-color-danger-line: var(--color-danger-line);
   --ev-color-danger-ink: var(--color-danger-ink);
+
   --ev-font-sans: var(--font-sans);
   --ev-font-mono: var(--font-mono);
   --ev-font-size-base: 15px;
@@ -104,6 +110,7 @@
   --ev-line-height-base: 1.6;
   --ev-line-height-loose: 1.9;
   --ev-line-height-tight: 1.25;
+
   --ev-space-2: var(--space-2);
   --ev-space-3: var(--space-3);
   --ev-space-4: var(--space-4);
@@ -112,6 +119,7 @@
   --ev-space-8: var(--space-8);
   --ev-space-10: var(--space-10);
   --ev-space-12: var(--space-12);
+
   --ev-radius-sm: var(--radius-sm);
   --ev-radius-md: var(--radius-md);
   --ev-radius-lg: var(--radius-lg);
@@ -119,7 +127,9 @@
   --ev-radius-2xl: var(--radius-2xl);
   --ev-radius-3xl: 24px;
   --ev-radius-round: var(--radius-round);
+
   --ev-shadow-soft: var(--shadow-soft);
+
   /* System compatibility aliases */
   --system-canvas: var(--color-canvas);
   --system-canvas-soft: var(--color-surface);
@@ -139,6 +149,7 @@
   --system-radius-sm: var(--radius-sm);
   --system-radius-md: var(--radius-md);
   --system-radius-lg: var(--radius-lg);
+
   --page-gutter: clamp(16px, 4vw, 56px);
   color-scheme: light dark;
 }
@@ -157,6 +168,7 @@
     --color-line-hover: #3f3f46;
     --color-line-strong: #3f3f46;
     --color-line-contrast: #334155;
+
     --color-accent: #34d399;
     --color-accent-hover: #6ee7b7;
     --color-accent-active: #a7f3d0;
@@ -165,6 +177,7 @@
     --color-accent-softer: rgba(52, 211, 153, 0.06);
     --color-accent-border: rgba(52, 211, 153, 0.25);
     --color-focus-ring: rgba(52, 211, 153, 0.45);
+
     --color-danger: #f87171;
     --color-danger-bg: rgba(248, 113, 113, 0.12);
     --color-danger-line: rgba(248, 113, 113, 0.3);
@@ -172,10 +185,12 @@
     --color-success: #34d399;
     --color-success-bg: rgba(52, 211, 153, 0.12);
     --color-success-line: rgba(52, 211, 153, 0.3);
+
     --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.4), 0 12px 28px -8px rgb(0 0 0 / 0.6);
     --shadow-lift: 0 4px 8px -2px rgb(0 0 0 / 0.4), 0 20px 36px -14px rgb(52 211 153 / 0.2);
     --shadow-soft: 0 2px 8px rgba(0, 0, 0, 0.35);
     --card-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+
     --btn-bg: #34d399;
     --btn-bg-hover: #6ee7b7;
     --btn-shadow: inset 0 1px 0 rgb(255 255 255 / 0.3), 0 1px 3px rgb(0 0 0 / 0.6);

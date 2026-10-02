@@ -1,0 +1,7 @@
+{
+  "name": "farm",
+  "private": true,
+  "scripts": {
+    "build:css": "./scripts/build-scss.sh"
+  }
+}

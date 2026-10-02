@@ -1,72 +1,185 @@
+/* CANONICAL SOURCE: Farm/scss/shared/tokens.scss
+   Shared system tokens for the PiggyFarm / eldervibe.dev apps.
+   Harmonized with LingoBridge styling.
+   Compiled to Farm/wwwroot/css/shared/tokens.css. Edit only SCSS source. */
+/* ==========================================================================
+   Design Tokens - Harmonized with LingoBridge Design System
+   Precision emerald accents, architectural zinc neutrals, light & dark mode.
+   ========================================================================== */
 :root {
-  --tile-size: 64px;
-  --ink: #2b1a12;
-  --ink-soft: #5c3b25;
-  --cream: #fff1c7;
-  --parchment: #f5d99a;
-  --parchment-dark: #c58a46;
-  --wood: #754222;
-  --wood-dark: #402314;
-  --leaf: #2f6b3d;
-  --leaf-bright: #72a94b;
-  --grass: #70a94a;
-  --grass-dark: #3e793e;
-  --gold: #f4bd4c;
-  --sky: #99d8dd;
-  --water: #4a9ca9;
-  --shadow: rgba(45, 32, 18, .28);
-  --pixel-border: 4px;
+  /* Typography */
+  --font-sans: 'Geist Variable', 'Geist', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: 'Geist Mono Variable', 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  /* Neutrals (Zinc/Slate Architectural Scale - Light) */
+  --color-canvas: #fafafa;
+  --color-raised: #ffffff;
+  --color-surface: #f4f4f5;
+  --color-surface-hover: #ececee;
+  --color-surface-sunken: #f0f0f2;
+  --color-ink: #18181b;
+  --color-muted: #52525b;
+  --color-muted-strong: #3f3f46;
+  --color-line: #e4e4e7;
+  --color-line-hover: #d4d4d8;
+  --color-line-strong: #d4d4d8;
+  --color-line-contrast: #cbd5e1;
+  /* Accent (Precision Emerald - LingoBridge Signature) */
+  --color-accent: #059669;
+  --color-accent-hover: #047857;
+  --color-accent-active: #065f46;
+  --color-accent-ink: #ffffff;
+  --color-accent-soft: rgba(5, 150, 105, 0.08);
+  --color-accent-softer: rgba(5, 150, 105, 0.04);
+  --color-accent-border: rgba(5, 150, 105, 0.22);
+  --color-focus-ring: rgba(5, 150, 105, 0.35);
+  /* Status Colors */
+  --color-danger: #b91c1c;
+  --color-danger-bg: rgba(185, 28, 28, 0.08);
+  --color-danger-line: rgba(185, 28, 28, 0.22);
+  --color-danger-ink: #991b1b;
+  --color-success: #059669;
+  --color-success-bg: rgba(5, 150, 105, 0.08);
+  --color-success-line: rgba(5, 150, 105, 0.22);
+  --color-warning: #d97706;
+  /* Shadows & Elevation */
+  --shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.03), 0 4px 16px -2px rgb(0 0 0 / 0.05);
+  --shadow-lift: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 20px 32px -12px rgb(5 150 105 / 0.18);
+  --shadow-soft: 0 1px 3px rgba(0, 0, 0, 0.04), 0 6px 12px -2px rgba(0, 0, 0, 0.03);
+  --card-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  /* Button Tokens */
+  --btn-bg: #059669;
+  --btn-bg-hover: #047857;
+  --btn-shadow: inset 0 1px 0 rgb(255 255 255 / 0.2), 0 1px 3px rgb(5 150 105 / 0.35);
+  --btn-shadow-hover: inset 0 1px 0 rgb(255 255 255 / 0.25), 0 4px 14px -3px rgb(5 150 105 / 0.45);
+  --btn-soft-shadow: 0 1px 2px rgb(24 24 27 / 0.04);
+  /* Spacing Scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  /* Radius Scale */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
+  --radius-round: 9999px;
+  /* Shared App Compatibility Aliases */
+  --ev-color-ink: var(--color-ink);
+  --ev-color-accent: var(--color-accent);
+  --ev-color-accent-strong: var(--color-accent-hover);
+  --ev-color-accent-soft: var(--color-accent-soft);
+  --ev-color-accent-softer: var(--color-accent-softer);
+  --ev-color-paper: var(--color-canvas);
+  --ev-color-surface: var(--color-raised);
+  --ev-color-surface-alt: var(--color-surface);
+  --ev-color-surface-hover: var(--color-surface-hover);
+  --ev-color-muted: var(--color-muted);
+  --ev-color-muted-strong: var(--color-muted-strong);
+  --ev-color-line: var(--color-line);
+  --ev-color-line-strong: var(--color-line-strong);
+  --ev-color-line-contrast: var(--color-line-contrast);
+  --ev-color-line-neutral: var(--color-line);
+  --ev-color-tint: var(--color-accent-soft);
+  --ev-color-tint-strong: rgba(5, 150, 105, 0.15);
+  --ev-color-leaf: var(--color-accent);
+  --ev-color-focus-ring: var(--color-focus-ring);
+  --ev-color-success-bg: var(--color-success-bg);
+  --ev-color-success-line: var(--color-success-line);
+  --ev-color-danger-bg: var(--color-danger-bg);
+  --ev-color-danger-line: var(--color-danger-line);
+  --ev-color-danger-ink: var(--color-danger-ink);
+  --ev-font-sans: var(--font-sans);
+  --ev-font-mono: var(--font-mono);
+  --ev-font-size-base: 15px;
+  --ev-font-size-sm: 13px;
+  --ev-font-size-xs: 12px;
+  --ev-font-size-2xs: 10px;
+  --ev-line-height-base: 1.6;
+  --ev-line-height-loose: 1.9;
+  --ev-line-height-tight: 1.25;
+  --ev-space-2: var(--space-2);
+  --ev-space-3: var(--space-3);
+  --ev-space-4: var(--space-4);
+  --ev-space-5: var(--space-5);
+  --ev-space-6: var(--space-6);
+  --ev-space-8: var(--space-8);
+  --ev-space-10: var(--space-10);
+  --ev-space-12: var(--space-12);
+  --ev-radius-sm: var(--radius-sm);
+  --ev-radius-md: var(--radius-md);
+  --ev-radius-lg: var(--radius-lg);
+  --ev-radius-xl: var(--radius-xl);
+  --ev-radius-2xl: var(--radius-2xl);
+  --ev-radius-3xl: 24px;
+  --ev-radius-round: var(--radius-round);
+  --ev-shadow-soft: var(--shadow-soft);
+  /* System compatibility aliases */
+  --system-canvas: var(--color-canvas);
+  --system-canvas-soft: var(--color-surface);
+  --system-surface: var(--color-raised);
+  --system-surface-raised: var(--color-raised);
+  --system-surface-sunken: var(--color-surface);
+  --system-border: var(--color-line);
+  --system-border-strong: var(--color-line-strong);
+  --system-text: var(--color-ink);
+  --system-text-muted: var(--color-muted);
+  --system-accent: var(--color-accent);
+  --system-accent-bright: var(--color-accent);
+  --system-danger: var(--color-danger);
+  --system-focus: var(--color-accent);
+  --system-shadow-sm: var(--shadow-card);
+  --system-shadow-md: var(--shadow-lift);
+  --system-radius-sm: var(--radius-sm);
+  --system-radius-md: var(--radius-md);
+  --system-radius-lg: var(--radius-lg);
   --page-gutter: clamp(16px, 4vw, 56px);
-  --font-display: "Courier New", "Lucida Console", monospace;
-  --font-body: ui-rounded, "Trebuchet MS", system-ui, sans-serif;
-
-  /* Shared application theme */
-  --system-canvas: #ead29a;
-  --system-canvas-soft: #f7e8bd;
-  --system-surface: #fff5d7;
-  --system-surface-raised: #fffaf0;
-  --system-surface-sunken: #ead09a;
-  --system-border: #8a5a32;
-  --system-border-strong: #4a2c19;
-  --system-text: #352114;
-  --system-text-muted: #72543b;
-  --system-accent: var(--leaf);
-  --system-accent-bright: var(--leaf-bright);
-  --system-danger: #a33d32;
-  --system-focus: #f4bd4c;
-  --system-shadow-sm: 0 3px 0 rgba(64, 35, 20, .22);
-  --system-shadow-md: 0 8px 0 rgba(64, 35, 20, .24);
-  --system-radius-sm: 5px;
-  --system-radius-md: 8px;
-  --system-radius-lg: 12px;
+  color-scheme: light dark;
 }
 
-* {
-  box-sizing: border-box;
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-canvas: #09090b;
+    --color-raised: #121215;
+    --color-surface: #18181c;
+    --color-surface-hover: #222228;
+    --color-surface-sunken: #101014;
+    --color-ink: #f4f4f5;
+    --color-muted: #a1a1aa;
+    --color-muted-strong: #d4d4d8;
+    --color-line: #27272a;
+    --color-line-hover: #3f3f46;
+    --color-line-strong: #3f3f46;
+    --color-line-contrast: #334155;
+    --color-accent: #34d399;
+    --color-accent-hover: #6ee7b7;
+    --color-accent-active: #a7f3d0;
+    --color-accent-ink: #022c22;
+    --color-accent-soft: rgba(52, 211, 153, 0.12);
+    --color-accent-softer: rgba(52, 211, 153, 0.06);
+    --color-accent-border: rgba(52, 211, 153, 0.25);
+    --color-focus-ring: rgba(52, 211, 153, 0.45);
+    --color-danger: #f87171;
+    --color-danger-bg: rgba(248, 113, 113, 0.12);
+    --color-danger-line: rgba(248, 113, 113, 0.3);
+    --color-danger-ink: #fca5a5;
+    --color-success: #34d399;
+    --color-success-bg: rgba(52, 211, 153, 0.12);
+    --color-success-line: rgba(52, 211, 153, 0.3);
+    --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.4), 0 12px 28px -8px rgb(0 0 0 / 0.6);
+    --shadow-lift: 0 4px 8px -2px rgb(0 0 0 / 0.4), 0 20px 36px -14px rgb(52 211 153 / 0.2);
+    --shadow-soft: 0 2px 8px rgba(0, 0, 0, 0.35);
+    --card-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    --btn-bg: #34d399;
+    --btn-bg-hover: #6ee7b7;
+    --btn-shadow: inset 0 1px 0 rgb(255 255 255 / 0.3), 0 1px 3px rgb(0 0 0 / 0.6);
+    --btn-shadow-hover: inset 0 1px 0 rgb(255 255 255 / 0.35), 0 4px 16px -4px rgb(52 211 153 / 0.45);
+    --btn-soft-shadow: 0 1px 2px rgb(0 0 0 / 0.4);
+  }
 }
-
-html,
-body {
-  min-height: 100%;
-  margin: 0;
-}
-
-body {
-  color: var(--ink);
-  font-family: var(--font-body);
-}
-
-a {
-  color: inherit;
-}
-
-button,
-input {
-  font: inherit;
-}
-
-::selection {
-  color: var(--cream);
-  background: var(--wood);
-}
-

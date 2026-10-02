@@ -6,6 +6,8 @@ appsettings.*.json
 # Staged from Farm/wwwroot at build time - never commit these copies.
 MailBox/web/static/shared/
 MailBox/web/static/favicon.ico
+MailBox/web/static/favicon.svg
+MailBox/web/static/icons.svg
 MailBox/runtime/
 MailBox/secrets/
 Farm/wwwroot/hanging-post/

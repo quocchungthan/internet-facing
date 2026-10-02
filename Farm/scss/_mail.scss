@@ -1,0 +1,166 @@
+/* ==========================================================================
+   MailBox Shared Component Styles
+   Harmonized with LingoBridge Design System
+   ========================================================================== */
+
+.mailbox-shell,
+body:not(.system-identity) {
+  header.mail-header {
+    height: 72px;
+    padding: 0 max(5vw, 1.5rem);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--color-line);
+    background: color-mix(in srgb, var(--color-raised) 85%, transparent);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  .mail-brand {
+    font-size: 1.125rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    color: var(--color-ink);
+  }
+
+  .mail-logo {
+    display: inline-grid;
+    place-items: center;
+    background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-hover) 100%);
+    color: var(--color-accent-ink);
+    width: 36px;
+    height: 36px;
+    border-radius: var(--ev-radius-md);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    font-size: 1.125rem;
+    font-weight: 750;
+  }
+
+  .mail-layout {
+    max-width: 1400px;
+    min-height: calc(100vh - 120px);
+    margin: 0 auto;
+    display: flex;
+    padding: 0 1rem;
+  }
+
+  aside.mail-aside {
+    width: 260px;
+    flex-shrink: 0;
+    padding: 2rem 1.25rem 2rem 0;
+    border-right: 1px solid var(--color-line);
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  main.mail-main {
+    padding: 2rem max(3vw, 1.5rem);
+    flex: 1;
+    min-width: 0;
+  }
+
+  .mail-compose {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    background-color: var(--btn-bg);
+    color: var(--color-accent-ink);
+    border: none;
+    border-radius: var(--ev-radius-md);
+    padding: 0.65rem 1.25rem;
+    font-weight: 600;
+    font-size: 0.9375rem;
+    box-shadow: var(--btn-shadow);
+    transition: all 0.15s ease;
+
+    &:hover {
+      background-color: var(--btn-bg-hover);
+      box-shadow: var(--btn-shadow-hover);
+      transform: translateY(-1px);
+    }
+  }
+
+  nav.mail-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+
+    a {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.6rem 0.85rem;
+      border-radius: var(--ev-radius-md);
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--color-muted);
+      transition: all 0.15s ease;
+
+      &:hover {
+        background-color: var(--color-surface);
+        color: var(--color-ink);
+      }
+
+      &.active {
+        background-color: var(--color-accent-soft);
+        color: var(--color-accent);
+        font-weight: 600;
+      }
+    }
+  }
+
+  .mail-account {
+    margin-top: auto;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--color-line);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+
+    .mail-avatar {
+      display: grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      background-color: var(--color-accent-soft);
+      color: var(--color-accent);
+      border: 1px solid var(--color-accent-border);
+      border-radius: 50%;
+      font-size: 0.875rem;
+      font-weight: 700;
+    }
+  }
+
+  .mail-list,
+  .mail-editor,
+  .mail-message {
+    background-color: var(--color-raised);
+    border: 1px solid var(--color-line);
+    border-radius: var(--ev-radius-xl);
+    box-shadow: var(--card-highlight), var(--shadow-card);
+    overflow: hidden;
+  }
+
+  .mail-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--color-line);
+    transition: background-color 0.15s ease;
+
+    &:last-child {
+      border-bottom: none;
+    }
+
+    &:hover {
+      background-color: var(--color-surface);
+    }
+  }
+}
