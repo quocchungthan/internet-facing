@@ -1,11 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-secrets_dir=/etc/shuneo/fences-secrets
-runtime_env_file="/etc/shuneo/fences.env"
+if [[ -n "${FENCES_DEPLOY_DIR:-}" ]]; then
+    if [[ ! "$FENCES_DEPLOY_DIR" =~ ^/[A-Za-z0-9_-][A-Za-z0-9._-]*(/[A-Za-z0-9_-][A-Za-z0-9._-]*)*$ ]]; then
+        echo "FENCES_DEPLOY_DIR must be an absolute path without dot or parent segments." >&2
+        exit 1
+    fi
+    secrets_parent="$FENCES_DEPLOY_DIR"
+    data_dir="$FENCES_DEPLOY_DIR/data"
+else
+    secrets_parent=/etc/shuneo
+    data_dir=/var/lib/fences
+fi
+secrets_dir="$secrets_parent/fences-secrets"
+runtime_env_file="$secrets_parent/fences.env"
 signing_pfx="$secrets_dir/oidc-signing.pfx"
 encryption_pfx="$secrets_dir/oidc-encryption.pfx"
-secrets_parent="$(dirname "$secrets_dir")"
 
 staging_dir=""
 secrets_staging_dir=""
@@ -56,6 +66,33 @@ if ! command -v openssl >/dev/null 2>&1; then
     exit 1
 fi
 
+if [[ -n "${FENCES_DEPLOY_DIR:-}" && ( -e /etc/shuneo/fences.env || -L /etc/shuneo/fences.env || -e /etc/shuneo/fences-secrets || -L /etc/shuneo/fences-secrets || -e /var/lib/fences || -L /var/lib/fences ) ]]; then
+    echo "Legacy Fences material exists; migrate it before bootstrapping under FENCES_DEPLOY_DIR." >&2
+    exit 1
+fi
+
+directory=/
+if [[ -n "${FENCES_DEPLOY_DIR:-}" ]]; then
+    IFS=/ read -ra segments <<< "${FENCES_DEPLOY_DIR#/}"
+    for segment in "${segments[@]}"; do
+        directory="${directory%/}/$segment"
+        if [[ ! -e "$directory" && ! -L "$directory" ]]; then
+            install -d -o root -g root -m 700 -- "$directory"
+        elif [[ ! -d "$directory" || -L "$directory" ]]; then
+            echo "Expected non-symlink directory: $directory" >&2
+            exit 1
+        fi
+        metadata="$(stat -c '%u:%g:%a' -- "$directory")"
+        IFS=: read -r owner group mode <<< "$metadata"
+        if [[ "$owner:$group" != "0:0" ]] || (( (8#$mode & 022) != 0 )); then
+            echo "Expected root-owned directory with no group or other write permission: $directory" >&2
+            exit 1
+        fi
+    done
+elif [[ ! -e "$secrets_parent" && ! -L "$secrets_parent" ]]; then
+    install -d -o root -g root -m 700 -- "$secrets_parent"
+fi
+
 if [[ ! -d "$secrets_parent" || -L "$secrets_parent" ]]; then
     echo "Expected non-symlink directory: $secrets_parent" >&2
     exit 1
@@ -69,6 +106,17 @@ fi
 
 if [[ -e "$secrets_dir" || -L "$secrets_dir" || -e "$runtime_env_file" || -L "$runtime_env_file" ]]; then
     echo "Refusing to provision because Fences secret material or runtime environment already exists." >&2
+    exit 1
+fi
+
+if [[ ! -e "$data_dir" && ! -L "$data_dir" ]]; then
+    install -d -o root -g root -m 700 -- "$data_dir"
+elif [[ ! -d "$data_dir" || -L "$data_dir" || "$(stat -c '%u:%g:%a' -- "$data_dir")" != "0:0:700" ]]; then
+    echo "Expected root-owned mode 700 directory: $data_dir" >&2
+    exit 1
+fi
+if [[ -n "$(find "$data_dir" -mindepth 1 -print -quit)" ]]; then
+    echo "Refusing to bootstrap against a populated Fences data directory: $data_dir" >&2
     exit 1
 fi
 
