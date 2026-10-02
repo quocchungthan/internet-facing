@@ -1,26 +1,18 @@
 name: Bootstrap Fences OIDC certificates
 
 on:
-  workflow_dispatch:
-    inputs:
-      confirmation:
-        description: Type BOOTSTRAP_FENCES to create the initial Fences OIDC material
-        required: true
-        type: string
-      reason:
-        description: Optional change reason
-        required: false
-        type: string
+  workflow_call:
 
 permissions:
   contents: read
 
 concurrency:
-  group: bootstrap-fences-production
+  group: deploy-service-shuneo-fences-production
   cancel-in-progress: false
 
 jobs:
   bootstrap:
+    if: ${{ false }}
     runs-on: ubuntu-latest
     environment: hostkey-server
 
@@ -53,6 +45,7 @@ jobs:
           FENCES_GITHUB_CLIENT_ID: ${{ secrets.FENCES_GITHUB_CLIENT_ID }}
           FENCES_GITHUB_CLIENT_SECRET: ${{ secrets.FENCES_GITHUB_CLIENT_SECRET }}
           FENCES_OIDC_CLIENTS_JSON: ${{ secrets.FENCES_OIDC_CLIENTS_JSON }}
+          FENCES_DEPLOY_DIR: ${{ vars.FENCES_DEPLOY_DIR }}
           FENCES_BRAND_NAME: ${{ vars.FENCES_BRAND_NAME }}
           FENCES_COOKIE_DOMAIN: ${{ vars.FENCES_COOKIE_DOMAIN }}
           FENCES_OIDC_ISSUER: ${{ vars.FENCES_OIDC_ISSUER }}
@@ -87,6 +80,10 @@ jobs:
           [[ "$VPS_HOST" =~ ^[A-Za-z0-9.:-]+$ ]] || { echo "::error::VPS_HOST has an invalid format." >&2; exit 1; }
           [[ "$VPS_PORT" =~ ^[0-9]+$ ]] || { echo "::error::VPS_PORT must be numeric." >&2; exit 1; }
           [[ "$VPS_USER" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "::error::VPS_USER has an invalid format." >&2; exit 1; }
+          if [[ -n "$FENCES_DEPLOY_DIR" && ! "$FENCES_DEPLOY_DIR" =~ ^/[A-Za-z0-9_-][A-Za-z0-9._-]*(/[A-Za-z0-9_-][A-Za-z0-9._-]*)*$ ]]; then
+            echo "::error::FENCES_DEPLOY_DIR must be an absolute path without dot or parent segments." >&2
+            exit 1
+          fi
 
           for dotenv_value in \
               FENCES_GITHUB_CLIENT_ID FENCES_GITHUB_CLIENT_SECRET FENCES_BRAND_NAME FENCES_COOKIE_DOMAIN FENCES_OIDC_ISSUER \
@@ -179,28 +176,6 @@ jobs:
               echo "Refusing to bootstrap because Fences outputs already exist." >&2
               exit 1
             fi
-            if [[ ! -e /etc/shuneo && ! -L /etc/shuneo ]]; then
-              install -d -o root -g root -m 700 /etc/shuneo
-            elif [[ ! -d /etc/shuneo || -L /etc/shuneo ]]; then
-              echo "Expected non-symlink directory: /etc/shuneo" >&2
-              exit 1
-            fi
-            shuneo_metadata="$(stat -c "%u:%g:%a" -- /etc/shuneo)"
-            IFS=: read -r shuneo_owner shuneo_group shuneo_mode <<< "$shuneo_metadata"
-            if [[ "$shuneo_owner:$shuneo_group" != "0:0" ]] || (( (8#$shuneo_mode & 022) != 0 )); then
-              echo "Expected root-owned directory with no group or other write permission: /etc/shuneo" >&2
-              exit 1
-            fi
-            if [[ ! -e /var/lib/fences && ! -L /var/lib/fences ]]; then
-              install -d -o root -g root -m 700 /var/lib/fences
-            elif [[ ! -d /var/lib/fences || -L /var/lib/fences ]]; then
-              echo "Expected non-symlink directory: /var/lib/fences" >&2
-              exit 1
-            fi
-            if [[ "$(stat -c "%u:%g:%a" -- /var/lib/fences)" != "0:0:700" ]]; then
-              echo "Expected root-owned mode 700 directory: /var/lib/fences" >&2
-              exit 1
-            fi
             command -v openssl >/dev/null 2>&1 || { echo "openssl is required for Fences bootstrap." >&2; exit 1; }
             staging_dir="$(mktemp -d /tmp/fences-bootstrap.XXXXXX)"
             chmod 700 -- "$staging_dir"
@@ -213,4 +188,4 @@ jobs:
 
           remote_script_path="$remote_dir/provision-oidc-certificates.sh"
           remote_env_path="$remote_dir/$(basename "$runtime_env_file")"
-          ssh "${ssh_options[@]}" "$ssh_target" "set -e; trap 'rm -rf -- '\''$remote_dir'\'' || true' EXIT; chmod 700 -- '$remote_script_path'; chmod 600 -- '$remote_env_path'; bash '$remote_script_path' --runtime-env-file '$remote_env_path'"
+          ssh "${ssh_options[@]}" "$ssh_target" "set -e; trap 'rm -rf -- '\''$remote_dir'\'' || true' EXIT; chmod 700 -- '$remote_script_path'; chmod 600 -- '$remote_env_path'; FENCES_DEPLOY_DIR='$FENCES_DEPLOY_DIR' bash '$remote_script_path' --runtime-env-file '$remote_env_path'"
