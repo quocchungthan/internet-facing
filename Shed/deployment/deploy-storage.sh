@@ -22,32 +22,6 @@ install -d -m 0755 "$CADDY_SITES_DIR"
 if [[ -n "${STORAGE_SOURCE_DIR:-}" ]] && [[ -f "$STORAGE_SOURCE_DIR/docker-compose.yml" ]]; then
     cp "$STORAGE_SOURCE_DIR/docker-compose.yml" "$STORAGE_DEPLOY_DIR/docker-compose.yml"
 fi
-if [[ -n "${STORAGE_SOURCE_DIR:-}" ]] && [[ -f "$STORAGE_SOURCE_DIR/conf/seahub_settings_template.py" ]]; then
-    seahub_config_dir="$STORAGE_DEPLOY_DIR/data/seafile/conf"
-    seahub_config="$seahub_config_dir/seahub_settings.py"
-    install -d -m 0750 "$seahub_config_dir"
-    if [[ ! -e "$seahub_config" ]]; then
-        install -m 0640 "$STORAGE_SOURCE_DIR/conf/seahub_settings_template.py" "$seahub_config"
-    fi
-    sed -i '/^# BEGIN MANAGED STORAGE PROXY SETTINGS$/,/^# END MANAGED STORAGE PROXY SETTINGS$/d' "$seahub_config"
-    cat >> "$seahub_config" <<PYTHON
-
-# BEGIN MANAGED STORAGE PROXY SETTINGS
-SERVICE_URL = 'https://${SERVICE_DOMAIN}'
-FILE_SERVER_ROOT = 'https://${SERVICE_DOMAIN}/seafhttp'
-ALLOWED_HOSTS = ['${SERVICE_DOMAIN}']
-CSRF_TRUSTED_ORIGINS = [SERVICE_URL]
-SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-USE_X_FORWARDED_HOST = True
-CSRF_COOKIE_SECURE = True
-CSRF_COOKIE_SAMESITE = 'Lax'
-SESSION_COOKIE_SECURE = True
-SESSION_COOKIE_SAMESITE = 'Lax'
-# END MANAGED STORAGE PROXY SETTINGS
-PYTHON
-    chmod 0640 "$seahub_config"
-fi
-
 # 1. Update Caddy site configuration
 fragment="$CADDY_SITES_DIR/$SERVICE_DOMAIN.caddy"
 fragment_tmp="$CADDY_SITES_DIR/.$SERVICE_DOMAIN.caddy.$$"
@@ -122,13 +96,50 @@ fi
 
 $COMPOSE_CMD pull || true
 $COMPOSE_CMD up -d --remove-orphans
-$COMPOSE_CMD restart seafile
 
 seahub_config="$STORAGE_DEPLOY_DIR/data/seafile/conf/seahub_settings.py"
+for attempt in {1..60}; do
+    [[ -f "$seahub_config" ]] && break
+    sleep 2
+done
 if [[ ! -f "$seahub_config" ]]; then
-    echo "Seahub settings file is missing: $seahub_config" >&2
+    echo "Seahub did not generate its settings file: $seahub_config" >&2
     exit 1
 fi
+sed -i '/^# BEGIN MANAGED STORAGE PROXY SETTINGS$/,/^# END MANAGED STORAGE PROXY SETTINGS$/d' "$seahub_config"
+cat >> "$seahub_config" <<PYTHON
+
+# BEGIN MANAGED STORAGE PROXY SETTINGS
+SERVICE_URL = 'https://${SERVICE_DOMAIN}'
+FILE_SERVER_ROOT = 'https://${SERVICE_DOMAIN}/seafhttp'
+ALLOWED_HOSTS = ['${SERVICE_DOMAIN}']
+CSRF_TRUSTED_ORIGINS = [SERVICE_URL]
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+USE_X_FORWARDED_HOST = True
+CSRF_COOKIE_SECURE = True
+CSRF_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_SECURE = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+import os
+ENABLE_OAUTH = True
+OAUTH_CLIENT_ID = os.environ.get('OAUTH_CLIENT_ID', 'storage')
+OAUTH_CLIENT_SECRET = os.environ.get('OAUTH_CLIENT_SECRET', '')
+OAUTH_REDIRECT_URL = os.environ.get('OAUTH_REDIRECT_URL', 'https://${SERVICE_DOMAIN}/oauth/callback/')
+OAUTH_AUTHORIZATION_URL = os.environ.get('OAUTH_AUTHORIZATION_URL', 'https://identity.eldervibe.dev/connect/authorize')
+OAUTH_TOKEN_URL = os.environ.get('OAUTH_TOKEN_URL', 'https://identity.eldervibe.dev/connect/token')
+OAUTH_USER_INFO_URL = os.environ.get('OAUTH_USER_INFO_URL', 'https://identity.eldervibe.dev/connect/userinfo')
+OAUTH_SCOPE = ['openid', 'profile', 'email']
+OAUTH_ATTRIBUTE_MAP = {
+    'sub': (True, 'uid'),
+    'email': (True, 'email'),
+    'name': (False, 'name'),
+}
+OAUTH_ACTIVATE_USER_AFTER_CREATION = True
+OAUTH_CREATE_UNKNOWN_USER = True
+# END MANAGED STORAGE PROXY SETTINGS
+PYTHON
+chmod 0640 "$seahub_config"
+$COMPOSE_CMD restart seafile
 grep -Fq "CSRF_TRUSTED_ORIGINS = [SERVICE_URL]" "$seahub_config" || {
     echo "Seahub CSRF configuration was not applied for $SERVICE_DOMAIN" >&2
     exit 1
