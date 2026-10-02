@@ -77,6 +77,8 @@ python3 scripts/manage.py init --domain eldervibe.dev --hostname mail.eldervibe.
 
 Script tạo `.env`, thư mục dữ liệu và `secrets/accounts.json` với hai mật khẩu ngẫu nhiên. Không chạy lại `init` trên dữ liệu cũ hoặc đổi domain trực tiếp sau khi đã có thư. Có thể xem tài khoản khi cần bằng `cat secrets/accounts.json`; không chia sẻ file này. Chưa cần sử dụng mật khẩu ở bước DNS.
 
+Trên Linux, chạy `init` bằng root: `secrets/` được giữ quyền `0750`, hai file JSON quyền `0640`, chỉ root và group `10001` của container `web` đọc được. Trên bản cài đã tạo trước đây với quyền `0700`/`0600`, cập nhật group/quyền của riêng `secrets/`, `secrets/accounts.json` và `secrets/managed_accounts.json` trước khi đăng nhập; không mở quyền đọc cho mọi người.
+
 `MAIL_DOMAINS` là danh sách domain local, phân tách bằng khoảng trắng. `MAIL_DOMAIN` vẫn là domain chính. Khi dùng GitHub Actions, đặt repository variable `MAILBOX_ADDITIONAL_DOMAINS` thành `shuneo.com` hoặc danh sách phân tách bằng dấu phẩy; workflow sẽ lưu danh sách này vào `.env` trước khi khởi động Maddy.
 
 ### Đăng nhập quản trị bằng GitHub (Fences)
