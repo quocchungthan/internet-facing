@@ -28,6 +28,9 @@ ASSETS = [
     ('css/shared/variables.css', 'shared/variables.css'),
     ('css/shared/base.css', 'shared/base.css'),
     ('favicon.ico', 'favicon.ico'),
+    ('favicon.svg', 'favicon.svg'),
+    ('apple-touch-icon.svg', 'apple-touch-icon.svg'),
+    ('icons.svg', 'icons.svg'),
 ]
 
 STAGE_COMMAND = 'python3 MailBox/scripts/stage-shared-assets.py'
