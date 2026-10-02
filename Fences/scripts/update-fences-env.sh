@@ -1,10 +1,25 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-runtime_env_file="/etc/shuneo/fences.env"
-secrets_dir="/etc/shuneo/fences-secrets"
+if [[ -n "${FENCES_DEPLOY_DIR:-}" ]]; then
+    if [[ ! "$FENCES_DEPLOY_DIR" =~ ^/[A-Za-z0-9_-][A-Za-z0-9._-]*(/[A-Za-z0-9_-][A-Za-z0-9._-]*)*$ ]]; then
+        echo "FENCES_DEPLOY_DIR must be an absolute path without dot or parent segments." >&2
+        exit 1
+    fi
+    config_dir="$FENCES_DEPLOY_DIR"
+    data_dir="$FENCES_DEPLOY_DIR/data"
+    if [[ -e /etc/shuneo/fences.env || -L /etc/shuneo/fences.env || -e /etc/shuneo/fences-secrets || -L /etc/shuneo/fences-secrets || -e /var/lib/fences || -L /var/lib/fences ]]; then
+        echo "Legacy Fences material exists; migrate it before updating with FENCES_DEPLOY_DIR." >&2
+        exit 1
+    fi
+else
+    config_dir=/etc/shuneo
+    data_dir=/var/lib/fences
+fi
+runtime_env_file="$config_dir/fences.env"
+secrets_dir="$config_dir/fences-secrets"
 service_container="shuneo-fences"
-service_volume="/var/lib/fences:/var/lib/fences"
+service_volume="$data_dir:/var/lib/fences"
 service_upstream_port=5188
 
 # Provisioner-managed values must only change via a planned certificate/database migration.
@@ -25,10 +40,11 @@ cleanup() {
 trap cleanup EXIT
 
 usage() {
-    echo "Usage: $0 --updates-file PATH [--restart]" >&2
+    echo "Usage: $0 --updates-file PATH [--replace-oidc] [--restart]" >&2
 }
 
 restart=false
+replace_oidc=false
 updates_file=""
 while [[ "$#" -gt 0 ]]; do
     case "$1" in
@@ -39,6 +55,10 @@ while [[ "$#" -gt 0 ]]; do
             ;;
         --restart)
             restart=true
+            shift
+            ;;
+        --replace-oidc)
+            replace_oidc=true
             shift
             ;;
         *)
@@ -52,6 +72,23 @@ done
 if [[ "${EUID}" -ne 0 ]]; then
     echo "Run this script as root; it edits a root-owned runtime environment file." >&2
     exit 1
+fi
+
+if [[ -n "${FENCES_DEPLOY_DIR:-}" ]]; then
+    path="$config_dir"
+    while [[ "$path" != / ]]; do
+        if [[ ! -d "$path" || -L "$path" ]]; then
+            echo "Expected non-symlink directory: $path" >&2
+            exit 1
+        fi
+        metadata="$(stat -c '%u:%g:%a' -- "$path")"
+        IFS=: read -r owner group mode <<< "$metadata"
+        if [[ "$owner:$group" != 0:0 ]] || (( (8#$mode & 022) != 0 )); then
+            echo "Expected root-owned directory with no group or other write permission: $path" >&2
+            exit 1
+        fi
+        path="$(dirname -- "$path")"
+    done
 fi
 
 require_root_regular_file_600() {
@@ -70,6 +107,21 @@ require_root_regular_file_600 "$runtime_env_file" "Fences runtime environment"
 require_root_regular_file_600 "$updates_file" "updates input"
 [[ -s "$updates_file" ]] || { echo "Updates input must not be empty." >&2; exit 1; }
 
+if [[ ! -d "$config_dir" || -L "$config_dir" ]]; then
+    echo "Expected non-symlink directory: $config_dir" >&2
+    exit 1
+fi
+config_metadata="$(stat -c '%u:%g:%a' -- "$config_dir")"
+IFS=: read -r config_owner config_group config_mode <<< "$config_metadata"
+if [[ "$config_owner:$config_group" != "0:0" ]] || (( (8#$config_mode & 022) != 0 )); then
+    echo "Expected root-owned directory with no group or other write permission: $config_dir" >&2
+    exit 1
+fi
+if [[ ! -d "$data_dir" || -L "$data_dir" || "$(stat -c '%u:%g:%a' -- "$data_dir")" != "0:0:700" ]]; then
+    echo "Expected root-owned mode 700 data directory: $data_dir" >&2
+    exit 1
+fi
+
 if [[ ! -d "$secrets_dir" || -L "$secrets_dir" ]]; then
     echo "Expected non-symlink directory: $secrets_dir" >&2
     exit 1
@@ -87,7 +139,7 @@ while IFS= read -r line || [[ -n "$line" ]]; do
     line="${line%$'\r'}"
     [[ -z "$line" ]] && continue
     if [[ ! "$line" =~ ^[A-Za-z_][A-Za-z0-9_]*=.*$ ]]; then
-        echo "Malformed update line (expected KEY=value): $line" >&2
+        echo "Malformed update line (expected KEY=value)." >&2
         exit 1
     fi
     key="${line%%=*}"
@@ -108,7 +160,27 @@ while IFS= read -r line || [[ -n "$line" ]]; do
 done < "$updates_file"
 [[ "${#ordered_keys[@]}" -gt 0 ]] || { echo "No valid updates found in input." >&2; exit 1; }
 
-staging_dir="$(mktemp -d /etc/shuneo/.fences-env-update.XXXXXX)"
+if [[ "$replace_oidc" == true ]]; then
+    declare -A desired_clients=()
+    has_desired_client=false
+    for key in "${ordered_keys[@]}"; do
+        if [[ "$key" =~ ^IdentityApp__OidcClients__[0-9]+__ClientId$ ]]; then
+            desired_clients["${updates[$key]}"]=1
+            has_desired_client=true
+        fi
+    done
+    [[ "$has_desired_client" == true ]] || { echo "Reconciliation requires at least one OIDC client." >&2; exit 1; }
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        if [[ "$line" =~ ^IdentityApp__OidcClients__[0-9]+__ClientId=(.*)$ ]]; then
+            if [[ -z "${desired_clients[${BASH_REMATCH[1]}]+set}" ]]; then
+                echo "Removing an existing OIDC client requires an explicit database migration." >&2
+                exit 1
+            fi
+        fi
+    done < "$runtime_env_file"
+fi
+
+staging_dir="$(mktemp -d "$config_dir/.fences-env-update.XXXXXX")"
 chmod 700 -- "$staging_dir"
 new_env_file="$staging_dir/fences.env"
 : > "$new_env_file"
@@ -122,6 +194,8 @@ while IFS= read -r line || [[ -n "$line" ]]; do
     if [[ -n "$existing_key" && -n "${updates[$existing_key]+set}" ]]; then
         printf '%s=%s\n' "$existing_key" "${updates[$existing_key]}" >> "$new_env_file"
         applied["$existing_key"]=1
+    elif [[ "$replace_oidc" == true && "$existing_key" == IdentityApp__OidcClients__* ]]; then
+        continue
     else
         printf '%s\n' "$line" >> "$new_env_file"
     fi
