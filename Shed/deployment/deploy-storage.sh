@@ -122,6 +122,7 @@ SESSION_COOKIE_SECURE = True
 SESSION_COOKIE_SAMESITE = 'Lax'
 import os
 ENABLE_OAUTH = True
+OAUTH_PROVIDER = 'identity.eldervibe.dev'
 OAUTH_CLIENT_ID = os.environ.get('OAUTH_CLIENT_ID', 'storage')
 OAUTH_CLIENT_SECRET = os.environ.get('OAUTH_CLIENT_SECRET', '')
 OAUTH_REDIRECT_URL = os.environ.get('OAUTH_REDIRECT_URL', 'https://${SERVICE_DOMAIN}/oauth/callback/')
