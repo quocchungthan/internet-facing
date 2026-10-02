@@ -1,31 +1,18 @@
 name: Update Fences runtime environment
 
 on:
-  workflow_dispatch:
-    inputs:
-      confirmation:
-        description: Type UPDATE_FENCES_ENV to update existing Fences runtime values
-        required: true
-        type: string
-      restart:
-        description: Restart the Fences container after updating fences.env
-        required: true
-        type: boolean
-        default: true
-      reason:
-        description: Optional change reason
-        required: false
-        type: string
+  workflow_call:
 
 permissions:
   contents: read
 
 concurrency:
-  group: update-fences-env-production
+  group: deploy-service-shuneo-fences-production
   cancel-in-progress: false
 
 jobs:
   update:
+    if: ${{ false }}
     runs-on: ubuntu-latest
     environment: hostkey-server
 
@@ -59,6 +46,7 @@ jobs:
           FENCES_GITHUB_CLIENT_ID: ${{ secrets.FENCES_GITHUB_CLIENT_ID }}
           FENCES_GITHUB_CLIENT_SECRET: ${{ secrets.FENCES_GITHUB_CLIENT_SECRET }}
           FENCES_OIDC_CLIENTS_JSON: ${{ secrets.FENCES_OIDC_CLIENTS_JSON }}
+          FENCES_DEPLOY_DIR: ${{ vars.FENCES_DEPLOY_DIR }}
           FENCES_BRAND_NAME: ${{ vars.FENCES_BRAND_NAME }}
           FENCES_COOKIE_DOMAIN: ${{ vars.FENCES_COOKIE_DOMAIN }}
           FENCES_PERSISTENT_LOGIN_DAYS: ${{ vars.FENCES_PERSISTENT_LOGIN_DAYS }}
@@ -88,6 +76,10 @@ jobs:
           [[ "$VPS_HOST" =~ ^[A-Za-z0-9.:-]+$ ]] || { echo "::error::VPS_HOST has an invalid format." >&2; exit 1; }
           [[ "$VPS_PORT" =~ ^[0-9]+$ ]] || { echo "::error::VPS_PORT must be numeric." >&2; exit 1; }
           [[ "$VPS_USER" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "::error::VPS_USER has an invalid format." >&2; exit 1; }
+          if [[ -n "$FENCES_DEPLOY_DIR" && ! "$FENCES_DEPLOY_DIR" =~ ^/[A-Za-z0-9_-][A-Za-z0-9._-]*(/[A-Za-z0-9_-][A-Za-z0-9._-]*)*$ ]]; then
+            echo "::error::FENCES_DEPLOY_DIR must be an absolute path without dot or parent segments." >&2
+            exit 1
+          fi
 
           for dotenv_value in \
               FENCES_GITHUB_CLIENT_ID FENCES_GITHUB_CLIENT_SECRET FENCES_BRAND_NAME FENCES_COOKIE_DOMAIN \
@@ -187,10 +179,6 @@ jobs:
               echo "VPS_USER must be root for Fences runtime environment updates." >&2
               exit 1
             fi
-            if [[ ! -e /etc/shuneo/fences.env || ! -e /etc/shuneo/fences-secrets ]]; then
-              echo "Refusing to update because Fences has not been bootstrapped yet." >&2
-              exit 1
-            fi
             staging_dir="$(mktemp -d /tmp/fences-env-update.XXXXXX)"
             chmod 700 -- "$staging_dir"
             printf "%s\n" "$staging_dir"')"
@@ -206,4 +194,4 @@ jobs:
           if [[ "$RESTART_FENCES" == "true" ]]; then
             restart_flag="--restart"
           fi
-          ssh "${ssh_options[@]}" "$ssh_target" "set -e; trap 'rm -rf -- '\''$remote_dir'\'' || true' EXIT; chmod 700 -- '$remote_script_path'; chmod 600 -- '$remote_updates_path'; bash '$remote_script_path' --updates-file '$remote_updates_path' $restart_flag"
+          ssh "${ssh_options[@]}" "$ssh_target" "set -e; trap 'rm -rf -- '\''$remote_dir'\'' || true' EXIT; chmod 700 -- '$remote_script_path'; chmod 600 -- '$remote_updates_path'; FENCES_DEPLOY_DIR='$FENCES_DEPLOY_DIR' bash '$remote_script_path' --updates-file '$remote_updates_path' $restart_flag"
