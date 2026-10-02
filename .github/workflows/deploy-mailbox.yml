@@ -465,7 +465,7 @@ jobs:
           python3 scripts/manage.py accounts
           docker compose exec maddy sh -c 'cat /data/dkim_keys/*.dns'   # C4: copy the TXT record into DNS
           \`\`\`
-          Passwords live in \`$DEPLOY_DIR/secrets/accounts.json\` (mode 0600). Never commit or upload it.
+          Passwords live in \`$DEPLOY_DIR/secrets/accounts.json\` (root-owned, group 10001, mode 0640). Never commit or upload it.
 
           **D. Recurring operations (not run by CI)**
           - Certificate renewal cron as root (README section 9):
