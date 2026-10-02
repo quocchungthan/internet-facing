@@ -18,5 +18,6 @@
     <Content Include="..\Farm\wwwroot\css\shared\tokens.css" Link="wwwroot\css\shared\tokens.css" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Always" />
     <Content Include="..\Farm\wwwroot\css\shared\identity.css" Link="wwwroot\css\shared\identity.css" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Always" />
     <Content Include="..\Farm\wwwroot\favicon.ico" Link="wwwroot\favicon.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Always" />
+    <Content Include="..\Farm\wwwroot\icons.svg" Link="wwwroot\icons.svg" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Always" />
   </ItemGroup>
 </Project>
