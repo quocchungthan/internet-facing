@@ -32,9 +32,20 @@ def settings():
     return dict(line.split('=', 1) for line in Path('.env').read_text().splitlines() if line and not line.startswith('#'))
 
 
+def allow_web_secrets():
+    if os.name == 'nt':
+        return
+    for path, mode in [('secrets', 0o750), ('secrets/accounts.json', 0o640),
+                       ('secrets/managed_accounts.json', 0o640)]:
+        os.chown(path, -1, 10001)
+        os.chmod(path, mode)
+
+
 def init(args):
     if Path('.env').exists():
         sys.exit('.env already exists; refusing to overwrite domain or credentials.')
+    if os.name != 'nt' and os.geteuid() != 0:
+        sys.exit('Run init as root to grant the web container access to mailbox credentials.')
     domain = args.domain.lower()
     host = (args.hostname or f'mail.{domain}').lower()
     pattern = r'(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}'
@@ -60,9 +71,7 @@ def init(args):
     Path('secrets/managed_accounts.json').write_text(json.dumps(managers, indent=2), encoding='utf-8')
     if os.name != 'nt':
         os.chmod('.env', 0o600)
-        os.chmod('secrets', 0o700)
-        os.chmod('secrets/accounts.json', 0o600)
-        os.chmod('secrets/managed_accounts.json', 0o600)
+    allow_web_secrets()
     print('Configured domain:', domain)
     print('Credentials saved to secrets/accounts.json (not printed).')
     print('GitHub login -> mailbox map saved to secrets/managed_accounts.json.')
@@ -162,8 +171,7 @@ def managers(args):
         # No --mailbox given: grant this manager every mailbox currently on the server.
         mapping[email] = list(json.loads(Path('secrets/accounts.json').read_text(encoding='utf-8')).keys())
     path.write_text(json.dumps(mapping, indent=2), encoding='utf-8')
-    if os.name != 'nt':
-        os.chmod(path, 0o600)
+    allow_web_secrets()
     print('Manager updated:', email, '->', mapping[email])
 
 
