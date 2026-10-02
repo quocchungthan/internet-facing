@@ -10,18 +10,43 @@ permissions:
   contents: read
 
 concurrency:
-  group: deploy-fences-production
+  group: fences-and-backup-production
   cancel-in-progress: false
 
 jobs:
   deploy:
-    uses: ./.github/workflows/reusable-deploy-service.yml
-    with:
-      image_name: shuneo-fences
-      image_tag: ${{ github.sha }}
-      docker_context: .
-      dockerfile: Fences/Dockerfile
-      wrapper_path: Fences/scripts/deploy-fences.sh
-      deploy_common_script: deployment/deploy-caddy-service.sh
-      runtime_image_argument: FENCES_IMAGE
-    secrets: inherit
+    runs-on: ubuntu-latest
+    environment: hostkey-server
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Validate Fences scripts
+        run: |
+          for script in Fences/scripts/deploy-from-github.sh Fences/scripts/provision-oidc-certificates.sh Fences/scripts/update-fences-env.sh Fences/scripts/deploy-fences.sh deployment/deploy-caddy-service.sh; do
+            bash -n "$script" || exit 1
+          done
+
+      - name: Build Fences image
+        run: docker build --pull --tag "shuneo-fences:${{ github.sha }}" --file Fences/Dockerfile .
+
+      - name: Provision or reconcile, then deploy candidate
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          ACME_EMAIL: ${{ secrets.ACME_EMAIL || vars.ACME_EMAIL }}
+          FENCES_GITHUB_CLIENT_ID: ${{ secrets.FENCES_GITHUB_CLIENT_ID }}
+          FENCES_GITHUB_CLIENT_SECRET: ${{ secrets.FENCES_GITHUB_CLIENT_SECRET }}
+          FENCES_OIDC_CLIENTS_JSON: ${{ secrets.FENCES_OIDC_CLIENTS_JSON }}
+          FENCES_DEPLOY_DIR: ${{ vars.FENCES_DEPLOY_DIR }}
+          FENCES_BRAND_NAME: ${{ vars.FENCES_BRAND_NAME }}
+          FENCES_COOKIE_DOMAIN: ${{ vars.FENCES_COOKIE_DOMAIN }}
+          FENCES_OIDC_ISSUER: ${{ vars.FENCES_OIDC_ISSUER }}
+          FENCES_PERSISTENT_LOGIN_DAYS: ${{ vars.FENCES_PERSISTENT_LOGIN_DAYS }}
+          FENCES_ALLOWED_RETURN_HOST: ${{ vars.FENCES_ALLOWED_RETURN_HOST }}
+          FENCES_ALLOWED_CORS_ORIGIN: ${{ vars.FENCES_ALLOWED_CORS_ORIGIN }}
+          FENCES_IMAGE: shuneo-fences:${{ github.sha }}
+        run: bash Fences/scripts/deploy-from-github.sh
