@@ -57,7 +57,7 @@ To authenticate Seafile users via `identity.eldervibe.dev`:
    OAUTH_USER_INFO_URL=https://identity.eldervibe.dev/connect/userinfo
    ```
 
-      Keep Seafile's generated `data/seafile/conf/seahub_settings.py`, including its database, cache and secret-key settings. Do not replace it with the standalone template. The deploy script replaces only its managed block, adding HTTPS proxy and OAuth settings to existing installations without removing local Seahub configuration. It restarts `seafile-server` after updating the file. The `STORAGE_OAUTH_CLIENT_ID`, `STORAGE_OAUTH_CLIENT_SECRET` and redirect URI must match the client registered in Fences exactly.
+      Keep Seafile's generated `data/seafile/conf/seahub_settings.py`, including its database, cache and secret-key settings. Do not replace it with the standalone template. The deploy script replaces only its managed block, adding HTTPS proxy and OAuth settings to existing installations without removing local Seahub configuration. It sets `OAUTH_PROVIDER` to the stable identifier `identity.eldervibe.dev`, used by Seafile to associate external users with their accounts; do not change it after users have signed in. It restarts `seafile-server` after updating the file. The `STORAGE_OAUTH_CLIENT_ID`, `STORAGE_OAUTH_CLIENT_SECRET` and redirect URI must match the client registered in Fences exactly.
 
 3. **Restart Seahub**:
    ```bash

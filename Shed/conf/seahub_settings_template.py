@@ -22,6 +22,7 @@ SESSION_COOKIE_SAMESITE = 'Lax'
 # ==========================================
 ENABLE_OAUTH = os.environ.get('ENABLE_OAUTH', 'True').lower() in ('true', '1', 't')
 OAUTH_ENABLE_INSECURE_URI = os.environ.get('OAUTH_ENABLE_INSECURE_URI', 'False').lower() in ('true', '1', 't')
+OAUTH_PROVIDER = 'identity.eldervibe.dev'
 OAUTH_CLIENT_ID = os.environ.get('OAUTH_CLIENT_ID', 'storage')
 OAUTH_CLIENT_SECRET = os.environ.get('OAUTH_CLIENT_SECRET', '')
 OAUTH_REDIRECT_URL = os.environ.get('OAUTH_REDIRECT_URL', 'https://storage.eldervibe.dev/oauth/callback/')
