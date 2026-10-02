@@ -30,7 +30,7 @@ oidc_clients_json="$(printf '%s' "$FENCES_OIDC_CLIENTS_JSON" | jq -ec '
     select(type == "array" and length > 0)
     | select(all(.[]; type == "object" and
         ((keys - ["clientId", "redirectUri", "displayName", "clientSecret", "requirePkce", "postLogoutRedirectUri"]) | length == 0) and
-        (.clientId | type == "string" and test("^[a-z0-9][a-z0-9-]*$")) and
+        (.clientId | type == "string" and test("^[A-Za-z0-9][A-Za-z0-9_-]*$")) and
         (.redirectUri | type == "string" and startswith("https://")) and
         ((.displayName // "") | type == "string") and
         ((.clientSecret // "") | type == "string") and
