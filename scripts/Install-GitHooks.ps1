@@ -1,7 +1,7 @@
 #!/usr/bin/env pwsh
 <#
 .SYNOPSIS
-    One-time setup: activates the repo's shared git hooks (secret-scanning pre-commit, etc).
+    One-time setup: activates the repo's shared git hooks (secret-scanning pre-commit and pre-push).
 .DESCRIPTION
     Points core.hooksPath at the checked-in githooks/ folder and ensures the
     hook scripts are executable (needed on macOS/Linux; harmless on Windows).

@@ -1,0 +1,96 @@
+#!/bin/sh
+# Blocks git pushes that contain potential secrets (API keys, tokens, credentials, private keys).
+# Receives "<local_ref> <local_sha> <remote_ref> <remote_sha>" on standard input.
+# Bypass false positives with: git push --no-verify
+
+remote_name="$1"
+remote_url="$2"
+blocked=0
+z40="0000000000000000000000000000000000000000"
+
+report() {
+    file="$1"
+    label="$2"
+    commit="$3"
+    echo "pre-push: blocked - '$file' (in $commit) matches pattern: $label" >&2
+    blocked=1
+}
+
+check_added_lines() {
+    file="$1"
+    commit="$2"
+    lines="$3"
+
+    base=$(basename "$file")
+    case "$base" in
+        .env|.env.*)
+            case "$base" in
+                *.example|*.sample|*.template) : ;;
+                *) report "$file" "committing a .env file" "$commit" ;;
+            esac
+            ;;
+    esac
+
+    case "$file" in
+        deployment/*.crt|deployment/*.pem)
+            report "$file" "CA certificate under deployment/" "$commit"
+            ;;
+    esac
+
+    echo "$lines" | grep -Eqi 'AKIA[0-9A-Z]{16}' && report "$file" "AWS Access Key ID" "$commit"
+    echo "$lines" | grep -Eqi 'aws_secret_access_key[[:space:]]*=[[:space:]]*[A-Za-z0-9/+=]{40}' && report "$file" "AWS Secret Access Key" "$commit"
+    echo "$lines" | grep -Eqi '\-\-\-\-\-BEGIN[ A-Z]*PRIVATE KEY\-\-\-\-\-' && report "$file" "Private key block" "$commit"
+    echo "$lines" | grep -Eqi 'ghp_[A-Za-z0-9]{36}' && report "$file" "GitHub personal access token" "$commit"
+    echo "$lines" | grep -Eqi 'github_pat_[A-Za-z0-9_]{82}' && report "$file" "GitHub fine-grained personal access token" "$commit"
+    echo "$lines" | grep -Eqi 'gh[oprsu]_[A-Za-z0-9]{36}' && report "$file" "GitHub token (oauth/app/refresh/server)" "$commit"
+    echo "$lines" | grep -Eqi 'xox[baprs]-[A-Za-z0-9-]{10,}' && report "$file" "Slack token" "$commit"
+    echo "$lines" | grep -Eqi 'AIza[0-9A-Za-z_-]{35}' && report "$file" "Google API key" "$commit"
+    echo "$lines" | grep -Eqi 'sk-[A-Za-z0-9]{20,}' && report "$file" "Generic secret key (sk-...)" "$commit"
+    echo "$lines" | grep -Eqi 'sk-ant-[A-Za-z0-9_-]{20,}' && report "$file" "Anthropic secret key" "$commit"
+    echo "$lines" | grep -Eqi '[A-Za-z0-9+/]{6,}:[^[:space:]@]{6,}@[A-Za-z0-9.-]+(:[0-9]+)?/' && report "$file" "Connection string with credentials" "$commit"
+}
+
+scan_range() {
+    range="$1"
+    commits=$(git rev-list "$range" 2>/dev/null)
+    [ -z "$commits" ] && return 0
+
+    for commit in $commits; do
+        # Inspect files modified in this commit
+        files=$(git diff-tree --no-commit-id --name-only -r "$commit")
+        for file in $files; do
+            # Skip binary files and deleted files
+            added_lines=$(git show "$commit" -- "$file" 2>/dev/null | grep -E '^\+' | grep -Ev '^\+\+\+')
+            [ -z "$added_lines" ] && continue
+            check_added_lines "$file" "$commit" "$added_lines"
+        done
+    done
+}
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+    # Skip branch deletion
+    if [ "$local_sha" = "$z40" ]; then
+        continue
+    fi
+
+    if [ "$remote_sha" = "$z40" ]; then
+        # New branch: scan commits not in origin/main or last 30 commits
+        if git rev-parse --verify origin/main >/dev/null 2>&1; then
+            scan_range "origin/main..$local_sha"
+        else
+            scan_range "$local_sha -n 30"
+        fi
+    else
+        scan_range "$remote_sha..$local_sha"
+    fi
+done
+
+if [ "$blocked" -ne 0 ]; then
+    echo "" >&2
+    echo "Push blocked: secret(s) detected in outbound commits (see above)." >&2
+    echo "Remove the secret(s) from git history before pushing." >&2
+    echo "If this is a false positive, bypass with: git push --no-verify" >&2
+    exit 1
+fi
+
+exit 0
