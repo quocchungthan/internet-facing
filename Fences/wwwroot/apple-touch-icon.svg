@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#059669"/>
+      <stop offset="100%" stop-color="#047857"/>
+    </linearGradient>
+    <linearGradient id="beam" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#a7f3d0"/>
+      <stop offset="50%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#6ee7b7"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#022c22" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <rect width="180" height="180" rx="40" fill="url(#bg)"/>
+
+  <!-- Left Pillar / Document Ingest -->
+  <path d="M45 125V62C45 55.3726 50.3726 50 57 50H69C75.6274 50 81 55.3726 81 62V125" stroke="#ffffff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Right Pillar / Document Output -->
+  <path d="M99 125V62C99 55.3726 104.373 50 111 50H123C129.627 50 135 55.3726 135 62V125" stroke="#ffffff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Arch Bridge -->
+  <path d="M45 95C68 67 112 67 135 95" stroke="url(#beam)" stroke-width="9" stroke-linecap="round" filter="url(#shadow)"/>
+
+  <!-- Translation Nexus Pulse -->
+  <circle cx="90" cy="76" r="9" fill="#ffffff"/>
+  <circle cx="90" cy="76" r="14" stroke="#a7f3d0" stroke-width="4" stroke-opacity="0.6"/>
+
+  <!-- Ground Plane -->
+  <line x1="40" y1="125" x2="140" y2="125" stroke="#a7f3d0" stroke-width="7" stroke-linecap="round" stroke-opacity="0.8"/>
+</svg>
