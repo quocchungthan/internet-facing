@@ -273,10 +273,12 @@ fi
 legacy_cron=0
 legacy_pattern='scripts/backup\.sh|backup-fences\.sh|BackupNote\.sh|backup-storage\.sh'
 if have crontab; then
-	legacy_cron=$(( legacy_cron + $( (crontab -l -u root 2>/dev/null || true) | grep -cE "$legacy_pattern" || true) ))
+	crontab_matches=$( (crontab -l -u root 2>/dev/null || true) | (grep -cE "$legacy_pattern" || true) )
+	legacy_cron=$(( legacy_cron + ${crontab_matches:-0} ))
 fi
 if [[ -d /etc/cron.d ]]; then
-	legacy_cron=$(( legacy_cron + $(grep -lE "$legacy_pattern" /etc/cron.d/* 2>/dev/null | wc -l) ))
+	cron_d_matches=$( (grep -lE "$legacy_pattern" /etc/cron.d/* 2>/dev/null || true) | wc -l )
+	legacy_cron=$(( legacy_cron + ${cron_d_matches:-0} ))
 fi
 if (( legacy_cron > 0 )); then
 	warn "Found $legacy_cron cron entr(y/ies) that still call a removed backup script. Remove with: sudo crontab -l | grep -vE '$legacy_pattern' | sudo crontab -"
