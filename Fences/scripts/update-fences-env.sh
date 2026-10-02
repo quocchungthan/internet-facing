@@ -35,7 +35,9 @@ protected_keys=(
 staging_dir=""
 new_env_file=""
 cleanup() {
-    [[ -n "$staging_dir" ]] && rm -rf -- "$staging_dir"
+    if [[ -n "$staging_dir" ]]; then
+        rm -rf -- "$staging_dir"
+    fi
 }
 trap cleanup EXIT
 
@@ -213,7 +215,7 @@ mv -f -- "$new_env_file" "$runtime_env_file"
 rm -rf -- "$staging_dir"
 staging_dir=""
 
-echo "Updated keys: ${ordered_keys[*]}"
+echo "Updated ${#ordered_keys[@]} runtime keys."
 
 if [[ "$restart" == true ]]; then
     command -v docker >/dev/null 2>&1 || { echo "docker is required to restart Fences." >&2; exit 1; }
@@ -227,4 +229,5 @@ if [[ "$restart" == true ]]; then
     echo "Restarted $service_container using image $image"
 fi
 
+echo 'Fences runtime reconciliation complete.'
 exit 0
