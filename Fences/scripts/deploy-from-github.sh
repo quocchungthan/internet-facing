@@ -60,6 +60,8 @@ cleanup() {
 }
 trap cleanup EXIT
 trap 'exit 1' HUP INT TERM
+stage='prepare deployment'
+trap 'status=$?; printf "::error::Fences deployment failed during %s (exit %d).\n" "$stage" "$status" >&2; exit "$status"' ERR
 runtime_env_file="$work_dir/fences.env"
 {
     printf '%s\n' 'ASPNETCORE_ENVIRONMENT=Production'
@@ -111,16 +113,24 @@ ssh "${ssh_options[@]}" "$ssh_target" "set -euo pipefail; if docker container in
 state="$(ssh "${ssh_options[@]}" "$ssh_target" "set -euo pipefail; if [[ -n '${FENCES_DEPLOY_DIR:-}' && ( -e /etc/shuneo/fences.env || -L /etc/shuneo/fences.env || -e /etc/shuneo/fences-secrets || -L /etc/shuneo/fences-secrets || -e /var/lib/fences || -L /var/lib/fences ) ]]; then echo 'Legacy Fences state exists; migrate it before changing FENCES_DEPLOY_DIR.' >&2; exit 1; fi; if [[ -e '$remote_config_dir/fences.env' && -d '$remote_config_dir/fences-secrets' ]]; then echo existing; elif [[ ! -e '$remote_config_dir/fences.env' && ! -L '$remote_config_dir/fences.env' && ! -e '$remote_config_dir/fences-secrets' && ! -L '$remote_config_dir/fences-secrets' ]]; then echo new; else echo 'Incomplete Fences state; refusing to provision.' >&2; exit 1; fi" < /dev/null)"
 if [[ "$state" == existing ]]; then
     existing=true
+    stage='reconcile runtime environment'
     ssh "${ssh_options[@]}" "$ssh_target" "set -euo pipefail; test ! -L '$remote_config_dir/fences.env'; test -f '$remote_config_dir/fences.env'; test \"\$(stat -c '%u:%g:%a' '$remote_config_dir/fences.env')\" = 0:0:600; cp -p -- '$remote_config_dir/fences.env' '$remote_dir/previous.env'; FENCES_DEPLOY_DIR='${FENCES_DEPLOY_DIR:-}' bash '$remote_dir/update-fences-env.sh' --updates-file '$remote_dir/fences.env' --replace-oidc" < /dev/null
 elif [[ "$state" == new ]]; then
+    stage='provision runtime environment'
     ssh "${ssh_options[@]}" "$ssh_target" "FENCES_DEPLOY_DIR='${FENCES_DEPLOY_DIR:-}' bash '$remote_dir/provision-oidc-certificates.sh' --runtime-env-file '$remote_dir/fences.env'" < /dev/null
 else
     echo 'Invalid remote Fences state.' >&2; exit 1
 fi
+stage='load image on VPS'
+echo 'Loading Fences image on VPS.'
 docker save "$FENCES_IMAGE" | gzip | ssh "${ssh_options[@]}" "$ssh_target" 'docker load'
+echo 'Fences image loaded on VPS.'
+stage='transfer deployment wrapper'
 printf 'export FENCES_IMAGE=%q\nexport FENCES_DEPLOY_DIR=%q\nexport ACME_EMAIL=%q\nexport DEPLOY_COMMON_SCRIPT=%q\n' \
     "$FENCES_IMAGE" "${FENCES_DEPLOY_DIR:-}" "${ACME_EMAIL:-}" "$remote_dir/deploy-caddy-service.sh" > "$work_dir/wrapper.sh"
 cat Fences/scripts/deploy-fences.sh >> "$work_dir/wrapper.sh"
 scp "${scp_options[@]}" "$work_dir/wrapper.sh" "$ssh_target:$remote_dir/wrapper.sh"
+stage='start candidate and switch traffic'
+echo 'Starting Fences candidate deployment.'
 ssh "${ssh_options[@]}" "$ssh_target" "bash '$remote_dir/wrapper.sh'" < /dev/null
 committed=true
