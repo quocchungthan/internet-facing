@@ -47,7 +47,7 @@ To authenticate Seafile users via `identity.eldervibe.dev`:
    - Scopes: `openid`, `profile`, `email`
 
 2. **Configure Seahub** (reads from environment variables via container):
-   Pass environment variables in `/srv/storage/.env` or docker-compose:
+   The deploy workflow writes these values to `$STORAGE_DEPLOY_DIR/.env` and passes them to the Seafile container:
    ```bash
    OAUTH_CLIENT_ID=storage
    OAUTH_CLIENT_SECRET=<generated-secret>
@@ -57,28 +57,7 @@ To authenticate Seafile users via `identity.eldervibe.dev`:
    OAUTH_USER_INFO_URL=https://identity.eldervibe.dev/connect/userinfo
    ```
 
-   Place [Shed/conf/seahub_settings_template.py](Shed/conf/seahub_settings_template.py) into `/srv/storage/data/seafile/conf/seahub_settings.py`:
-   ```python
-   import os
-
-   ENABLE_OAUTH = os.environ.get('ENABLE_OAUTH', 'True').lower() in ('true', '1', 't')
-   OAUTH_CLIENT_ID = os.environ.get('OAUTH_CLIENT_ID', 'storage')
-   OAUTH_CLIENT_SECRET = os.environ.get('OAUTH_CLIENT_SECRET', '')
-   OAUTH_REDIRECT_URL = os.environ.get('OAUTH_REDIRECT_URL', 'https://storage.eldervibe.dev/oauth/callback/')
-   OAUTH_AUTHORIZATION_URL = os.environ.get('OAUTH_AUTHORIZATION_URL', 'https://identity.eldervibe.dev/connect/authorize')
-   OAUTH_TOKEN_URL = os.environ.get('OAUTH_TOKEN_URL', 'https://identity.eldervibe.dev/connect/token')
-   OAUTH_USER_INFO_URL = os.environ.get('OAUTH_USER_INFO_URL', 'https://identity.eldervibe.dev/connect/userinfo')
-   OAUTH_SCOPE = os.environ.get('OAUTH_SCOPE', 'openid profile email').split()
-   OAUTH_ATTRIBUTE_MAP = {
-       "id": (True, "email"),
-       "name": (False, "name"),
-       "email": (True, "email"),
-   }
-   OAUTH_ACTIVATE_USER_AFTER_CREATION = True
-   OAUTH_CREATE_UNKNOWN_USER = True
-   ```
-
-   The template sets `CSRF_TRUSTED_ORIGINS`, `SECURE_PROXY_SSL_HEADER`, and secure cookies for HTTPS behind Caddy. The deploy script appends the managed proxy block on each deploy so existing installations receive the fix without replacing their local Seahub settings. Restart `seafile-server` after deployment.
+      Keep Seafile's generated `data/seafile/conf/seahub_settings.py`, including its database, cache and secret-key settings. Do not replace it with the standalone template. The deploy script replaces only its managed block, adding HTTPS proxy and OAuth settings to existing installations without removing local Seahub configuration. It restarts `seafile-server` after updating the file. The `STORAGE_OAUTH_CLIENT_ID`, `STORAGE_OAUTH_CLIENT_SECRET` and redirect URI must match the client registered in Fences exactly.
 
 3. **Restart Seahub**:
    ```bash
