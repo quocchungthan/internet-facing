@@ -1,6 +1,7 @@
 name: Rebase sub branches
 
 on:
+  workflow_dispatch:
   workflow_run:
     workflows:
       - Build without warnings
@@ -10,7 +11,6 @@ on:
 permissions:
   contents: write
   actions: write
-  workflows: write
 
 concurrency:
   group: rebase-sub-branches
@@ -19,8 +19,9 @@ concurrency:
 jobs:
   rebase:
     if: >-
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.head_branch == 'main'
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main')
     runs-on: ubuntu-latest
 
     steps:

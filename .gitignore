@@ -7,6 +7,7 @@ appsettings.*.json
 MailBox/web/static/shared/
 MailBox/web/static/favicon.ico
 MailBox/web/static/favicon.svg
+MailBox/web/static/apple-touch-icon.svg
 MailBox/web/static/icons.svg
 MailBox/runtime/
 MailBox/secrets/
