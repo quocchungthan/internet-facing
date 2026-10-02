@@ -30,7 +30,7 @@ Set OAuth secrets with environment variables rather than committing them:
 
 OIDC uses OpenIddict 7.0.0 with EF Core SQLite persistence. The stable subject is `github:<numeric-github-id>`, so a GitHub rename does not change the OIDC subject. The issuer is `https://identity.eldervibe.dev`.
 
-`IdentityApp:OidcClients` is an indexed array and registers as many clients as needed at startup; clients that already exist are updated in place from the current configuration on every start. The client id is the service's subdomain label. Each client needs a `ClientId`, one or more exact `RedirectUris`, and optional `DisplayName`, `ClientSecret`, `RequirePkce`, and `PostLogoutRedirectUris`; do not add wildcard redirect URIs.
+`IdentityApp:OidcClients` is an indexed array and registers as many clients as needed at startup; clients that already exist are updated in place from the current configuration on every start. Each client ID must match the consuming service's configured ID exactly. Each client needs a `ClientId`, one or more exact `RedirectUris`, and optional `DisplayName`, `ClientSecret`, `RequirePkce`, and `PostLogoutRedirectUris`; do not add wildcard redirect URIs.
 
 PKCE policy: a client without `ClientSecret` is public and must use PKCE. A client with `ClientSecret` is confidential and PKCE is optional, unless `RequirePkce=true` forces it (used for `note`/AFFiNE). A missing `RequirePkce` means `false`.
 
