@@ -34,6 +34,31 @@ warn() { printf '::warning::%s\n' "$*" >&2; }
 die() { printf '::error::%s\n' "$*" >&2; exit 1; }
 have() { command -v "$1" >/dev/null 2>&1; }
 
+if ! have sqlite3; then
+	if have apt-get; then
+		export DEBIAN_FRONTEND=noninteractive
+		apt-get update -qq >/dev/null 2>&1 && apt-get install -y -qq --no-install-recommends sqlite3 >/dev/null 2>&1 || true
+	fi
+fi
+if ! have sqlite3 && have python3; then
+	sqlite3() {
+		local db="$1" cmd="$2"
+		python3 -c '
+import os, re, sqlite3, sys
+db_path, cmd = sys.argv[1], sys.argv[2]
+m = re.match(r"^\.backup\s+[\x27\"]?([^\x27\"]+)[\x27\"]?$", cmd)
+if not m:
+    sys.exit(1)
+dest_path = m.group(1)
+src = sqlite3.connect(f"file:{os.path.abspath(db_path)}?mode=ro", uri=True)
+dst = sqlite3.connect(dest_path)
+src.backup(dst)
+dst.close()
+src.close()
+' "$db" "$cmd"
+	}
+fi
+
 [[ "$EUID" -eq 0 ]] || die "backup-all.sh must run as root (VPS_USER=root or passwordless sudo)."
 [[ "$BACKUP_KEEP" =~ ^[1-9][0-9]*$ ]] || die "BACKUP_KEEP must be a positive integer."
 for path_var in BACKUP_ROOT MAILBOX_DEPLOY_DIR STORAGE_DEPLOY_DIR AFFINE_DEPLOY_DIR; do

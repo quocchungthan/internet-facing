@@ -164,7 +164,8 @@ apt-get install -y --no-install-recommends \
     git \
     tmux \
     htop \
-    ufw
+    ufw \
+    sqlite3
 
 log_success "Base packages installed"
 
