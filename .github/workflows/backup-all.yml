@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: backup-all-production
+  group: fences-and-backup-production
   cancel-in-progress: false
 
 jobs:
@@ -54,6 +54,7 @@ jobs:
           MAILBOX_DEPLOY_DIR: ${{ vars.MAILBOX_DEPLOY_DIR }}
           STORAGE_DEPLOY_DIR: ${{ vars.STORAGE_DEPLOY_DIR }}
           AFFINE_DEPLOY_DIR: ${{ vars.AFFINE_DEPLOY_DIR }}
+          FENCES_DEPLOY_DIR: ${{ vars.FENCES_DEPLOY_DIR }}
           BACKUP_GIT_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
@@ -62,9 +63,13 @@ jobs:
 
           # Unset variables fall back to the defaults inside scripts/backup-all.sh.
           remote_env="BACKUP_GIT_SHA=$BACKUP_GIT_SHA"
-          for name in MAILBOX_DEPLOY_DIR STORAGE_DEPLOY_DIR AFFINE_DEPLOY_DIR; do
+          for name in MAILBOX_DEPLOY_DIR STORAGE_DEPLOY_DIR AFFINE_DEPLOY_DIR FENCES_DEPLOY_DIR; do
             value="${!name:-}"
             [[ -z "$value" ]] && continue
+            if [[ "$name" == FENCES_DEPLOY_DIR && ! "$value" =~ ^/[A-Za-z0-9_-][A-Za-z0-9._-]*(/[A-Za-z0-9_-][A-Za-z0-9._-]*)*$ ]]; then
+              echo "::error::FENCES_DEPLOY_DIR must be an absolute path without dot or parent segments."
+              exit 1
+            fi
             if [[ ! "$value" =~ ^/[A-Za-z0-9._/-]+$ || "$value" == "/" ]]; then
               echo "::error::Variable $name must be an absolute path."
               exit 1

@@ -13,8 +13,14 @@ umask 077
 : "${STORAGE_DEPLOY_DIR:=/srv/storage}"
 : "${AFFINE_DEPLOY_DIR:=/opt/affine-note}"
 
-FENCES_CONFIG_DIR=/etc/shuneo
-FENCES_DATA_DIR=/var/lib/fences
+if [[ -n "${FENCES_DEPLOY_DIR:-}" ]]; then
+	[[ "$FENCES_DEPLOY_DIR" =~ ^/[A-Za-z0-9_-][A-Za-z0-9._-]*(/[A-Za-z0-9_-][A-Za-z0-9._-]*)*$ ]] || { echo 'FENCES_DEPLOY_DIR must be an absolute path without dot or parent segments.' >&2; exit 1; }
+	FENCES_CONFIG_DIR="$FENCES_DEPLOY_DIR"
+	FENCES_DATA_DIR="$FENCES_DEPLOY_DIR/data"
+else
+	FENCES_CONFIG_DIR=/etc/shuneo
+	FENCES_DATA_DIR=/var/lib/fences
+fi
 FENCES_CONTAINER=shuneo-fences
 FARM_CONTAINER=eldervibe-farm
 FARM_STATIC_ROOT=/var/lib/caddy/farm/hanging-post
@@ -33,6 +39,9 @@ have() { command -v "$1" >/dev/null 2>&1; }
 for path_var in BACKUP_ROOT MAILBOX_DEPLOY_DIR STORAGE_DEPLOY_DIR AFFINE_DEPLOY_DIR; do
 	[[ "${!path_var}" =~ ^/[A-Za-z0-9._/-]+$ && "${!path_var}" != "/" ]] || die "$path_var must be an absolute path."
 done
+if [[ -n "${FENCES_DEPLOY_DIR:-}" && ( "$FENCES_DEPLOY_DIR/" == "$BACKUP_ROOT/"* || "$BACKUP_ROOT/" == "$FENCES_DEPLOY_DIR/"* ) ]]; then
+	die "FENCES_DEPLOY_DIR and BACKUP_ROOT must not overlap."
+fi
 [[ "$BACKUP_GIT_SHA" =~ ^[A-Za-z0-9]+$ ]] || BACKUP_GIT_SHA=unknown
 
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
@@ -139,6 +148,10 @@ sqlite_snapshot() {
 		fi
 		return 0
 	fi
+	if [[ "$service" == fences ]]; then
+		record "$id" "$service" failed "$db" - "sqlite3 is required for a consistent live Fences database backup"
+		return 0
+	fi
 	cp -a -- "$db" "$dest"
 	local suffix
 	for suffix in -wal -shm; do
@@ -195,7 +208,12 @@ fi
 
 # ---- Fences (sub/identity) ----------------------------------------------------
 if [[ -e "$FENCES_CONFIG_DIR/fences.env" || -d "$FENCES_DATA_DIR" ]] || container_exists "$FENCES_CONTAINER"; then
-	copy_path fences-config fences required "$FENCES_CONFIG_DIR"
+	# The data directory holds SQLite files; snapshot those separately rather than copying live DB files.
+	if [[ -n "${FENCES_DEPLOY_DIR:-}" ]]; then
+		copy_path fences-config fences required "$FENCES_CONFIG_DIR" --exclude='data'
+	else
+		copy_path fences-config fences required "$FENCES_CONFIG_DIR"
+	fi
 	copy_path fences-data fences required "$FENCES_DATA_DIR" \
 		--exclude='*.db' --exclude='*.db-wal' --exclude='*.db-shm' --exclude='*.db-journal'
 	if [[ -d "$FENCES_DATA_DIR" ]]; then
@@ -205,6 +223,17 @@ if [[ -e "$FENCES_CONFIG_DIR/fences.env" || -d "$FENCES_DATA_DIR" ]] || containe
 	fi
 else
 	record fences fences missing "$FENCES_CONFIG_DIR" - "Fences not installed"
+fi
+if [[ -n "${FENCES_DEPLOY_DIR:-}" && ( -e /etc/shuneo/fences.env || -d /var/lib/fences ) ]]; then
+	warn "Legacy Fences material remains; including it separately until migration is complete."
+	copy_path fences-legacy-config fences required /etc/shuneo
+	copy_path fences-legacy-data fences required /var/lib/fences \
+		--exclude='*.db' --exclude='*.db-wal' --exclude='*.db-shm' --exclude='*.db-journal'
+	if [[ -d /var/lib/fences ]]; then
+		while IFS= read -r -d '' fences_db; do
+			sqlite_snapshot "fences-legacy-db-$(basename -- "$fences_db" .db)" fences "$fences_db"
+		done < <(find /var/lib/fences -type f -name '*.db' -print0)
+	fi
 fi
 
 # ---- MailBox / Maddy (sub/mail) ----------------------------------------------
@@ -342,9 +371,17 @@ restore_cmd() { # <zip path> <original path>
 	printf '### Farm (main, eldervibe.dev)\n\nRedeploy with the `build-deploy-farm.yml` workflow (the image is rebuilt, the container is stateless). Then, if needed:\n\n'
 	printf '```bash\nrsync -a files%s/ %s/\nchown -R caddy:caddy %s\n```\n\n' "$FARM_STATIC_ROOT" "$FARM_STATIC_ROOT" "$FARM_STATIC_ROOT"
 	printf '### Fences (identity)\n\n```bash\ndocker stop %s\n' "$FENCES_CONTAINER"
+	if [[ -n "${FENCES_DEPLOY_DIR:-}" ]]; then
+		printf '# Restore to FENCES_DEPLOY_DIR=%s; set the same GitHub variable before re-deploying.\n' "$FENCES_DEPLOY_DIR"
+		printf 'mkdir -p %s\n' "$FENCES_DATA_DIR"
+	fi
 	printf 'rsync -a files%s/ %s/\nrsync -a files%s/ %s/\n' "$FENCES_CONFIG_DIR" "$FENCES_CONFIG_DIR" "$FENCES_DATA_DIR" "$FENCES_DATA_DIR"
 	printf '# identity.db came from `sqlite3 .backup` unless the note says otherwise: drop stale WAL files first\nrm -f %s/*.db-wal %s/*.db-shm\n' "$FENCES_DATA_DIR" "$FENCES_DATA_DIR"
 	printf 'chown root:root %s %s/fences.env; chmod 700 %s/fences-secrets; chmod 600 %s/fences.env %s/fences-secrets/*\n' "$FENCES_CONFIG_DIR" "$FENCES_CONFIG_DIR" "$FENCES_CONFIG_DIR" "$FENCES_CONFIG_DIR" "$FENCES_CONFIG_DIR"
+	printf 'chmod 700 %s\n' "$FENCES_DATA_DIR"
+	if [[ -n "${FENCES_DEPLOY_DIR:-}" ]]; then
+		printf '# Legacy Fences files, when present, are also in files/etc/shuneo/ and files/var/lib/fences/. Do not merge them with the configured installation; reconcile them offline before restarting.\n'
+	fi
 	printf 'docker start %s   # or re-run deploy-fences.yml\n```\n\n' "$FENCES_CONTAINER"
 	printf '### MailBox / Maddy (mail)\n\n```bash\ncd %s\ndocker compose stop web maddy\n' "$mail_dir"
 	printf 'for p in .env compose.yaml secrets maddy runtime/mail/dkim_keys runtime/letsencrypt runtime/ca; do [ -e "/root/restore/files%s/$p" ] && cp -a "/root/restore/files%s/$p" "$(dirname "%s/$p")/"; done\n' "$mail_dir" "$mail_dir" "$mail_dir"
