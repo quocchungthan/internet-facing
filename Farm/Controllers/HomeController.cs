@@ -17,6 +17,14 @@ public class HomeController : Controller
         return View("Index");
     }
 
+    [HttpGet("tracker")]
+    [HttpGet("brick")]
+    [HttpGet("bricks")]
+    public IActionResult Tracker()
+    {
+        return View("Index");
+    }
+
     public IActionResult Privacy()
     {
         return View();

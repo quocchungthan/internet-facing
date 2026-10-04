@@ -106,4 +106,18 @@ public class ApiEndpointsTests : IClassFixture<WebApplicationFactory<Program>>
         Assert.True(lastResponse.Headers.Contains("X-Client-Status"));
         Assert.Equal("RateLimitExceeded", lastResponse.Headers.GetValues("X-Client-Status").First());
     }
+
+    [Theory]
+    [InlineData("/")]
+    [InlineData("/winchester")]
+    [InlineData("/tracker")]
+    [InlineData("/brick")]
+    public async Task DirectRouteAccess_Returns_Success(string route)
+    {
+        var client = _factory.CreateClient();
+        var response = await client.GetAsync(route);
+        response.EnsureSuccessStatusCode();
+        var content = await response.Content.ReadAsStringAsync();
+        Assert.Contains("<div id=\"root\"></div>", content);
+    }
 }
