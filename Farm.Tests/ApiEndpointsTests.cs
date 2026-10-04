@@ -4,6 +4,7 @@ using System.Text.Json;
 using Farm.Data;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -11,6 +12,11 @@ namespace Farm.Tests;
 
 public class ApiEndpointsTests : IClassFixture<WebApplicationFactory<Program>>
 {
+    static ApiEndpointsTests()
+    {
+        Environment.SetEnvironmentVariable("USE_IN_MEMORY_DATABASE", "true");
+    }
+
     private readonly WebApplicationFactory<Program> _factory;
 
     public ApiEndpointsTests(WebApplicationFactory<Program> factory)
