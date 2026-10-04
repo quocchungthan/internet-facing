@@ -1,0 +1,28 @@
+// Microsoft Theme for Tab Bar Item 1 and shared Microsoft styles
+$ms-primary: #0078d4;
+$ms-primary-dark: #005a9e;
+$ms-primary-light: #e5f1fb;
+$ms-border: #e1dfdd;
+$ms-text-primary: #201f1e;
+$ms-text-secondary: #605e5c;
+$ms-font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+
+.tab-microsoft {
+  font-family: $ms-font-family;
+  color: $ms-text-secondary;
+  font-weight: 600;
+  position: relative;
+  transition: all 0.2s cubic-bezier(0.1, 0.9, 0.2, 1);
+
+  &:hover {
+    color: $ms-primary;
+    background-color: rgba($ms-primary, 0.04);
+  }
+
+  &.tabActive {
+    color: $ms-primary;
+    font-weight: 700;
+    border-bottom: 3px solid $ms-primary;
+    background-color: rgba($ms-primary, 0.06);
+  }
+}

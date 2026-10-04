@@ -1,16 +1,32 @@
 import { useEffect, useState } from 'react'
+import { MicrosoftTab } from '@farm/microsoft'
+import { BrickTracker } from './BrickTracker'
+import { WinchesterView } from './WinchesterView'
 import './App.css'
+import './themes/microsoft/microsoft.scss'
+import './themes/brick/brick.scss'
+import './themes/winchester/winchester.scss'
 
-const tabs = [
-  { label: 'Elder Vibe Coder', path: '/' },
-  { label: 'Winchester', path: '/winchester' },
-]
-
-function getPathname() {
-  return window.location.pathname === '/winchester' ? '/winchester' : '/'
+interface TabDefinition {
+  label: string
+  path: string
+  themeClass: string
 }
 
-function App() {
+const tabs: TabDefinition[] = [
+  { label: 'Elder Vibe Coder', path: '/', themeClass: 'tab-microsoft' },
+  { label: 'Brick Tracker', path: '/tracker', themeClass: 'tab-brick' },
+  { label: 'Winchester', path: '/winchester', themeClass: 'tab-winchester' },
+]
+
+function getPathname(): string {
+  const path = window.location.pathname.toLowerCase()
+  if (path === '/winchester') return '/winchester'
+  if (path === '/tracker' || path === '/brick' || path === '/bricks') return '/tracker'
+  return '/'
+}
+
+export function App() {
   const [pathname, setPathname] = useState(getPathname)
 
   useEffect(() => {
@@ -21,10 +37,7 @@ function App() {
   }, [])
 
   const navigate = (path: string) => {
-    if (path === pathname) {
-      return
-    }
-
+    if (path === pathname) return
     window.history.pushState(null, '', path)
     setPathname(path)
   }
@@ -32,31 +45,29 @@ function App() {
   return (
     <main className="app-shell">
       <nav className="tab-list" aria-label="Primary navigation">
-        {tabs.map((tab) => (
-          <a
-            aria-current={pathname === tab.path ? 'page' : undefined}
-            className={`tab${pathname === tab.path ? ' tabActive' : ''}`}
-            href={tab.path}
-            key={tab.path}
-            onClick={(event) => {
-              event.preventDefault()
-              navigate(tab.path)
-            }}
-          >
-            {tab.label}
-          </a>
-        ))}
+        {tabs.map((tab) => {
+          const isActive = pathname === tab.path
+          return (
+            <a
+              key={tab.path}
+              href={tab.path}
+              aria-current={isActive ? 'page' : undefined}
+              className={`tab ${tab.themeClass}${isActive ? ' tabActive' : ''}`}
+              onClick={(event) => {
+                event.preventDefault()
+                navigate(tab.path)
+              }}
+            >
+              {tab.label}
+            </a>
+          )
+        })}
       </nav>
-      <section className="content" aria-labelledby="page-title">
-        <p className="eyebrow">Farm</p>
-        <h1 id="page-title">
-          {pathname === '/winchester' ? 'Winchester' : 'Elder Vibe Coder'}
-        </h1>
-        <p className="intro">
-          {pathname === '/winchester'
-            ? 'A focused space for Winchester.'
-            : 'A practical home for thoughtful software work.'}
-        </p>
+
+      <section className="tab-content" aria-live="polite">
+        {pathname === '/' && <MicrosoftTab />}
+        {pathname === '/tracker' && <BrickTracker />}
+        {pathname === '/winchester' && <WinchesterView />}
       </section>
     </main>
   )

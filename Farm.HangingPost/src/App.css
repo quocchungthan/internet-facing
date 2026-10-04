@@ -38,6 +38,12 @@
   color: var(--text);
 }
 
+.tab-content {
+  margin: 0 auto;
+  max-width: 1040px;
+  padding: 32px 16px 40px;
+}
+
 .content {
   margin: 0 auto;
   max-width: 720px;

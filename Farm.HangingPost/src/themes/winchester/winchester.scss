@@ -1,0 +1,116 @@
+// Winchester Theme - Sam and Dean Case Solving Style
+$winchester-primary: #8b5a2b; // Leather brown
+$winchester-dark: #2c221e;
+$winchester-parchment: #fdfaf5;
+$winchester-border: #d4c5b9;
+$winchester-blood-red: #8b0000;
+$winchester-accent: #c49a45; // Hunter brass
+$winchester-muted: #6e645e;
+
+.tab-winchester {
+  font-family: 'Georgia', 'Times New Roman', serif;
+  color: #5c4e43;
+  font-weight: 600;
+  position: relative;
+  transition: all 0.2s ease;
+
+  &:hover {
+    color: $winchester-primary;
+    background-color: rgba($winchester-primary, 0.05);
+  }
+
+  &.tabActive {
+    color: $winchester-dark;
+    font-weight: 700;
+    border-bottom: 3px solid $winchester-primary;
+    background-color: rgba($winchester-primary, 0.08);
+  }
+}
+
+.winchester-container {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem;
+  text-align: left;
+  font-family: 'Georgia', 'Times New Roman', serif;
+}
+
+.winchester-header {
+  border-bottom: 2px solid $winchester-border;
+  padding-bottom: 1.5rem;
+  margin-bottom: 2rem;
+
+  .journal-badge {
+    display: inline-block;
+    background: $winchester-dark;
+    color: $winchester-accent;
+    font-size: 0.75rem;
+    font-family: -apple-system, sans-serif;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 0.25rem 0.6rem;
+    border-radius: 3px;
+    margin-bottom: 0.5rem;
+  }
+
+  h1 {
+    font-size: 2.25rem;
+    margin: 0.25rem 0;
+    color: $winchester-dark;
+    letter-spacing: -0.02em;
+  }
+
+  p {
+    font-style: italic;
+    color: $winchester-muted;
+    margin: 0.25rem 0 0;
+    font-size: 1.0625rem;
+  }
+}
+
+.winchester-case-board {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.5rem;
+}
+
+.case-card {
+  background: $winchester-parchment;
+  border: 1px solid $winchester-border;
+  border-left: 5px solid $winchester-primary;
+  border-radius: 4px;
+  padding: 1.25rem;
+  box-shadow: 2px 3px 10px rgba(44, 34, 30, 0.06);
+
+  .case-status {
+    font-family: -apple-system, sans-serif;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: $winchester-blood-red;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.5rem;
+  }
+
+  h3 {
+    margin: 0 0 0.5rem;
+    font-size: 1.25rem;
+    color: $winchester-dark;
+  }
+
+  p {
+    font-size: 0.9375rem;
+    color: $winchester-muted;
+    line-height: 1.5;
+    margin: 0 0 0.75rem;
+  }
+
+  .case-meta {
+    font-family: -apple-system, sans-serif;
+    font-size: 0.75rem;
+    color: #8c827a;
+    border-top: 1px dashed $winchester-border;
+    padding-top: 0.5rem;
+  }
+}

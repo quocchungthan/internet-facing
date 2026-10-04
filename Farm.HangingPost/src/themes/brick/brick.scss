@@ -1,0 +1,262 @@
+// Brick Style & Habit Tracker Theme
+$brick-primary: #b24c29;
+$brick-dark: #8c3518;
+$brick-light: #f5ebe6;
+$brick-mortar: #d8cfca;
+$brick-bg: #2d2624;
+$brick-surface: #ffffff;
+$brick-text: #2c2523;
+$brick-muted: #7d716d;
+
+.tab-brick {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: #695e59;
+  font-weight: 600;
+  position: relative;
+  transition: all 0.2s ease;
+
+  &:hover {
+    color: $brick-primary;
+    background-color: rgba($brick-primary, 0.05);
+  }
+
+  &.tabActive {
+    color: $brick-primary;
+    font-weight: 700;
+    border-bottom: 3px solid $brick-primary;
+    background-color: rgba($brick-primary, 0.08);
+  }
+}
+
+.brick-container {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem;
+  text-align: left;
+}
+
+.brick-header {
+  margin-bottom: 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 1rem;
+
+  .brick-title-group {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+
+    .brick-icon {
+      font-size: 1.75rem;
+      background: $brick-light;
+      border: 1px solid $brick-mortar;
+      border-radius: 8px;
+      padding: 0.35rem 0.6rem;
+      color: $brick-primary;
+    }
+
+    h2 {
+      margin: 0;
+      font-size: 1.625rem;
+      font-weight: 700;
+      color: $brick-text;
+    }
+  }
+
+  .brick-subtitle {
+    margin: 0.35rem 0 0 54px;
+    font-size: 0.9375rem;
+    color: $brick-muted;
+  }
+}
+
+// Platform Filter Chips
+.brick-platform-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.brick-platform-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.85rem;
+  border-radius: 20px;
+  border: 1px solid $brick-mortar;
+  background: #ffffff;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  .platform-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+
+  &:hover {
+    border-color: $brick-primary;
+  }
+
+  &.active {
+    color: #ffffff;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  }
+}
+
+// Habit Tracker Matrix (like GitHub contributions)
+.brick-tracker-card {
+  background: #ffffff;
+  border: 1px solid $brick-mortar;
+  border-radius: 10px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 2px 8px rgba(45, 38, 36, 0.05);
+
+  .tracker-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.25rem;
+
+    h3 {
+      margin: 0;
+      font-size: 1.125rem;
+      font-weight: 600;
+      color: $brick-text;
+    }
+
+    .tracker-stats {
+      font-size: 0.8125rem;
+      color: $brick-muted;
+      display: flex;
+      gap: 1rem;
+      strong {
+        color: $brick-text;
+      }
+    }
+  }
+
+  .tracker-grid-container {
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
+  }
+
+  .tracker-grid {
+    display: inline-grid;
+    grid-template-rows: repeat(7, 14px);
+    grid-auto-flow: column;
+    grid-auto-columns: 14px;
+    gap: 4px;
+    padding: 2px;
+  }
+
+  .tracker-brick {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    background-color: #ebedf0;
+    transition: transform 0.1s ease, outline 0.1s ease;
+    cursor: pointer;
+
+    &:hover {
+      transform: scale(1.3);
+      z-index: 2;
+      outline: 1px solid rgba(0, 0, 0, 0.3);
+    }
+  }
+
+  .tracker-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 1rem;
+    font-size: 0.75rem;
+    color: $brick-muted;
+
+    .legend-group {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+
+      .legend-brick {
+        width: 12px;
+        height: 12px;
+        border-radius: 2px;
+      }
+    }
+  }
+}
+
+// Feeds Cards Grid
+.brick-feeds-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.25rem;
+}
+
+.brick-feed-card {
+  background: #ffffff;
+  border: 1px solid $brick-mortar;
+  border-top: 4px solid var(--card-color, $brick-primary);
+  border-radius: 8px;
+  padding: 1.25rem;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.08);
+  }
+
+  .feed-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+
+    .feed-platform {
+      font-weight: 700;
+      font-size: 1rem;
+      color: $brick-text;
+    }
+
+    .feed-tag {
+      font-size: 0.75rem;
+      padding: 0.2rem 0.5rem;
+      border-radius: 12px;
+      background-color: var(--card-light, #f5f5f5);
+      color: var(--card-color, $brick-primary);
+      font-weight: 600;
+    }
+  }
+
+  .feed-desc {
+    font-size: 0.875rem;
+    color: $brick-muted;
+    margin: 0 0 1rem;
+    line-height: 1.4;
+  }
+
+  .feed-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--card-color, $brick-primary);
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}

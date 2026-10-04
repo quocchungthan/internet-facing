@@ -6,6 +6,8 @@ on:
       - main
     paths:
       - Farm/**
+      - Farm.Data/**
+      - Farm.Microsoft/**
       - Farm.HangingPost/**
       - .github/workflows/build-deploy-farm.yml
       - .github/workflows/reusable-deploy-service.yml
@@ -38,16 +40,20 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22.x
-          cache: npm
-          cache-dependency-path: Farm.HangingPost/package-lock.json
 
       - name: Restore .NET dependencies
         run: dotnet restore PiggyFarm.slnx
 
+      - name: Build Microsoft frontend
+        working-directory: Farm.Microsoft
+        run: |
+          npm install
+          npm run build
+
       - name: Build HangingPost frontend
         working-directory: Farm.HangingPost
         run: |
-          npm ci
+          npm install
           npm run build
 
       - name: Test solution

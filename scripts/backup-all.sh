@@ -23,6 +23,8 @@ else
 fi
 FENCES_CONTAINER=shuneo-fences
 FARM_CONTAINER=eldervibe-farm
+FARM_DB_CONTAINER=eldervibe-farm-postgres
+FARM_CONFIG_DIR=/etc/farm
 FARM_STATIC_ROOT=/var/lib/caddy/farm/hanging-post
 SEAFILE_CONTAINER=seafile-server
 SEAFILE_DB_CONTAINER=seafile-mysql
@@ -224,9 +226,13 @@ else
 fi
 
 # ---- Farm (main, eldervibe.dev) ---------------------------------------------
-if [[ -d "$FARM_STATIC_ROOT" ]] || container_exists "$FARM_CONTAINER"; then
-	COPY_NOTE="HangingPost static release; container env file is /dev/null (stateless)" \
-		copy_path farm-hanging-post farm required "$FARM_STATIC_ROOT"
+if [[ -d "$FARM_STATIC_ROOT" ]] || container_exists "$FARM_CONTAINER" || container_exists "$FARM_DB_CONTAINER"; then
+	copy_path farm-hanging-post farm required "$FARM_STATIC_ROOT"
+	copy_path farm-config farm optional "$FARM_CONFIG_DIR"
+	if container_exists "$FARM_DB_CONTAINER"; then
+		dump_to farm-postgres farm "$FARM_DB_CONTAINER" dumps/farm-postgres.sql 'Farm PostgreSQL database dump complete' -- \
+			'set -- "${POSTGRES_PASSWORD:-}"; PGPASSWORD="$1" exec pg_dump -U "${POSTGRES_USER:-postgres}" -d "${POSTGRES_DB:-aurafarming}" --clean --if-exists'
+	fi
 else
 	record farm farm missing "$FARM_STATIC_ROOT" - "Farm not deployed"
 fi
@@ -393,8 +399,9 @@ restore_cmd() { # <zip path> <original path>
 	printf '[ -e files/etc/default/caddy ] && cp -a files/etc/default/caddy /etc/default/caddy\n'
 	printf '[ -d files/etc/systemd/system/caddy.service.d ] && rsync -a files/etc/systemd/system/caddy.service.d/ /etc/systemd/system/caddy.service.d/ && systemctl daemon-reload\n'
 	printf 'chown -R caddy:caddy %s/.local/share/caddy\ncaddy validate --config /etc/caddy/Caddyfile --adapter caddyfile\nsystemctl start caddy\n```\n\n' "$caddy_home"
-	printf '### Farm (main, eldervibe.dev)\n\nRedeploy with the `build-deploy-farm.yml` workflow (the image is rebuilt, the container is stateless). Then, if needed:\n\n'
-	printf '```bash\nrsync -a files%s/ %s/\nchown -R caddy:caddy %s\n```\n\n' "$FARM_STATIC_ROOT" "$FARM_STATIC_ROOT" "$FARM_STATIC_ROOT"
+	printf '### Farm (main, eldervibe.dev)\n\nRedeploy with the `build-deploy-farm.yml` workflow. Restore static assets and PostgreSQL database if needed:\n\n'
+	printf '```bash\nrsync -a files%s/ %s/\nchown -R caddy:caddy %s\n' "$FARM_STATIC_ROOT" "$FARM_STATIC_ROOT" "$FARM_STATIC_ROOT"
+	printf 'if [[ -f /root/restore/dumps/farm-postgres.sql ]]; then\n  docker exec -i %s psql -U postgres -d aurafarming < /root/restore/dumps/farm-postgres.sql\nfi\n```\n\n' "$FARM_DB_CONTAINER"
 	printf '### Fences (identity)\n\n```bash\ndocker stop %s\n' "$FENCES_CONTAINER"
 	if [[ -n "${FENCES_DEPLOY_DIR:-}" ]]; then
 		printf '# Restore to FENCES_DEPLOY_DIR=%s; set the same GitHub variable before re-deploying.\n' "$FENCES_DEPLOY_DIR"

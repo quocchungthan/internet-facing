@@ -1,3 +1,5 @@
 <Solution>
     <Project Path="Farm/Farm.csproj" />
+    <Project Path="Farm.Data/Farm.Data.csproj" />
+    <Project Path="Farm.Tests/Farm.Tests.csproj" />
 </Solution>

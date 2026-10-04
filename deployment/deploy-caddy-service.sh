@@ -21,6 +21,7 @@ set -Eeuo pipefail
 : "${SERVICE_STATIC_PUBLIC_PREFIX:=}"
 : "${CADDY_USER:=caddy}"
 : "${CADDY_GROUP:=caddy}"
+: "${SERVICE_EXTRA_ARGS:=}"
 
 as_root() {
 	if [[ "$EUID" -eq 0 ]]; then
@@ -155,9 +156,15 @@ if [[ -n "$SERVICE_VOLUME" ]]; then
 	docker_volume_args+=(--volume "$SERVICE_VOLUME")
 fi
 
+docker_extra_args=()
+if [[ -n "$SERVICE_EXTRA_ARGS" ]]; then
+	read -ra docker_extra_args <<< "$SERVICE_EXTRA_ARGS"
+fi
+
 docker run --detach --name "$candidate_container" --restart no \
 	--publish "127.0.0.1:$candidate_port:80" \
 	"${docker_volume_args[@]}" \
+	${docker_extra_args+"${docker_extra_args[@]}"} \
 	--env-file "$SERVICE_ENV_FILE" "$SERVICE_IMAGE" >/dev/null
 candidate_started=true
 

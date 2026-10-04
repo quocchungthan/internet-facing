@@ -1,0 +1,309 @@
+// Microsoft Theme SCSS - Fluent Design System
+$ms-primary: #0078d4;
+$ms-primary-dark: #005a9e;
+$ms-primary-darker: #004578;
+$ms-primary-light: #e5f1fb;
+$ms-bg: #f8f9fa;
+$ms-surface: #ffffff;
+$ms-border: #e1dfdd;
+$ms-border-focus: #0078d4;
+$ms-text-primary: #201f1e;
+$ms-text-secondary: #605e5c;
+$ms-text-disabled: #a19f9d;
+$ms-success: #107c41;
+$ms-success-bg: #dff6dd;
+$ms-warning: #797673;
+$ms-warning-bg: #fff4ce;
+$ms-error: #d83b01;
+$ms-error-bg: #fed9cc;
+$ms-code-bg: #1e1e1e;
+$ms-code-text: #d4d4d4;
+$ms-font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', sans-serif;
+$ms-font-mono: 'Cascadia Code', 'Segoe UI Mono', Consolas, 'Courier New', monospace;
+
+// Shared Tab Item 1 Style
+.tab-microsoft {
+  font-family: $ms-font-family;
+  color: $ms-text-secondary;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  transition: all 0.2s cubic-bezier(0.1, 0.9, 0.2, 1);
+  position: relative;
+
+  &:hover {
+    color: $ms-primary;
+    background-color: rgba($ms-primary, 0.04);
+  }
+
+  &.tab-active {
+    color: $ms-primary;
+    font-weight: 700;
+
+    &::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 12px;
+      right: 12px;
+      height: 3px;
+      background-color: $ms-primary;
+      border-radius: 3px 3px 0 0;
+    }
+  }
+}
+
+.ms-view-container {
+  font-family: $ms-font-family;
+  color: $ms-text-primary;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem;
+}
+
+.ms-header {
+  margin-bottom: 2rem;
+  text-align: left;
+
+  .ms-title-group {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+
+    .ms-icon-tile {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 42px;
+      height: 42px;
+      background: linear-gradient(135deg, $ms-primary, $ms-primary-dark);
+      border-radius: 8px;
+      color: #ffffff;
+      font-size: 1.25rem;
+      font-weight: 700;
+      box-shadow: 0 4px 12px rgba(0, 120, 212, 0.25);
+    }
+
+    h2 {
+      font-size: 1.625rem;
+      font-weight: 600;
+      color: $ms-text-primary;
+      margin: 0;
+    }
+  }
+
+  .ms-subtitle {
+    color: $ms-text-secondary;
+    font-size: 0.9375rem;
+    margin: 0.5rem 0 0 54px;
+  }
+}
+
+.ms-get-block {
+  background: $ms-surface;
+  border: 1px solid $ms-border;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+  margin-bottom: 2rem;
+  overflow: hidden;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+
+  &:hover {
+    border-color: #c8c6c4;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+  }
+}
+
+// Top Bar of GET Block
+.ms-api-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0.875rem 1.25rem;
+  background: #faf9f8;
+  border-bottom: 1px solid $ms-border;
+
+  .ms-api-left {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.625rem;
+  }
+
+  .ms-method-badge {
+    background-color: $ms-primary-light;
+    color: $ms-primary-dark;
+    font-family: $ms-font-mono;
+    font-weight: 700;
+    font-size: 0.8125rem;
+    padding: 0.25rem 0.625rem;
+    border-radius: 4px;
+    letter-spacing: 0.03em;
+    border: 1px solid rgba($ms-primary, 0.2);
+  }
+
+  .ms-endpoint-path {
+    font-family: $ms-font-mono;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: $ms-text-primary;
+  }
+
+  .ms-status-badge {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.2rem 0.55rem;
+    border-radius: 12px;
+
+    &.status-success {
+      background-color: $ms-success-bg;
+      color: $ms-success;
+      border: 1px solid rgba($ms-success, 0.25);
+    }
+
+    &.status-loading {
+      background-color: $ms-warning-bg;
+      color: #8a6d3b;
+      border: 1px solid rgba(138, 109, 59, 0.25);
+    }
+
+    &.status-error {
+      background-color: $ms-error-bg;
+      color: $ms-error;
+      border: 1px solid rgba($ms-error, 0.25);
+    }
+  }
+
+  .ms-metrics-group {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+  }
+
+  .ms-metric-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    background: #ffffff;
+    color: $ms-text-secondary;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    border: 1px solid $ms-border;
+    white-space: nowrap;
+
+    .metric-value {
+      font-weight: 600;
+      color: $ms-text-primary;
+    }
+
+    &.rate-limit-pill {
+      &.limit-ok {
+        border-color: rgba($ms-success, 0.4);
+        .metric-value {
+          color: $ms-success;
+        }
+      }
+      &.limit-warn {
+        border-color: rgba($ms-error, 0.4);
+        .metric-value {
+          color: $ms-error;
+        }
+      }
+    }
+  }
+
+  .ms-api-right {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .ms-btn-get {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    background-color: $ms-primary;
+    color: #ffffff;
+    border: none;
+    padding: 0.45rem 1rem;
+    border-radius: 4px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+    transition: background-color 0.15s ease, transform 0.05s ease;
+
+    &:hover:not(:disabled) {
+      background-color: $ms-primary-dark;
+    }
+
+    &:active:not(:disabled) {
+      background-color: $ms-primary-darker;
+      transform: translateY(1px);
+    }
+
+    &:focus-visible {
+      outline: 2px solid $ms-border-focus;
+      outline-offset: 2px;
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+  }
+}
+
+// Code Block Below Bar
+.ms-code-block-wrapper {
+  background: $ms-code-bg;
+  padding: 0;
+  position: relative;
+  max-height: 420px;
+  overflow: auto;
+
+  pre {
+    margin: 0;
+    padding: 1.25rem;
+    font-family: $ms-font-mono;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: $ms-code-text;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+
+  .json-key {
+    color: #9cdcfe;
+  }
+
+  .json-string {
+    color: #ce9178;
+  }
+
+  .json-number {
+    color: #b5cea8;
+  }
+
+  .json-boolean {
+    color: #569cd6;
+  }
+
+  .json-null {
+    color: #569cd6;
+  }
+}
+
+.ms-block-footer {
+  padding: 0.5rem 1.25rem;
+  background: #fdfdfd;
+  border-top: 1px solid #f0f0f0;
+  font-size: 0.75rem;
+  color: $ms-text-secondary;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}

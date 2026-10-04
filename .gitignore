@@ -1,5 +1,7 @@
 **/bin/
 **/obj/
+**/node_modules/
+**/dist/
 appsettings.*.json
 .env
 
