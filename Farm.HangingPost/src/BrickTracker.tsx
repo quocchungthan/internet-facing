@@ -61,10 +61,10 @@ export const BrickTracker = () => {
         <div>
           <div className="brick-title-group">
             <span className="brick-icon">🧱</span>
-            <h2>Platform Habit Tracker &amp; Gigs Feed</h2>
+            <h2>Platform Habit Tracker &amp; Feeds</h2>
           </div>
           <p className="brick-subtitle">
-            Brick-style contribution matrix mimicking GitHub's activity graph with per-platform custom colors.
+            Contributions and gig feeds across active platforms.
           </p>
         </div>
       </header>
@@ -98,8 +98,8 @@ export const BrickTracker = () => {
         })}
       </div>
 
-      {/* Habit Tracker Matrix Card */}
-      <section className="brick-tracker-card" aria-label="Habit contribution graph">
+      {/* Habit Tracker Matrix */}
+      <section className="brick-tracker-section" aria-label="Habit contribution graph">
         <div className="tracker-header">
           <h3>
             {selectedPlatform === 'all'
@@ -121,7 +121,7 @@ export const BrickTracker = () => {
             {contributions.map((level, idx) => {
               const bg =
                 level === 0
-                  ? '#ebedf0'
+                  ? 'var(--brick-empty, #ebedf0)'
                   : currentThemeColor + (level === 1 ? '44' : level === 2 ? '77' : level === 3 ? 'bb' : 'ff')
 
               return (
@@ -141,7 +141,7 @@ export const BrickTracker = () => {
           <span>{loading ? 'Fetching platform feeds...' : `${platforms.length} active platforms monitored`}</span>
           <div className="legend-group">
             <span>Less</span>
-            <span className="legend-brick" style={{ backgroundColor: '#ebedf0' }} />
+            <span className="legend-brick" style={{ backgroundColor: 'var(--brick-empty, #ebedf0)' }} />
             <span className="legend-brick" style={{ backgroundColor: currentThemeColor + '44' }} />
             <span className="legend-brick" style={{ backgroundColor: currentThemeColor + '77' }} />
             <span className="legend-brick" style={{ backgroundColor: currentThemeColor + 'bb' }} />
@@ -151,30 +151,22 @@ export const BrickTracker = () => {
         </div>
       </section>
 
-      {/* Feeds Cards Grid */}
-      <section>
-        <h3 style={{ fontSize: '1.25rem', marginBottom: '1rem', color: '#2c2523' }}>
-          Configured Platform Feeds &amp; Bookmarks
-        </h3>
-        <div className="brick-feeds-grid">
+      {/* Feeds Stream List */}
+      <section className="brick-feeds-section">
+        <h3>Configured Platform Feeds &amp; Bookmarks</h3>
+        <div className="brick-feeds-list">
           {platforms.map((p) => (
-            <article
+            <div
               key={p.id}
-              className="brick-feed-card"
-              style={
-                {
-                  '--card-color': p.color,
-                  '--card-light': p.color + '1a',
-                } as React.CSSProperties
-              }
+              className="brick-feed-row"
+              style={{ '--card-color': p.color } as React.CSSProperties}
             >
-              <div>
-                <div className="feed-top">
-                  <span className="feed-platform">{p.platform}</span>
-                  <span className="feed-tag">@{p.platformId}</span>
-                </div>
-                <p className="feed-desc">{p.description}</p>
+              <div className="feed-left">
+                <span className="feed-dot" style={{ backgroundColor: p.color }} />
+                <span className="feed-platform">{p.platform}</span>
+                <span className="feed-tag">@{p.platformId}</span>
               </div>
+              <p className="feed-desc">{p.description}</p>
               <div>
                 <a
                   href={p.url}
@@ -185,7 +177,7 @@ export const BrickTracker = () => {
                   Visit {p.platform} &rarr;
                 </a>
               </div>
-            </article>
+            </div>
           ))}
         </div>
       </section>

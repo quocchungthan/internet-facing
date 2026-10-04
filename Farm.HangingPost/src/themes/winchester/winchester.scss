@@ -28,9 +28,10 @@ $winchester-muted: #6e645e;
 }
 
 .winchester-container {
-  max-width: 880px;
-  margin: 0 auto;
-  padding: 1.5rem 1rem;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
   text-align: left;
   font-family: 'Georgia', 'Times New Roman', serif;
 }
@@ -70,47 +71,137 @@ $winchester-muted: #6e645e;
 }
 
 .winchester-case-board {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  border-top: 1px solid $winchester-border;
 }
 
-.case-card {
-  background: $winchester-parchment;
-  border: 1px solid $winchester-border;
-  border-left: 5px solid $winchester-primary;
-  border-radius: 4px;
-  padding: 1.25rem;
-  box-shadow: 2px 3px 10px rgba(44, 34, 30, 0.06);
+.case-entry {
+  background: transparent;
+  border-bottom: 1px solid $winchester-border;
+  padding: 1.25rem 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 2rem;
+  align-items: flex-start;
+  transition: background-color 0.12s ease;
 
-  .case-status {
-    font-family: -apple-system, sans-serif;
-    font-size: 0.75rem;
-    font-weight: 700;
-    color: $winchester-blood-red;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: 0.5rem;
+  &:hover {
+    background-color: rgba(139, 90, 43, 0.03);
   }
 
-  h3 {
-    margin: 0 0 0.5rem;
-    font-size: 1.25rem;
-    color: $winchester-dark;
-  }
+  .case-main {
+    flex: 1;
 
-  p {
-    font-size: 0.9375rem;
-    color: $winchester-muted;
-    line-height: 1.5;
-    margin: 0 0 0.75rem;
+    .case-status {
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: $winchester-blood-red;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.25rem;
+    }
+
+    h3 {
+      margin: 0 0 0.35rem;
+      font-size: 1.25rem;
+      color: $winchester-dark;
+    }
+
+    p {
+      font-size: 0.9375rem;
+      color: $winchester-muted;
+      line-height: 1.5;
+      margin: 0;
+    }
   }
 
   .case-meta {
-    font-family: -apple-system, sans-serif;
-    font-size: 0.75rem;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 0.8125rem;
     color: #8c827a;
-    border-top: 1px dashed $winchester-border;
-    padding-top: 0.5rem;
+    min-width: 220px;
+    text-align: right;
+  }
+}
+
+@media (max-width: 768px) {
+  .case-entry {
+    flex-direction: column;
+    gap: 0.5rem;
+    .case-meta {
+      text-align: left;
+    }
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .tab-winchester {
+    color: #b09f90;
+
+    &:hover {
+      color: #c49a45;
+      background-color: rgba(196, 154, 69, 0.08);
+    }
+
+    &.tabActive {
+      color: #f3e5d0;
+      border-bottom-color: #c49a45;
+      background-color: rgba(196, 154, 69, 0.12);
+    }
+  }
+
+  .winchester-container {
+    color: #eadecb;
+  }
+
+  .winchester-header {
+    border-color: #3d332c;
+
+    .journal-badge {
+      background: #120e0c;
+      color: #e5b869;
+      border: 1px solid #3d332c;
+    }
+
+    h1 {
+      color: #f3e5d0;
+    }
+
+    p {
+      color: #a69a8f;
+    }
+  }
+
+  .winchester-case-board {
+    border-color: #3d332c;
+  }
+
+  .case-entry {
+    border-color: #3d332c;
+
+    &:hover {
+      background-color: rgba(196, 154, 69, 0.04);
+    }
+
+    .case-main {
+      .case-status {
+        color: #e0524c;
+      }
+
+      h3 {
+        color: #f3e5d0;
+      }
+
+      p {
+        color: #c9bdb0;
+      }
+    }
+
+    .case-meta {
+      color: #9c8e82;
+    }
   }
 }

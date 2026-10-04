@@ -1,14 +1,19 @@
 .app-shell {
-  margin: 0 auto;
-  max-width: 1200px;
+  margin: 0;
+  width: 100%;
+  max-width: 100%;
   min-height: 100svh;
-  padding: 36px 32px;
+  padding: 20px 32px 48px;
+  box-sizing: border-box;
 }
 
 .tab-list {
   border-bottom: 1px solid var(--border);
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
+  gap: 8px;
+  width: 100%;
+  margin-bottom: 8px;
 }
 
 .tab {
@@ -17,15 +22,15 @@
   font-size: 0.9375rem;
   font-weight: 600;
   line-height: 1.25;
-  max-width: 9rem;
-  padding: 14px 18px 11px;
+  padding: 14px 20px 11px;
   text-align: center;
   text-decoration: none;
+  white-space: nowrap;
 }
 
 .tab:hover {
   color: var(--link-hover);
-  text-decoration: underline;
+  text-decoration: none;
 }
 
 .tab:focus-visible {
@@ -39,9 +44,10 @@
 }
 
 .tab-content {
-  margin: 0 auto;
-  max-width: 1040px;
-  padding: 32px 16px 40px;
+  width: 100%;
+  max-width: 100%;
+  padding: 20px 0 40px;
+  box-sizing: border-box;
 }
 
 .content {

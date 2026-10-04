@@ -26,3 +26,20 @@ $ms-font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-ser
     background-color: rgba($ms-primary, 0.06);
   }
 }
+
+@media (prefers-color-scheme: dark) {
+  .tab-microsoft {
+    color: #c8c6c4;
+
+    &:hover {
+      color: #4cc2ff;
+      background-color: rgba(76, 194, 255, 0.08);
+    }
+
+    &.tabActive {
+      color: #4cc2ff;
+      border-bottom-color: #4cc2ff;
+      background-color: rgba(76, 194, 255, 0.12);
+    }
+  }
+}

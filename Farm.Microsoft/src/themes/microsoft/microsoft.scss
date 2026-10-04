@@ -55,9 +55,10 @@ $ms-font-mono: 'Cascadia Code', 'Segoe UI Mono', Consolas, 'Courier New', monosp
 .ms-view-container {
   font-family: $ms-font-family;
   color: $ms-text-primary;
-  max-width: 960px;
-  margin: 0 auto;
-  padding: 1.5rem 1rem;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
 }
 
 .ms-header {
@@ -73,14 +74,13 @@ $ms-font-mono: 'Cascadia Code', 'Segoe UI Mono', Consolas, 'Courier New', monosp
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 42px;
-      height: 42px;
+      width: 38px;
+      height: 38px;
       background: linear-gradient(135deg, $ms-primary, $ms-primary-dark);
-      border-radius: 8px;
+      border-radius: 6px;
       color: #ffffff;
-      font-size: 1.25rem;
+      font-size: 1.15rem;
       font-weight: 700;
-      box-shadow: 0 4px 12px rgba(0, 120, 212, 0.25);
     }
 
     h2 {
@@ -94,23 +94,17 @@ $ms-font-mono: 'Cascadia Code', 'Segoe UI Mono', Consolas, 'Courier New', monosp
   .ms-subtitle {
     color: $ms-text-secondary;
     font-size: 0.9375rem;
-    margin: 0.5rem 0 0 54px;
+    margin: 0.4rem 0 0 50px;
   }
 }
 
 .ms-get-block {
+  width: 100%;
   background: $ms-surface;
-  border: 1px solid $ms-border;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
-  margin-bottom: 2rem;
+  border-top: 1px solid $ms-border;
+  border-bottom: 1px solid $ms-border;
+  margin-bottom: 2.5rem;
   overflow: hidden;
-  transition: box-shadow 0.2s ease, border-color 0.2s ease;
-
-  &:hover {
-    border-color: #c8c6c4;
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
-  }
 }
 
 // Top Bar of GET Block
@@ -306,4 +300,107 @@ $ms-font-mono: 'Cascadia Code', 'Segoe UI Mono', Consolas, 'Courier New', monosp
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+@media (prefers-color-scheme: dark) {
+  .tab-microsoft {
+    color: #c8c6c4;
+
+    &:hover {
+      color: #4cc2ff;
+      background-color: rgba(76, 194, 255, 0.08);
+    }
+
+    &.tab-active {
+      color: #4cc2ff;
+
+      &::after {
+        background-color: #4cc2ff;
+      }
+    }
+  }
+
+  .ms-view-container {
+    color: #f3f2f1;
+  }
+
+  .ms-header {
+    .ms-title-group h2 {
+      color: #ffffff;
+    }
+
+    .ms-subtitle {
+      color: #a19f9d;
+    }
+  }
+
+  .ms-get-block {
+    background: #1e1e1e;
+    border-color: #333333;
+  }
+
+  .ms-api-bar {
+    background: #252525;
+    border-color: #333333;
+
+    .ms-method-badge {
+      background-color: rgba(76, 194, 255, 0.15);
+      color: #4cc2ff;
+      border-color: rgba(76, 194, 255, 0.3);
+    }
+
+    .ms-endpoint-path {
+      color: #ffffff;
+    }
+
+    .ms-metric-pill {
+      background: #2d2d2d;
+      color: #c8c6c4;
+      border-color: #3d3d3d;
+
+      .metric-value {
+        color: #ffffff;
+      }
+
+      &.rate-limit-pill.limit-ok {
+        border-color: rgba(16, 124, 65, 0.5);
+        .metric-value {
+          color: #57d983;
+        }
+      }
+
+      &.rate-limit-pill.limit-warn {
+        border-color: rgba(216, 59, 1, 0.5);
+        .metric-value {
+          color: #ff6b3b;
+        }
+      }
+    }
+
+    .ms-btn-get {
+      background-color: #0078d4;
+
+      &:hover:not(:disabled) {
+        background-color: #106ebe;
+      }
+
+      &:active:not(:disabled) {
+        background-color: #005a9e;
+      }
+    }
+  }
+
+  .ms-code-block-wrapper {
+    background: #141414;
+
+    pre {
+      color: #d4d4d4;
+    }
+  }
+
+  .ms-block-footer {
+    background: #1c1c1c;
+    border-top: 1px solid #2d2d2d;
+    color: #8a8886;
+  }
 }

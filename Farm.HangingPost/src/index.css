@@ -1,5 +1,7 @@
 :root {
+  color-scheme: light dark;
   --background: #ffffff;
+  --surface: #ffffff;
   --border: #d1d1d1;
   --brand: #0067b8;
   --focus: #000000;
@@ -9,10 +11,24 @@
   --text: #1a1a1a;
   background: var(--background);
   color: var(--text);
-  font-family: 'Segoe UI', SegoeUI, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-family: 'Segoe UI', SegoeUI, -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', Arial, sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #141414;
+    --surface: #1f1f1f;
+    --border: #333333;
+    --brand: #4cc2ff;
+    --focus: #ffffff;
+    --link: #4cc2ff;
+    --link-hover: #70d1ff;
+    --muted-text: #a8a8a8;
+    --text: #f0f0f0;
+  }
 }
 
 * {
@@ -21,4 +37,7 @@
 
 body {
   margin: 0;
+  background-color: var(--background);
+  color: var(--text);
+  min-height: 100vh;
 }

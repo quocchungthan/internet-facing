@@ -29,9 +29,10 @@ $brick-muted: #7d716d;
 }
 
 .brick-container {
-  max-width: 980px;
-  margin: 0 auto;
-  padding: 1.5rem 1rem;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
   text-align: left;
 }
 
@@ -109,14 +110,14 @@ $brick-muted: #7d716d;
   }
 }
 
-// Habit Tracker Matrix (like GitHub contributions)
-.brick-tracker-card {
+// Habit Tracker Matrix
+.brick-tracker-section {
+  width: 100%;
   background: #ffffff;
-  border: 1px solid $brick-mortar;
-  border-radius: 10px;
-  padding: 1.5rem;
-  margin-bottom: 2rem;
-  box-shadow: 0 2px 8px rgba(45, 38, 36, 0.05);
+  border-top: 1px solid $brick-mortar;
+  border-bottom: 1px solid $brick-mortar;
+  padding: 1.5rem 0;
+  margin-bottom: 2.5rem;
 
   .tracker-header {
     display: flex;
@@ -193,56 +194,69 @@ $brick-muted: #7d716d;
   }
 }
 
-// Feeds Cards Grid
-.brick-feeds-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 1.25rem;
+// Feeds Stream List
+.brick-feeds-section {
+  width: 100%;
+  margin-top: 2rem;
+
+  h3 {
+    font-size: 1.25rem;
+    margin-bottom: 1rem;
+    color: $brick-text;
+    font-weight: 600;
+  }
 }
 
-.brick-feed-card {
-  background: #ffffff;
-  border: 1px solid $brick-mortar;
-  border-top: 4px solid var(--card-color, $brick-primary);
-  border-radius: 8px;
-  padding: 1.25rem;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+.brick-feeds-list {
+  width: 100%;
+  border-top: 1px solid $brick-mortar;
+}
+
+.brick-feed-row {
+  width: 100%;
   display: flex;
-  flex-direction: column;
+  align-items: center;
   justify-content: space-between;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  padding: 1rem 0;
+  border-bottom: 1px solid $brick-mortar;
+  gap: 1.5rem;
+  transition: background-color 0.12s ease;
 
   &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.08);
+    background-color: rgba(0, 0, 0, 0.02);
   }
 
-  .feed-top {
+  .feed-left {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    margin-bottom: 0.75rem;
+    gap: 0.75rem;
+    min-width: 220px;
+
+    .feed-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
 
     .feed-platform {
       font-weight: 700;
-      font-size: 1rem;
+      font-size: 0.9375rem;
       color: $brick-text;
     }
 
     .feed-tag {
       font-size: 0.75rem;
-      padding: 0.2rem 0.5rem;
-      border-radius: 12px;
-      background-color: var(--card-light, #f5f5f5);
-      color: var(--card-color, $brick-primary);
-      font-weight: 600;
+      color: $brick-muted;
+      font-family: monospace;
     }
   }
 
   .feed-desc {
+    flex: 1;
     font-size: 0.875rem;
-    color: $brick-muted;
-    margin: 0 0 1rem;
+    color: #444;
+    margin: 0;
     line-height: 1.4;
   }
 
@@ -254,9 +268,134 @@ $brick-muted: #7d716d;
     font-weight: 600;
     color: var(--card-color, $brick-primary);
     text-decoration: none;
+    white-space: nowrap;
 
     &:hover {
       text-decoration: underline;
+    }
+  }
+}
+
+@media (max-width: 768px) {
+  .brick-feed-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.875rem 0;
+
+    .feed-desc {
+      width: 100%;
+    }
+  }
+}
+
+:root {
+  --brick-empty: #ebedf0;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --brick-empty: #2e2420;
+  }
+
+  .tab-brick {
+    color: #b5a8a1;
+
+    &:hover {
+      color: #f08562;
+      background-color: rgba(240, 133, 98, 0.08);
+    }
+
+    &.tabActive {
+      color: #f08562;
+      border-bottom-color: #f08562;
+      background-color: rgba(240, 133, 98, 0.12);
+    }
+  }
+
+  .brick-header {
+    .brick-title-group {
+      .brick-icon {
+        background: #251e1b;
+        border-color: #423632;
+        color: #f08562;
+      }
+
+      h2 {
+        color: #f0e6e1;
+      }
+    }
+
+    .brick-subtitle {
+      color: #a89a93;
+    }
+  }
+
+  .brick-platform-btn {
+    background: #251e1b;
+    border-color: #423632;
+    color: #d6cbc5;
+
+    &:hover {
+      border-color: #f08562;
+    }
+
+    &.active {
+      color: #ffffff;
+    }
+  }
+
+  .brick-tracker-section {
+    background: #1c1715;
+    border-color: #382c27;
+
+    .tracker-header {
+      h3 {
+        color: #f0e6e1;
+      }
+
+      .tracker-stats {
+        color: #a89a93;
+        strong {
+          color: #f0e6e1;
+        }
+      }
+    }
+
+    .tracker-footer {
+      color: #a89a93;
+    }
+  }
+
+  .brick-feeds-section {
+    h3 {
+      color: #f0e6e1;
+    }
+  }
+
+  .brick-feeds-list {
+    border-color: #382c27;
+  }
+
+  .brick-feed-row {
+    border-color: #382c27;
+
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.03);
+    }
+
+    .feed-left {
+      .feed-platform {
+        color: #f0e6e1;
+      }
+
+      .feed-tag {
+        color: #a89a93;
+      }
+    }
+
+    .feed-desc {
+      color: #d6cbc5;
     }
   }
 }

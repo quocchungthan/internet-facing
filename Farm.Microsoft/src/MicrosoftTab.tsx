@@ -240,18 +240,18 @@ export const MicrosoftTab = () => {
         <div className="ms-title-group">
           <div className="ms-icon-tile">⊞</div>
           <div>
-            <h2>Elder Vibe Coder &middot; Microsoft Fluent Suite</h2>
+            <h2>Elder Vibe Coder</h2>
           </div>
         </div>
         <p className="ms-subtitle">
-          Microsoft-styled API explorer connected to the EF Core AuraFarming PostgreSQL service.
+          If you are seeking for a software developer to talk to, it's me here.
         </p>
       </header>
 
       {/* Block 1: GET /api/metadata */}
       {renderApiBlock(
         '/api/metadata',
-        'Website Metadata & Developer Identity',
+        'Metadata',
         metadataBlock,
         () => fetchEndpoint('/api/metadata', setMetadataBlock)
       )}
@@ -259,7 +259,7 @@ export const MicrosoftTab = () => {
       {/* Block 2: GET /api/feeds */}
       {renderApiBlock(
         '/api/feeds',
-        'Gig Feeds & Platform Bookmarks',
+        'Feeds',
         feedsBlock,
         () => fetchEndpoint('/api/feeds', setFeedsBlock)
       )}
