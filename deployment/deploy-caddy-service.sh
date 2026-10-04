@@ -22,6 +22,7 @@ set -Eeuo pipefail
 : "${CADDY_USER:=caddy}"
 : "${CADDY_GROUP:=caddy}"
 : "${SERVICE_EXTRA_ARGS:=}"
+: "${SERVICE_SECRET_DIR:=}"
 
 as_root() {
 	if [[ "$EUID" -eq 0 ]]; then
@@ -70,6 +71,11 @@ fi
 if [[ ! "$SERVICE_UPSTREAM_PORT" =~ ^[0-9]+$ || ! "$SERVICE_CANDIDATE_PORT" =~ ^[0-9]+$ ]]; then
 	echo "SERVICE_UPSTREAM_PORT and SERVICE_CANDIDATE_PORT must be numeric" >&2
 	exit 2
+fi
+
+if [[ -n "$SERVICE_SECRET_DIR" && ! -d "$SERVICE_SECRET_DIR" ]]; then
+	echo "SERVICE_SECRET_DIR must identify an existing directory: $SERVICE_SECRET_DIR" >&2
+	exit 1
 fi
 
 fragment="$CADDY_SITES_DIR/$SERVICE_DOMAIN.caddy"
@@ -156,6 +162,11 @@ if [[ -n "$SERVICE_VOLUME" ]]; then
 	docker_volume_args+=(--volume "$SERVICE_VOLUME")
 fi
 
+docker_secret_args=()
+if [[ -n "$SERVICE_SECRET_DIR" ]]; then
+	docker_secret_args+=(--mount "type=bind,source=$SERVICE_SECRET_DIR,destination=/run/secrets,readonly")
+fi
+
 docker_extra_args=()
 if [[ -n "$SERVICE_EXTRA_ARGS" ]]; then
 	read -ra docker_extra_args <<< "$SERVICE_EXTRA_ARGS"
@@ -164,6 +175,7 @@ fi
 docker run --detach --name "$candidate_container" --restart no \
 	--publish "127.0.0.1:$candidate_port:80" \
 	"${docker_volume_args[@]}" \
+	${docker_secret_args+"${docker_secret_args[@]}"} \
 	${docker_extra_args+"${docker_extra_args[@]}"} \
 	--env-file "$SERVICE_ENV_FILE" "$SERVICE_IMAGE" >/dev/null
 candidate_started=true
