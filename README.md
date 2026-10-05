@@ -26,6 +26,8 @@ Farm deployments start a candidate container on an unused loopback port, require
 
 One workflow backs up every service: `.github/workflows/backup-all.yml` (daily 02:00 UTC and `workflow_dispatch`) runs `scripts/backup-all.sh` on the VPS as root. It writes a single root-only archive `/var/backups/eldervibe/eldervibe-backup-<UTC timestamp>.zip` (newest 7 kept) with Caddy, Farm, Fences, MailBox/Maddy, Seafile and AFFiNE config, credentials, certificates, data and DB dumps. Logs and mail content are excluded. `RESTORE.md` at the archive root maps every item to its original VPS path and lists the restore steps. The job summary shows the archive path, size and SHA-256.
 
+The Farm PostgreSQL dump uses `FARM_PG_PORT`, defaulting to `4554` when unset or empty. To override it, set the GitHub Actions variable `FARM_PG_PORT` in the `hostkey-server` environment (or export it when running the script directly). It must be between `1` and `65535`. The dump runs inside the database container, so this must match PostgreSQL's internal port, not just a host-published port. Other database dumps, including AFFiNE, are unaffected.
+
 ### Non-root deployment user
 
 `VPS_USER` may be a dedicated non-root deploy user with Docker daemon access through the `docker` group. When direct Docker access is unavailable, deployment falls back to passwordless `sudo -n docker`.

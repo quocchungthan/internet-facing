@@ -12,6 +12,7 @@ umask 077
 : "${MAILBOX_DEPLOY_DIR:=/opt/shuneo-mail-mvp}"
 : "${STORAGE_DEPLOY_DIR:=/srv/storage}"
 : "${AFFINE_DEPLOY_DIR:=/opt/affine-note}"
+: "${FARM_PG_PORT:=4554}"
 
 if [[ -n "${FENCES_DEPLOY_DIR:-}" ]]; then
 	[[ "$FENCES_DEPLOY_DIR" =~ ^/[A-Za-z0-9_-][A-Za-z0-9._-]*(/[A-Za-z0-9_-][A-Za-z0-9._-]*)*$ ]] || { echo 'FENCES_DEPLOY_DIR must be an absolute path without dot or parent segments.' >&2; exit 1; }
@@ -63,6 +64,7 @@ fi
 
 [[ "$EUID" -eq 0 ]] || die "backup-all.sh must run as root (VPS_USER=root or passwordless sudo)."
 [[ "$BACKUP_KEEP" =~ ^[1-9][0-9]*$ ]] || die "BACKUP_KEEP must be a positive integer."
+[[ "$FARM_PG_PORT" =~ ^[1-9][0-9]{0,4}$ && "$FARM_PG_PORT" -le 65535 ]] || die "FARM_PG_PORT must be an integer between 1 and 65535."
 for path_var in BACKUP_ROOT MAILBOX_DEPLOY_DIR STORAGE_DEPLOY_DIR AFFINE_DEPLOY_DIR; do
 	[[ "${!path_var}" =~ ^/[A-Za-z0-9._/-]+$ && "${!path_var}" != "/" ]] || die "$path_var must be an absolute path."
 done
@@ -231,7 +233,7 @@ if [[ -d "$FARM_STATIC_ROOT" ]] || container_exists "$FARM_CONTAINER" || contain
 	copy_path farm-config farm optional "$FARM_CONFIG_DIR"
 	if container_exists "$FARM_DB_CONTAINER"; then
 		dump_to farm-postgres farm "$FARM_DB_CONTAINER" dumps/farm-postgres.sql 'Farm PostgreSQL database dump complete' -- \
-			'set -- "${POSTGRES_PASSWORD:-}"; PGPASSWORD="$1" exec pg_dump -U "${POSTGRES_USER:-postgres}" -d "${POSTGRES_DB:-aurafarming}" --clean --if-exists'
+			'set -- "${POSTGRES_PASSWORD:-}"; PGPASSWORD="$1" exec pg_dump -p '"$FARM_PG_PORT"' -U "${POSTGRES_USER:-postgres}" -d "${POSTGRES_DB:-aurafarming}" --clean --if-exists'
 	fi
 else
 	record farm farm missing "$FARM_STATIC_ROOT" - "Farm not deployed"
