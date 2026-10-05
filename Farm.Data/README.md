@@ -4,7 +4,7 @@ Reusable .NET 10 data access for the AuraFarming PostgreSQL database. The
 package contains the `AuraFarming` EF Core context, entities, model mappings,
 and migrations. It does not depend on the Farm web/business layer.
 
-## Build and download
+## Build and publish
 
 Build a package locally from the repository root:
 
@@ -12,29 +12,41 @@ Build a package locally from the repository root:
 dotnet pack .\Farm.Data\Farm.Data.csproj --configuration Release --output .\artifacts\nuget -p:PackageVersion=1.0.0
 ```
 
-The **Package Farm.Data** GitHub Actions workflow uploads a
-`Farm.Data-nuget` artifact whenever relevant changes reach `main`. Automatic
+The **Package Farm.Data** GitHub Actions workflow publishes to the
+`quocchungthan` GitHub Packages NuGet feed whenever relevant changes reach
+`main`, using its built-in `GITHUB_TOKEN` with `packages: write` permission. Automatic
 builds use unique `1.0.0-ci.<run>.<attempt>` prerelease versions. Run the workflow
-manually with an explicit version for a release package. Download and extract
-the artifact from the workflow run; it is retained for 90 days.
+manually with an explicit version for a release package. The workflow also
+uploads a `Farm.Data-nuget` artifact, retained for 90 days.
 
-This workflow publishes a downloadable build artifact, not a NuGet feed.
-For long-term distribution and normal feed-based restores, publish the same
-`.nupkg` to your organization's NuGet feed. Use a new version for each release,
-and coordinate package versions with database schema changes.
+Feed URL: `https://nuget.pkg.github.com/quocchungthan/index.json`.
+Use a new version for each release; publishing an existing version fails.
+Coordinate package versions with database schema changes.
 
 ## Consume from another solution
 
-Use a .NET 10 application. Place the downloaded `.nupkg` in a local folder,
-register that folder as a NuGet source, and install the exact package version:
+Use a .NET 10 application. GitHub's NuGet registry requires authentication,
+including for public packages. Create a personal access token (classic) with
+`read:packages` permission and access to the package. Supply it through the
+`GITHUB_PACKAGES_TOKEN` environment variable, not source-controlled files.
+Register the feed and install the exact published package version:
 
 ```powershell
-dotnet nuget add source C:\packages\farm-data --name FarmDataLocal
+dotnet nuget add source https://nuget.pkg.github.com/quocchungthan/index.json --name FarmDataGitHub --username YOUR_GITHUB_USERNAME --password $env:GITHUB_PACKAGES_TOKEN
 dotnet add .\YourApp\YourApp.csproj package Farm.Data --version 1.0.0
 ```
 
-Use the actual version from the artifact if it is a prerelease build. CI and
-other developers must also have access to the configured package source.
+The command above stores encrypted credentials in the local user NuGet
+configuration on Windows. Do not commit credentials. On platforms without
+NuGet password encryption, use a credential provider or a CI-secret-backed
+NuGet environment credential instead of storing the password.
+
+Use the actual published version if it is a prerelease build; `1.0.0` is only
+available after a manual release run publishes it. CI and other developers
+must also have access to the configured package source.
+For consumption from another GitHub Actions repository, grant that repository
+Actions access in the package settings and give its `GITHUB_TOKEN`
+`packages: read` permission, or use an appropriately scoped token.
 EF Core and the PostgreSQL provider are restored as transitive dependencies.
 
 Register the context in the consuming application's `Program.cs`:
