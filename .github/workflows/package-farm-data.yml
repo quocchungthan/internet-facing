@@ -1,0 +1,51 @@
+name: Package Farm.Data
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'Farm.Data/**'
+      - 'Directory.Build.props'
+      - '.github/workflows/package-farm-data.yml'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: NuGet package version
+        required: true
+        default: '1.0.0'
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.x
+
+      - name: Pack data layer
+        env:
+          PACKAGE_VERSION: ${{ inputs.version || format('1.0.0-ci.{0}.{1}', github.run_number, github.run_attempt) }}
+        run: >-
+          dotnet pack Farm.Data/Farm.Data.csproj
+          --configuration Release
+          --output artifacts/nuget
+          -p:PackageVersion="$PACKAGE_VERSION"
+          -p:ContinuousIntegrationBuild=true
+          -warnaserror
+
+      - name: Publish NuGet artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Farm.Data-nuget
+          path: artifacts/nuget/*.nupkg
+          if-no-files-found: error
+          retention-days: 90
