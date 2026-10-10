@@ -71,6 +71,22 @@ else
     });
 }
 
+// Portfolio tables share Farm's provider/connection but have an independent migration history.
+builder.Services.AddDbContext<PortfolioDbContext>((services, options) =>
+{
+    if (useInMemory)
+    {
+        var name = builder.Configuration["InMemoryDatabaseName"] ?? "AuraFarmingInMemory";
+        options.UseInMemoryDatabase(name + "-Portfolio");
+    }
+    else
+    {
+        var farm = services.GetRequiredService<AuraFarming>();
+        options.UseNpgsql(farm.Database.GetConnectionString(),
+            provider => provider.MigrationsHistoryTable("__PortfolioMigrationsHistory"));
+    }
+});
+
 // Register Client Tracing & Rate Limiting Service
 builder.Services.AddSingleton<IClientTracingService, ClientTracingService>();
 

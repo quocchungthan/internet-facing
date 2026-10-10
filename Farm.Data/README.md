@@ -4,6 +4,34 @@ Reusable .NET 10 data access for the AuraFarming PostgreSQL database. The
 package contains the `AuraFarming` EF Core context, entities, model mappings,
 and migrations. It does not depend on the Farm web/business layer.
 
+## Portfolio schema
+
+The same `Farm.Data` package also contains the eight portfolio entities in
+`Farm.Data.Entities` and `PortfolioDbContext`. This context uses the same
+AuraFarming PostgreSQL connection, owns only the portfolio tables, and has
+its own `__PortfolioMigrationsHistory` table. Register it with
+`UseNpgsql(connectionString, p => p.MigrationsHistoryTable("__PortfolioMigrationsHistory"))`.
+It has no seed data or automatic migration on startup. `AvatarSvg` is stored
+as PostgreSQL `text`; no avatar generation is included. Employment enums are
+stored as strings, and dates use PostgreSQL `date`.
+
+The designated migrator can generate/review a SQL script without connecting:
+
+```powershell
+dotnet ef migrations script --project Farm.Data --context PortfolioDbContext --output portfolio.sql
+```
+
+For an approved schema deployment only, supply `ConnectionStrings__AuraFarming`
+through secret configuration and run:
+
+```powershell
+dotnet ef database update --project Farm.Data --context PortfolioDbContext
+```
+
+Portfolio migrations and snapshot live in `Migrations/Portfolio`; existing
+AuraFarming migrations are unchanged. Applying the schema does not import
+source sample data.
+
 ## Build and publish
 
 Build a package locally from the repository root:

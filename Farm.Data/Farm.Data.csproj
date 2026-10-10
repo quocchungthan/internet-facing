@@ -8,7 +8,7 @@
     <PackageId>Farm.Data</PackageId>
     <Version>1.0.0</Version>
     <Authors>quocchungthan</Authors>
-    <Description>Entity Framework Core PostgreSQL data access, entities, and migrations for AuraFarming.</Description>
+    <Description>Entity Framework Core PostgreSQL data access, entities, and migrations for AuraFarming and portfolios.</Description>
     <RepositoryUrl>https://github.com/quocchungthan/internet-facing</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
