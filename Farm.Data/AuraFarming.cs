@@ -24,6 +24,7 @@ public class AuraFarming : DbContext
             entity.Property(e => e.Title).HasMaxLength(256).IsRequired();
             entity.Property(e => e.Description).HasMaxLength(1024).IsRequired();
             entity.Property(e => e.RepositoryUrl).HasMaxLength(512).IsRequired();
+            entity.Property(e => e.SpecifiedIssueUrl).HasMaxLength(512);
 
             entity.HasData(new WebsiteMetadata
             {

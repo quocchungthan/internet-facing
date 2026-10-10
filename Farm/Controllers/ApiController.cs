@@ -54,7 +54,8 @@ public class ApiController : ControllerBase
             developerName = metadata.DeveloperName,
             title = metadata.Title,
             description = metadata.Description,
-            repositoryUrl = metadata.RepositoryUrl
+            repositoryUrl = metadata.RepositoryUrl,
+            specifiedIssueUrl = metadata.SpecifiedIssueUrl
         });
     }
 
