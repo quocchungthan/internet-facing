@@ -19,11 +19,11 @@ public class PortfolioModelTests
             provider => provider.MigrationsHistoryTable("__PortfolioMigrationsHistory")).Options);
 
     [Fact]
-    public void Model_ContainsOnlyEightEntitiesAndNoSeeds()
+    public void Model_ContainsOnlyElevenEntitiesAndNoSeeds()
     {
         using var db = CreateContext();
         var model = db.GetService<IDesignTimeModel>().Model;
-        Assert.Equal(8, model.GetEntityTypes().Count());
+        Assert.Equal(11, model.GetEntityTypes().Count());
         Assert.All(model.GetEntityTypes(), entity => Assert.Empty(entity.GetSeedData()));
         Assert.DoesNotContain(model.GetEntityTypes(), e => e.ClrType == typeof(PlatformBookmark));
         Assert.Equal("text", model.FindEntityType(typeof(PortfolioProfile))!
@@ -92,10 +92,11 @@ public class PortfolioModelTests
                 i => i.Properties.Select(p => p.Name).SequenceEqual(new[] { "ProfileId", "DisplayOrder" }));
 
         var foreignKeys = model.GetEntityTypes().SelectMany(e => e.GetForeignKeys()).ToArray();
-        Assert.Equal(8, foreignKeys.Length);
+        Assert.Equal(11, foreignKeys.Length);
         Assert.All(foreignKeys, key =>
         {
-            var skillRestriction = key.DeclaringEntityType.ClrType == typeof(ProjectSkill)
+            var skillRestriction = (key.DeclaringEntityType.ClrType == typeof(ProjectSkill)
+                || key.DeclaringEntityType.ClrType == typeof(GigProblemSkill))
                 && key.PrincipalEntityType.ClrType == typeof(PortfolioSkill);
             Assert.Equal(skillRestriction ? DeleteBehavior.NoAction : DeleteBehavior.Cascade, key.DeleteBehavior);
             Assert.True(key.IsRequired);
@@ -120,7 +121,7 @@ public class PortfolioModelTests
     {
         using var db = CreateContext();
         Assert.False(db.Database.HasPendingModelChanges());
-        Assert.Single(db.Database.GetMigrations());
+        Assert.Equal(2, db.Database.GetMigrations().Count());
         var script = db.GetService<IMigrator>().GenerateScript();
         Assert.Contains("__PortfolioMigrationsHistory", script);
         Assert.DoesNotContain("INSERT INTO \"Portfolio", script);
@@ -129,7 +130,7 @@ public class PortfolioModelTests
         var tables = db.GetService<IDesignTimeModel>().Model.GetEntityTypes().ToArray();
         Assert.All(tables, entity => Assert.Contains($"CREATE TABLE \"{entity.GetTableName()}\"", script));
         var constraints = tables.SelectMany(e => e.GetCheckConstraints()).ToArray();
-        Assert.Equal(7, constraints.Length);
+        Assert.Equal(9, constraints.Length);
         Assert.All(constraints, constraint => Assert.Contains(constraint.Sql, script));
         Assert.Contains("NOT \"IsCurrent\" OR \"EndDate\" IS NULL", script);
         Assert.Contains("ON DELETE CASCADE", script);

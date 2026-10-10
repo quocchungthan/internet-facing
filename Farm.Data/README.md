@@ -6,7 +6,7 @@ and migrations. It does not depend on the Farm web/business layer.
 
 ## Portfolio schema
 
-The same `Farm.Data` package also contains the eight portfolio entities in
+The same `Farm.Data` package also contains the portfolio entities (profile, projects, experiences, skills, social links and gig problems/steps) in
 `Farm.Data.Entities` and `PortfolioDbContext`. This context uses the same
 AuraFarming PostgreSQL connection, owns only the portfolio tables, and has
 its own `__PortfolioMigrationsHistory` table. Register it with
@@ -27,6 +27,10 @@ through secret configuration and run:
 ```powershell
 dotnet ef database update --project Farm.Data --context PortfolioDbContext
 ```
+
+`GigProblem`, `GigStep` and `GigProblemSkill` store the problems solved as a gig and
+the steps taken. Profile, project, experience and gig problem rows carry a nullable
+unique `SourceDocId` (the AFFiNE page id) so a sync can upsert by source page.
 
 Portfolio migrations and snapshot live in `Migrations/Portfolio`; existing
 AuraFarming migrations are unchanged. Applying the schema does not import

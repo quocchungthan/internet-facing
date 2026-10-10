@@ -3,6 +3,7 @@ namespace Farm.Data.Entities;
 public class PortfolioProfile
 {
     public int Id { get; set; }
+    public string? SourceDocId { get; set; }
     public string DisplayName { get; set; } = string.Empty;
     public string Headline { get; set; } = string.Empty;
     public string? Bio { get; set; }

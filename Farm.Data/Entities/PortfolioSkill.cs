@@ -8,4 +8,5 @@ public class PortfolioSkill
 
     public ICollection<ProfileSkill> Profiles { get; set; } = new List<ProfileSkill>();
     public ICollection<ProjectSkill> ProjectSkills { get; set; } = new List<ProjectSkill>();
+    public ICollection<GigProblemSkill> GigProblems { get; set; } = new List<GigProblemSkill>();
 }

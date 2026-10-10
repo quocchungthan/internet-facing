@@ -13,6 +13,9 @@ public class PortfolioDbContext(DbContextOptions<PortfolioDbContext> options) : 
     public DbSet<ProfileProject> ProfileProjects => Set<ProfileProject>();
     public DbSet<ProfileSkill> ProfileSkills => Set<ProfileSkill>();
     public DbSet<ProjectSkill> ProjectSkills => Set<ProjectSkill>();
+    public DbSet<GigProblem> GigProblems => Set<GigProblem>();
+    public DbSet<GigStep> GigSteps => Set<GigStep>();
+    public DbSet<GigProblemSkill> GigProblemSkills => Set<GigProblemSkill>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -22,6 +25,8 @@ public class PortfolioDbContext(DbContextOptions<PortfolioDbContext> options) : 
         {
             entity.ToTable("PortfolioProfiles");
             entity.HasKey(p => p.Id);
+            entity.Property(p => p.SourceDocId).HasMaxLength(64);
+            entity.HasIndex(p => p.SourceDocId).IsUnique();
             entity.Property(p => p.DisplayName).HasMaxLength(160).IsRequired();
             entity.Property(p => p.Headline).HasMaxLength(240).IsRequired();
             entity.Property(p => p.Bio).HasMaxLength(4000);
@@ -44,6 +49,8 @@ public class PortfolioDbContext(DbContextOptions<PortfolioDbContext> options) : 
         {
             entity.ToTable("PortfolioProjects");
             entity.HasKey(p => p.Id);
+            entity.Property(p => p.SourceDocId).HasMaxLength(64);
+            entity.HasIndex(p => p.SourceDocId).IsUnique();
             entity.Property(p => p.Title).HasMaxLength(200).IsRequired();
             entity.Property(p => p.Slug).HasMaxLength(220).IsRequired();
             entity.Property(p => p.Summary).HasMaxLength(500).IsRequired();
@@ -84,6 +91,8 @@ public class PortfolioDbContext(DbContextOptions<PortfolioDbContext> options) : 
                 table.HasCheckConstraint("CK_PortfolioExperiences_DisplayOrder", "\"DisplayOrder\" >= 0");
             });
             entity.HasKey(p => p.Id);
+            entity.Property(p => p.SourceDocId).HasMaxLength(64);
+            entity.HasIndex(p => p.SourceDocId).IsUnique();
             entity.Property(p => p.Company).HasMaxLength(200).IsRequired();
             entity.Property(p => p.JobTitle).HasMaxLength(160).IsRequired();
             entity.Property(p => p.Description).HasMaxLength(4000);
@@ -130,6 +139,45 @@ public class PortfolioDbContext(DbContextOptions<PortfolioDbContext> options) : 
             entity.Property(p => p.Url).HasMaxLength(2048).IsRequired();
             entity.HasIndex(p => new { p.ProfileId, p.Label }).IsUnique();
             entity.HasIndex(p => new { p.ProfileId, p.DisplayOrder });
+        });
+
+        modelBuilder.Entity<GigProblem>(entity =>
+        {
+            entity.ToTable("GigProblems", table =>
+                table.HasCheckConstraint("CK_GigProblems_DisplayOrder", "\"DisplayOrder\" >= 0"));
+            entity.HasKey(p => p.Id);
+            entity.Property(p => p.SourceDocId).HasMaxLength(64);
+            entity.HasIndex(p => p.SourceDocId).IsUnique();
+            entity.Property(p => p.Title).HasMaxLength(200).IsRequired();
+            entity.Property(p => p.Slug).HasMaxLength(220).IsRequired();
+            entity.Property(p => p.Category).HasMaxLength(80).IsRequired();
+            entity.Property(p => p.Summary).HasMaxLength(500).IsRequired();
+            entity.Property(p => p.Problem).HasMaxLength(8000);
+            entity.Property(p => p.Outcome).HasMaxLength(4000);
+            entity.Property(p => p.SolvedOn).HasColumnType("date");
+            entity.HasIndex(p => p.Slug).IsUnique();
+            entity.HasMany(p => p.Steps).WithOne(p => p.Problem)
+                .HasForeignKey(p => p.ProblemId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasMany(p => p.Skills).WithOne(p => p.Problem)
+                .HasForeignKey(p => p.ProblemId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<GigStep>(entity =>
+        {
+            entity.ToTable("GigSteps", table =>
+                table.HasCheckConstraint("CK_GigSteps_StepNumber", "\"StepNumber\" >= 1"));
+            entity.HasKey(p => p.Id);
+            entity.Property(p => p.Title).HasMaxLength(200).IsRequired();
+            entity.Property(p => p.Description).HasMaxLength(4000);
+            entity.HasIndex(p => new { p.ProblemId, p.StepNumber }).IsUnique();
+        });
+
+        modelBuilder.Entity<GigProblemSkill>(entity =>
+        {
+            entity.ToTable("GigProblemSkills");
+            entity.HasKey(p => new { p.ProblemId, p.SkillId });
+            entity.HasOne(p => p.Skill).WithMany(p => p.GigProblems)
+                .HasForeignKey(p => p.SkillId).OnDelete(DeleteBehavior.NoAction);
         });
     }
 }
