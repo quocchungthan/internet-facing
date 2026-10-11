@@ -23,6 +23,16 @@ set -Eeuo pipefail
 : "${CADDY_GROUP:=caddy}"
 : "${SERVICE_EXTRA_ARGS:=}"
 : "${SERVICE_SECRET_DIR:=}"
+# Path-based sharing of one domain between services (all optional; unset keeps the one-service-per-domain behavior):
+#   SERVICE_HEALTH_PATH        path the candidate must answer with 2xx/3xx before traffic moves (default /)
+#   SERVICE_IMPORT_ROUTES_DIR  the domain's site block also imports <dir>/*.caddy, where other services add routes
+#   SERVICE_ROUTES_DIR +       this service does not own the site block: it writes <dir>/<SERVICE_NAME>.caddy that
+#   SERVICE_ROUTE_PATHS        routes the space-separated Caddy path matchers (for example "/mcp /mcp/*") to it.
+#                              The domain's owner must have been deployed with SERVICE_IMPORT_ROUTES_DIR set to the same dir.
+: "${SERVICE_HEALTH_PATH:=/}"
+: "${SERVICE_IMPORT_ROUTES_DIR:=}"
+: "${SERVICE_ROUTES_DIR:=}"
+: "${SERVICE_ROUTE_PATHS:=}"
 
 as_root() {
 	if [[ "$EUID" -eq 0 ]]; then
@@ -78,9 +88,58 @@ if [[ -n "$SERVICE_SECRET_DIR" && ! -d "$SERVICE_SECRET_DIR" ]]; then
 	exit 1
 fi
 
-fragment="$CADDY_SITES_DIR/$SERVICE_DOMAIN.caddy"
-fragment_tmp="$CADDY_SITES_DIR/.$SERVICE_DOMAIN.caddy.$$"
-fragment_backup="$CADDY_SITES_DIR/.$SERVICE_DOMAIN.caddy.previous.$$"
+if [[ ! "$SERVICE_HEALTH_PATH" =~ ^/[A-Za-z0-9._~/-]*$ ]]; then
+	echo "SERVICE_HEALTH_PATH must be an absolute URL path: $SERVICE_HEALTH_PATH" >&2
+	exit 2
+fi
+
+path_routed=false
+if [[ -n "$SERVICE_ROUTES_DIR$SERVICE_ROUTE_PATHS" ]]; then
+	if [[ -z "$SERVICE_ROUTES_DIR" || -z "$SERVICE_ROUTE_PATHS" ]]; then
+		echo "SERVICE_ROUTES_DIR and SERVICE_ROUTE_PATHS must be set together" >&2
+		exit 2
+	fi
+	if [[ -n "$SERVICE_STATIC_ROOT" || -n "$SERVICE_IMPORT_ROUTES_DIR" ]]; then
+		echo "A path-routed service cannot also own static files or import routes" >&2
+		exit 2
+	fi
+	if [[ ! "$SERVICE_ROUTES_DIR" =~ ^/[A-Za-z0-9._/-]+$ ]]; then
+		echo "SERVICE_ROUTES_DIR must be an absolute path without spaces: $SERVICE_ROUTES_DIR" >&2
+		exit 2
+	fi
+	if [[ ! "$SERVICE_NAME" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
+		echo "SERVICE_NAME must be lowercase letters, digits and hyphens for a path-routed service: $SERVICE_NAME" >&2
+		exit 2
+	fi
+	for route_path in $SERVICE_ROUTE_PATHS; do
+		if [[ ! "$route_path" =~ ^/[A-Za-z0-9._~/*-]*$ ]]; then
+			echo "SERVICE_ROUTE_PATHS entries must be Caddy path matchers like /mcp or /api/memory/*: $route_path" >&2
+			exit 2
+		fi
+	done
+	path_routed=true
+fi
+
+if [[ -n "$SERVICE_IMPORT_ROUTES_DIR" && ! "$SERVICE_IMPORT_ROUTES_DIR" =~ ^/[A-Za-z0-9._/-]+$ ]]; then
+	echo "SERVICE_IMPORT_ROUTES_DIR must be an absolute path without spaces: $SERVICE_IMPORT_ROUTES_DIR" >&2
+	exit 2
+fi
+
+if [[ "$path_routed" == true ]]; then
+	fragment_dir="$SERVICE_ROUTES_DIR"
+	fragment_name="$SERVICE_NAME.caddy"
+	domain_fragment="$CADDY_SITES_DIR/$SERVICE_DOMAIN.caddy"
+	if ! grep -qF "import $SERVICE_ROUTES_DIR/" "$domain_fragment" 2>/dev/null; then
+		echo "$domain_fragment does not import $SERVICE_ROUTES_DIR/*.caddy. Deploy the service that owns $SERVICE_DOMAIN first (with SERVICE_IMPORT_ROUTES_DIR=$SERVICE_ROUTES_DIR)." >&2
+		exit 1
+	fi
+else
+	fragment_dir="$CADDY_SITES_DIR"
+	fragment_name="$SERVICE_DOMAIN.caddy"
+fi
+fragment="$fragment_dir/$fragment_name"
+fragment_tmp="$fragment_dir/.$fragment_name.$$"
+fragment_backup="$fragment_dir/.$fragment_name.previous.$$"
 state=absent
 candidate_container="$SERVICE_CONTAINER-candidate-$$"
 candidate_started=false
@@ -90,7 +149,7 @@ static_releases_dir=
 fragment_source=
 
 umask 077
-as_root install -d -m 0755 "$(dirname "$CADDY_LOCK_FILE")" "$CADDY_SITES_DIR"
+as_root install -d -m 0755 "$(dirname "$CADDY_LOCK_FILE")" "$CADDY_SITES_DIR" "$fragment_dir"
 as_root install -m 0600 -o "$(id --user)" -g "$(id --group)" /dev/null "$CADDY_LOCK_FILE"
 
 ensure_caddy_path_access() {
@@ -99,6 +158,11 @@ ensure_caddy_path_access() {
 }
 
 ensure_caddy_path_access "$CADDY_SITES_DIR"
+ensure_caddy_path_access "$fragment_dir"
+if [[ -n "$SERVICE_IMPORT_ROUTES_DIR" ]]; then
+	as_root install -d -m 0755 "$SERVICE_IMPORT_ROUTES_DIR"
+	ensure_caddy_path_access "$SERVICE_IMPORT_ROUTES_DIR"
+fi
 exec 9>"$CADDY_LOCK_FILE"
 flock -n 9 || { echo "Another Caddy deployment is already running" >&2; exit 1; }
 
@@ -183,7 +247,7 @@ candidate_started=true
 health_status=
 for attempt in {1..30}; do
 	health_status=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
-		--max-time 2 "http://127.0.0.1:$candidate_port/" || true)
+		--max-time 2 "http://127.0.0.1:$candidate_port$SERVICE_HEALTH_PATH" || true)
 	if [[ "$health_status" =~ ^[23][0-9][0-9]$ ]]; then
 		break
 	fi
@@ -229,14 +293,29 @@ fi
 
 capture_fragment
 fragment_source=$(mktemp)
-cat > "$fragment_source" <<EOF
+if [[ "$path_routed" == true ]]; then
+	cat > "$fragment_source" <<EOF
+@$SERVICE_NAME path $SERVICE_ROUTE_PATHS
+handle @$SERVICE_NAME {
+	reverse_proxy 127.0.0.1:$candidate_port
+}
+EOF
+else
+	imported_routes=
+	if [[ -n "$SERVICE_IMPORT_ROUTES_DIR" ]]; then
+		imported_routes="	import $SERVICE_IMPORT_ROUTES_DIR/*.caddy
+"
+	fi
+	cat > "$fragment_source" <<EOF
 $SERVICE_DOMAIN {
 $static_caddy_config
+$imported_routes
 	handle {
 		reverse_proxy 127.0.0.1:$candidate_port
 	}
 }
 EOF
+fi
 as_root install -m 0644 "$fragment_source" "$fragment_tmp"
 as_root mv -f -- "$fragment_tmp" "$fragment"
 as_root chmod 0644 "$fragment"

@@ -1,4 +1,4 @@
-name: Build and deploy Farm
+name: Build and deploy Farm and Farm.Mind
 
 on:
   push:
@@ -8,6 +8,7 @@ on:
       - Farm/**
       - Farm.Data/**
       - Farm.Auth/**
+      - Farm.Mind/**
       - Farm.Microsoft/**
       - Farm.HangingPost/**
       - .github/workflows/build-deploy-farm.yml
@@ -98,4 +99,19 @@ jobs:
       deploy_common_script: deployment/deploy-caddy-service.sh
       runtime_image_argument: FARM_IMAGE
       image_artifact: farm-docker-image
+    secrets: inherit
+
+  # Farm.Mind (MCP + memory API) shares eldervibe.dev through path routes, so it deploys after Farm,
+  # which creates the database password, the key ring and the route directory.
+  deploy-mind:
+    needs: deploy
+    uses: ./.github/workflows/reusable-deploy-service.yml
+    with:
+      image_name: eldervibe-farm-mind
+      image_tag: ${{ github.sha }}
+      docker_context: .
+      dockerfile: Farm.Mind/Dockerfile
+      wrapper_path: Farm.Mind/scripts/deploy-farm-mind.sh
+      deploy_common_script: deployment/deploy-caddy-service.sh
+      runtime_image_argument: MIND_IMAGE
     secrets: inherit
