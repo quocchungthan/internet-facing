@@ -255,10 +255,10 @@ jobs:
           out "Container eldervibe-farm-postgres is running" "$(running eldervibe-farm-postgres)"
           out "Container eldervibe-farm is running" "$(running eldervibe-farm)"
           out "Container eldervibe-farm-mind is running" "$(running eldervibe-farm-mind)"
-          out "Farm DB accepts connections" "$(ok docker exec eldervibe-farm-postgres pg_isready -U postgres -d aurafarming)"
-          tables="$(docker exec eldervibe-farm-postgres psql -U postgres -d aurafarming -tAc "select count(*) from information_schema.tables where table_name in ('PortfolioProjects','PortfolioExperiences','WebsiteMetadata','PlatformBookmarks')" 2>/dev/null | tr -d '[:space:]')"
+          out "Farm DB accepts connections" "$(ok docker exec eldervibe-farm-postgres pg_isready -p 4554 -U postgres -d aurafarming)"
+          tables="$(docker exec eldervibe-farm-postgres psql -p 4554 -U postgres -d aurafarming -tAc "select count(*) from information_schema.tables where table_name in ('PortfolioProjects','PortfolioExperiences','WebsiteMetadata','PlatformBookmarks')" 2>/dev/null | tr -d '[:space:]')"
           out "Farm DB has the AuraFarming and portfolio tables (4 expected)" "$([[ "$tables" == 4 ]] && echo true || echo false)"
-          mind="$(docker exec eldervibe-farm-postgres psql -U postgres -d aurafarming -tAc "select count(*) from information_schema.schemata where schema_name='mind'" 2>/dev/null | tr -d '[:space:]')"
+          mind="$(docker exec eldervibe-farm-postgres psql -p 4554 -U postgres -d aurafarming -tAc "select count(*) from information_schema.schemata where schema_name='mind'" 2>/dev/null | tr -d '[:space:]')"
           out "Farm DB has the mind schema" "$([[ "$mind" == 1 ]] && echo true || echo false)"
           dir="$AFFINE_DEPLOY_DIR"
           out "AFFiNE deploy dir exists" "$([[ -n "$dir" ]] && ok test -d "$dir" || echo false)"
@@ -267,7 +267,8 @@ jobs:
             services="$(cd "$dir" && docker compose -f compose.yml ps --services --status running 2>/dev/null)"
             out "AFFiNE compose service postgres is running" "$(grep -qx postgres <<<"$services" && echo true || echo false)"
             out "AFFiNE compose service affine is running" "$(grep -qx affine <<<"$services" && echo true || echo false)"
-            out "AFFiNE database 'affine' exists" "$(cd "$dir" && ok docker compose -f compose.yml exec -T postgres psql -U postgres -d affine -c 'select 1')"
+            found="$(cd "$dir" && docker compose -f compose.yml exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d postgres -tAc "select 1 from pg_database where datname='"'"'affine'"'"'"' 2>/dev/null | tr -d '"'"'[:space:]'"'"')"
+            out "AFFiNE database 'affine' exists" "$([[ "$found" == 1 ]] && echo true || echo false)"
           fi
           out "sync.env exists in the AFFiNE deploy dir" "$([[ -n "$dir" ]] && ok test -f "$dir/sync.env" || echo false)"
           for key in DATABASE_CONNECTION_STRING AFFINE_DATABASE_URL AFFINE_WORKSPACE_ID AFFINE_COLLECTION_ID AFFINE_META_DOC_ID AFFINE_FEEDS_DOC_ID AFFINE_FEEDS_BLOCK_ID AFFINE_PORTFOLIO_COLLECTION_ID AFFINE_GIGS_COLLECTION_ID; do
