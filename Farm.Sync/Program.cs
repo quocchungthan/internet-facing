@@ -2,10 +2,10 @@ using AffineSync;
 using Farm.Data;
 using Microsoft.EntityFrameworkCore;
 
-if (args.Any(argument => argument is not ("--once" or "--show-data")) ||
-    (args.Contains("--once") && args.Contains("--show-data")))
+if (args.Any(argument => argument is not ("--once" or "--show-data" or "--healthcheck")) ||
+    args.Length > 1)
 {
-    Console.Error.WriteLine("Usage: AffineSync [--once | --show-data]");
+    Console.Error.WriteLine("Usage: AffineSync [--once | --show-data | --healthcheck]");
     return 1;
 }
 
@@ -25,7 +25,15 @@ try
         await DatabaseDisplay.WriteAsync(database, Console.Out, shutdown.Token);
         return 0;
     }
+    if (args.Contains("--healthcheck"))
+    {
+        var path = Environment.GetEnvironmentVariable("SYNC_STATE_PATH") ?? "/state/checkpoint.json";
+        var seconds = int.TryParse(Environment.GetEnvironmentVariable("SYNC_INTERVAL_SECONDS"), out var parsed) && parsed > 0 ? parsed : 60;
+        return new SyncHealth(path).IsHealthy(DateTimeOffset.UtcNow, SyncHealth.MaxAge(seconds)) ? 0 : 1;
+    }
     var configuration = WorkerConfiguration.FromEnvironment();
+    var health = new SyncHealth(configuration.StatePath);
+    var failures = 0;
     var state = new CheckpointStore(configuration.StatePath);
     using var ownership = state.AcquireLock();
     var options = new DbContextOptionsBuilder<AuraFarming>()
@@ -47,15 +55,18 @@ try
         {
             var count = await worker.RunAsync(shutdown.Token);
             Console.WriteLine($"{DateTimeOffset.UtcNow:O} Synced {count} changed document(s).");
+            failures = 0;
+            health.MarkSuccess(DateTimeOffset.UtcNow);
         }
         catch (OperationCanceledException) when (shutdown.IsCancellationRequested) { return once ? 1 : 0; }
         catch (Exception exception)
         {
             Console.Error.WriteLine($"{DateTimeOffset.UtcNow:O} Sync failed ({exception.GetType().Name}): {exception.GetBaseException().Message}");
             if (once) return 1;
+            failures++;
         }
         if (once) return 0;
-        await Task.Delay(TimeSpan.FromSeconds(configuration.IntervalSeconds), shutdown.Token);
+        await Task.Delay(SyncHealth.Backoff(configuration.IntervalSeconds, failures), shutdown.Token);
     } while (!shutdown.IsCancellationRequested);
     return 0;
 }
