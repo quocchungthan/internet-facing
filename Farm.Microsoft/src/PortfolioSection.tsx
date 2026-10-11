@@ -1,17 +1,11 @@
 import { useEffect, useState } from 'react'
 
-interface Profile { id: number; displayName: string; headline: string; bio?: string | null; location?: string | null; resumeUrl?: string | null }
 interface Project { id: number; title: string; slug: string; summary: string; description?: string | null; demoUrl?: string | null; sourceUrl?: string | null }
-interface Skill { id: number; name: string; category: string }
 interface Experience { id: number; company: string; jobTitle: string; description?: string | null; startDate: string; endDate?: string | null; isCurrent: boolean; displayOrder: number }
-interface SocialLink { id: number; label: string; url: string; displayOrder: number }
 
 interface PortfolioData {
-  profile: Profile | null
   projects: Project[]
-  skills: Skill[]
   experiences: Experience[]
-  links: SocialLink[]
 }
 
 async function getJson<T>(path: string): Promise<T> {
@@ -40,20 +34,14 @@ export function PortfolioSection() {
   useEffect(() => {
     let cancelled = false
     Promise.all([
-      getJson<Profile[]>('/api/portfolio/profiles'),
       getJson<Project[]>('/api/portfolio/projects'),
-      getJson<Skill[]>('/api/portfolio/skills'),
       getJson<Experience[]>('/api/portfolio/experiences'),
-      getJson<SocialLink[]>('/api/portfolio/social-links'),
     ])
-      .then(([profiles, projects, skills, experiences, links]) => {
+      .then(([projects, experiences]) => {
         if (cancelled) return
         setData({
-          profile: profiles[0] ?? null,
           projects,
-          skills,
           experiences: [...experiences].sort((a, b) => a.displayOrder - b.displayOrder),
-          links: [...links].sort((a, b) => a.displayOrder - b.displayOrder),
         })
       })
       .catch((err: unknown) => {
@@ -67,33 +55,9 @@ export function PortfolioSection() {
   if (error) return <p className="ms-portfolio-note">Portfolio is unavailable right now ({error}).</p>
   if (!data) return <p className="ms-portfolio-note">Loading portfolio…</p>
 
-  const { profile, projects, skills, experiences, links } = data
-  const skillGroups = Object.entries(
-    skills.reduce<Record<string, Skill[]>>((groups, skill) => {
-      ;(groups[skill.category] ??= []).push(skill)
-      return groups
-    }, {})
-  )
-
+  const { projects, experiences } = data
   return (
     <div className="ms-portfolio">
-      {profile && (
-        <section className="ms-portfolio-section" aria-label="Profile">
-          <h3>{profile.displayName}</h3>
-          <p className="ms-portfolio-headline">{profile.headline}</p>
-          {profile.bio && <p>{profile.bio}</p>}
-          {profile.location && <p className="ms-portfolio-muted">{profile.location}</p>}
-          <p className="ms-portfolio-links">
-            {profile.resumeUrl && <ExternalLink href={profile.resumeUrl}>Resume</ExternalLink>}
-            {links.map((link) => (
-              <ExternalLink key={link.id} href={link.url}>
-                {link.label}
-              </ExternalLink>
-            ))}
-          </p>
-        </section>
-      )}
-
       {experiences.length > 0 && (
         <section className="ms-portfolio-section" aria-label="Experience">
           <h3>Experience</h3>
@@ -122,18 +86,6 @@ export function PortfolioSection() {
                 {project.demoUrl && <ExternalLink href={project.demoUrl}>Demo</ExternalLink>}
               </p>
             </article>
-          ))}
-        </section>
-      )}
-
-      {skillGroups.length > 0 && (
-        <section className="ms-portfolio-section" aria-label="Skills">
-          <h3>Skills</h3>
-          {skillGroups.map(([category, items]) => (
-            <p key={category}>
-              <span className="ms-portfolio-muted">{category}: </span>
-              {items.map((skill) => skill.name).join(', ')}
-            </p>
           ))}
         </section>
       )}
