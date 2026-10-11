@@ -2,6 +2,7 @@
 #   docker compose -f Fences/compose.dev.yml up -d --build
 # Browsers resolve *.localhost to loopback, so http://fences.localhost:5188 works without hosts changes.
 # Containers that must reach it (Farm, Farm.Mind) add `extra_hosts: ["fences.localhost:host-gateway"]`.
+# Registered clients: farm-local (Farm UI), note (local AFFiNE; needs FENCES_NOTE_CLIENT_SECRET), mcp-local (AI clients).
 # Sign-in goes through GitHub, so set FENCES_GITHUB_CLIENT_ID / FENCES_GITHUB_CLIENT_SECRET
 # (a GitHub OAuth app; without them the login page returns 500). Callback: http://fences.localhost:5188/signin-github
 services:
@@ -17,10 +18,23 @@ services:
       IdentityApp__AllowedReturnHosts__0: fences.localhost:${FENCES_HOST_PORT:-5188}
       IdentityApp__AllowedReturnHosts__1: localhost:${FARM_HOST_PORT:-8080}
       IdentityApp__AllowedReturnHosts__2: localhost:${MIND_HOST_PORT:-8081}
+      IdentityApp__AllowedReturnHosts__3: localhost:${AFFINE_HOST_PORT:-3010}
       IdentityApp__OidcClients__0__ClientId: farm-local
       IdentityApp__OidcClients__0__DisplayName: Farm (local)
       IdentityApp__OidcClients__0__RedirectUris__0: http://localhost:${FARM_HOST_PORT:-8080}/signin-oidc
       IdentityApp__OidcClients__0__PostLogoutRedirectUris__0: http://localhost:${FARM_HOST_PORT:-8080}/
+      # Local AFFiNE (note): confidential, PKCE forced, as in production.
+      IdentityApp__OidcClients__1__ClientId: note
+      IdentityApp__OidcClients__1__DisplayName: Note (local AFFiNE)
+      IdentityApp__OidcClients__1__ClientSecret: ${FENCES_NOTE_CLIENT_SECRET:?Set FENCES_NOTE_CLIENT_SECRET in the environment}
+      IdentityApp__OidcClients__1__RequirePkce: "true"
+      IdentityApp__OidcClients__1__RedirectUris__0: http://localhost:${AFFINE_HOST_PORT:-3010}/oauth/callback
+      IdentityApp__OidcClients__1__PostLogoutRedirectUris__0: http://localhost:${AFFINE_HOST_PORT:-3010}/
+      # Public MCP/AI client (PKCE always required); loopback redirects for desktop AI harnesses.
+      IdentityApp__OidcClients__2__ClientId: mcp-local
+      IdentityApp__OidcClients__2__DisplayName: MCP client (local)
+      IdentityApp__OidcClients__2__RedirectUris__0: http://localhost:${MCP_CALLBACK_PORT:-33418}/callback
+      IdentityApp__OidcClients__2__RedirectUris__1: http://127.0.0.1:${MCP_CALLBACK_PORT:-33418}/callback
       Authentication__GitHub__ClientId: ${FENCES_GITHUB_CLIENT_ID:-}
       Authentication__GitHub__ClientSecret: ${FENCES_GITHUB_CLIENT_SECRET:-}
     ports:
