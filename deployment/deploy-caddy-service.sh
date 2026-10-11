@@ -211,8 +211,11 @@ rollback_caddy() {
 }
 
 active_port=
+previous_exists=false
 if docker container inspect "$SERVICE_CONTAINER" >/dev/null 2>&1; then
-	active_mapping=$(docker port "$SERVICE_CONTAINER" 80)
+	previous_exists=true
+	# A stopped or hand-made container has no published port 80; it is still replaced by the candidate.
+	active_mapping=$(docker port "$SERVICE_CONTAINER" 80 2>/dev/null | head -n 1 || true)
 	active_port="${active_mapping##*:}"
 fi
 
@@ -335,7 +338,7 @@ if ! reload_caddy; then
 fi
 
 deployment_committed=true
-if [[ -n "$active_port" ]]; then
+if [[ "$previous_exists" == true ]]; then
 	if ! docker stop "$SERVICE_CONTAINER" >/dev/null; then
 		echo "Could not stop previous container $SERVICE_CONTAINER; candidate remains available as $candidate_container" >&2
 	fi
