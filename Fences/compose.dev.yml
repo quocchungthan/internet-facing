@@ -14,6 +14,8 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       IdentityApp__OidcIssuer: http://fences.localhost:${FENCES_HOST_PORT:-5188}
+      # Empty overrides appsettings' .eldervibe.dev, giving a host-only cookie for fences.localhost. The cookie is
+      # always Secure: Chrome and Firefox accept that on http://*.localhost, Safari does not.
       IdentityApp__CookieDomain: ""
       IdentityApp__DefaultReturnUrl: http://localhost:${FARM_HOST_PORT:-8080}
       IdentityApp__AllowedReturnHosts__0: fences.localhost:${FENCES_HOST_PORT:-5188}
