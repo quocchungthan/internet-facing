@@ -38,7 +38,8 @@ export function ConnectAi({ session, loading }: ConnectAiProps) {
           </p>
         ) : session.signInAvailable ? (
           <p>
-            <a href={signInUrl('/connect')}>Sign in</a> to manage the AI clients connected to your account.
+            <a href={signInUrl('/connect')}>Sign in</a> so your AI assistants share one private memory. Signing in here only
+            identifies you; each assistant still asks for its own approval the first time it connects.
           </p>
         ) : (
           <p>Sign-in is not available on this server yet.</p>

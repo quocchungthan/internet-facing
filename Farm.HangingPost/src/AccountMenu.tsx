@@ -13,8 +13,12 @@ export function AccountMenu({ session, loading, pathname, onNavigate }: AccountM
   if (!session.isAuthenticated) {
     return (
       <div className="account">
-        <a className="account-button account-button-primary" href={signInUrl(pathname)}>
-          Sign in
+        <a
+          className="account-button account-button-primary"
+          href={signInUrl('/connect')}
+          title="Sign in to give your AI assistants one private memory"
+        >
+          Sign in to connect your AI
         </a>
       </div>
     )
