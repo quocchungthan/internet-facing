@@ -1,27 +1,11 @@
-# Development stack: Farm database + sync worker + Farm website, fed by the local AFFiNE Docker stack.
-# Run from this directory with POSTGRES_PASSWORD set in the environment:
-#   POSTGRES_PASSWORD=... docker compose -f compose.dev.yml --profile sync --profile farm up -d --build
+# Development sync worker only. It owns neither database nor website; it attaches to two other stacks:
+#   - the Farm database, from main:  docker compose -f deployment/local/compose.yml up -d   (network farm-local_default)
+#   - the local AFFiNE Docker stack  (network affine_default)
+# Run from this directory; DATABASE_CONNECTION_STRING should use Host=postgres (the main stack's service):
+#   docker compose -f compose.dev.yml up -d --build
 # Production runs the worker as a sidecar of the AFFiNE stack instead (deploy/compose.sync.yml).
 services:
-  postgres:
-    image: postgres:17-alpine
-    environment:
-      POSTGRES_DB: aurafarming
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the environment}
-    ports:
-      - "127.0.0.1:${POSTGRES_HOST_PORT:-4554}:5432"
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
-      interval: 5s
-      timeout: 5s
-      retries: 20
-    restart: unless-stopped
-
   sync:
-    profiles: ["sync"]
     build:
       context: ..
       dockerfile: Farm.Sync/Dockerfile
@@ -38,39 +22,20 @@ services:
       AFFINE_FEEDS_BLOCK_ID: ${AFFINE_FEEDS_BLOCK_ID:-}
       AFFINE_PORTFOLIO_COLLECTION_ID: ${AFFINE_PORTFOLIO_COLLECTION_ID:-}
       AFFINE_GIGS_COLLECTION_ID: ${AFFINE_GIGS_COLLECTION_ID:-}
-    depends_on:
-      postgres:
-        condition: service_healthy
     volumes:
       - sync-state:/state
     networks:
-      - default
+      - farm-db
       - affine-source
     restart: unless-stopped
 
-  farm:
-    profiles: ["farm"]
-    build:
-      context: ..
-      dockerfile: Farm/Dockerfile
-    environment:
-      POSTGRES_HOST: postgres
-      POSTGRES_PORT: "5432"
-      POSTGRES_DB: aurafarming
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the environment}
-    ports:
-      - "127.0.0.1:${FARM_HOST_PORT:-8080}:80"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    restart: unless-stopped
-
 volumes:
-  postgres-data:
   sync-state:
 
 networks:
+  farm-db:
+    external: true
+    name: ${FARM_DOCKER_NETWORK:-farm-local_default}
   affine-source:
     external: true
     name: ${AFFINE_DOCKER_NETWORK:-affine_default}
