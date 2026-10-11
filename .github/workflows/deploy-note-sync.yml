@@ -5,15 +5,12 @@ name: Deploy Note Sync
 # never depends on this worker. Prerequisite: sync.env in AFFINE_DEPLOY_DIR (Farm.Sync/deploy/sync.env.example).
 
 # The Run workflow button only lists workflows that exist on the default branch, so this one also
-# runs on push to sub/note. A push only runs the setup check (nothing is started); put
+# runs on every push to sub/note. A push only runs the setup check (nothing is started); put
 # [deploy-sync] in the commit message to also start/restart the sync.
 on:
   push:
     branches:
       - sub/note
-    paths:
-      - Farm.Sync/**
-      - .github/workflows/deploy-note-sync.yml
   workflow_dispatch:
     inputs:
       check_only:
