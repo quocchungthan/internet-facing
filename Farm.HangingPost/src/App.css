@@ -10,11 +10,87 @@
 
 .app-header {
   align-items: center;
+  background: var(--background);
+  position: sticky;
+  top: 0;
+  z-index: 20;
   border-bottom: 1px solid var(--border);
   display: flex;
   gap: 16px;
   justify-content: space-between;
   margin-bottom: 8px;
+}
+
+.services {
+  flex: 0 0 auto;
+  position: relative;
+}
+
+.services-toggle {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  padding: 6px 12px;
+}
+
+.services-toggle:hover {
+  border-color: var(--brand);
+}
+
+.services-toggle:focus-visible,
+.services-list a:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.services-arrow {
+  display: inline-block;
+  transition: transform 0.15s;
+}
+
+.services-arrow-open {
+  transform: rotate(180deg);
+}
+
+.services-list {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  list-style: none;
+  margin: 6px 0 0;
+  min-width: 15rem;
+  padding: 6px;
+  position: absolute;
+  right: 0;
+  top: 100%;
+}
+
+.services-list a {
+  border-radius: 4px;
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  padding: 8px 12px;
+  text-decoration: none;
+}
+
+.services-list a:hover {
+  background: var(--background);
+}
+
+.services-name {
+  font-weight: 600;
+}
+
+.services-host {
+  color: var(--muted-text);
+  font-size: 0.8125rem;
 }
 
 .tab-list {

@@ -3,6 +3,7 @@ import { MicrosoftTab } from '@farm/microsoft'
 import { BrickTracker } from './BrickTracker'
 import { WinchesterView } from './WinchesterView'
 import { AccountMenu } from './AccountMenu'
+import { ServicesMenu } from './ServicesMenu'
 import { ConnectAi } from './ConnectAi'
 import { useSession } from './session'
 import './App.css'
@@ -114,6 +115,7 @@ export function App() {
             )
           })}
         </nav>
+        <ServicesMenu />
         <AccountMenu session={session} loading={status === 'loading'} pathname={pathname} onNavigate={navigate} />
       </header>
 
