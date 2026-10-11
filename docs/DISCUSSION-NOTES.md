@@ -239,3 +239,4 @@ Same operations as REST under `/api/memory/*` for the Farm UI, behind the same t
 - 2026-10-11: Decision 10 - sync worker moves into sub/note as a sidecar with ProjectReference to Farm.Data.
 - 2026-10-11: Decision 8 expanded: two-way Mongo <-> AFFiNE sync; latest write wins; writes via AFFiNE API service token (spike first).
 - 2026-10-11: Decision 11 - AFFiNE remains source of truth, with fragility safeguards.
+- 2026-10-11: Confirmed decision 9: the AI feature (Farm.Mind, MCP) is owned by main and served on eldervibe.dev via Caddy path routes.
