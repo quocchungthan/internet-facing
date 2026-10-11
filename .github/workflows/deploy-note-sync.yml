@@ -4,7 +4,16 @@ name: Deploy Note Sync
 # stack (note.eldervibe.dev). Deliberately separate from "Deploy Note" so AFFiNE's own deployment
 # never depends on this worker. Prerequisite: sync.env in AFFINE_DEPLOY_DIR (Farm.Sync/deploy/sync.env.example).
 
+# The Run workflow button only lists workflows that exist on the default branch, so this one also
+# runs on push to sub/note. A push only runs the setup check (nothing is started); put
+# [deploy-sync] in the commit message to also start/restart the sync.
 on:
+  push:
+    branches:
+      - sub/note
+    paths:
+      - Farm.Sync/**
+      - .github/workflows/deploy-note-sync.yml
   workflow_dispatch:
     inputs:
       check_only:
@@ -18,6 +27,9 @@ permissions:
 concurrency:
   group: deploy-note-production
   cancel-in-progress: false
+
+env:
+  CHECK_ONLY: ${{ github.event_name == 'push' && !contains(github.event.head_commit.message, '[deploy-sync]') || inputs.check_only == true }}
 
 jobs:
   build:
@@ -112,7 +124,7 @@ jobs:
           ssh "${ssh_opts[@]}" "$remote" "cat > '$AFFINE_DEPLOY_DIR/sync.env.example'" < Farm.Sync/deploy/sync.env.example
 
           ssh "${ssh_opts[@]}" "$remote" \
-            "AFFINE_DEPLOY_DIR='$AFFINE_DEPLOY_DIR' AFFINE_SYNC_IMAGE='$IMAGE_TAG' CHECK_ONLY='${{ inputs.check_only }}' bash -s" <<'REMOTE'
+            "AFFINE_DEPLOY_DIR='$AFFINE_DEPLOY_DIR' AFFINE_SYNC_IMAGE='$IMAGE_TAG' CHECK_ONLY='${{ env.CHECK_ONLY }}' bash -s" <<'REMOTE'
           set -euo pipefail
           cd "$AFFINE_DEPLOY_DIR"
           if [ ! -f sync.env ]; then
