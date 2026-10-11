@@ -231,6 +231,9 @@ fi
 if [[ -d "$FARM_STATIC_ROOT" ]] || container_exists "$FARM_CONTAINER" || container_exists "$FARM_DB_CONTAINER"; then
 	copy_path farm-hanging-post farm required "$FARM_STATIC_ROOT"
 	copy_path farm-config farm optional "$FARM_CONFIG_DIR"
+	# Shared sign-in key ring (Farm and Farm.Mind). Losing it only signs everyone out, but it is tiny.
+	farm_keys="$(docker volume inspect -f '{{.Mountpoint}}' eldervibe-farm-keys 2>/dev/null || true)"
+	[[ -n "$farm_keys" ]] && copy_path farm-keys farm optional "$farm_keys"
 	if container_exists "$FARM_DB_CONTAINER"; then
 		dump_to farm-postgres farm "$FARM_DB_CONTAINER" dumps/farm-postgres.sql 'Farm PostgreSQL database dump complete' -- \
 			'set -- "${POSTGRES_PASSWORD:-}"; PGPASSWORD="$1" exec pg_dump -p '"$FARM_PG_PORT"' -U "${POSTGRES_USER:-postgres}" -d "${POSTGRES_DB:-aurafarming}" --clean --if-exists'
@@ -317,6 +320,9 @@ note_dir="$AFFINE_DEPLOY_DIR"
 if [[ -f "$note_dir/compose.yml" ]] || container_exists "$AFFINE_CONTAINER"; then
 	copy_path note-env note optional "$note_dir/.env"
 	copy_path note-compose note required "$note_dir/compose.yml"
+	# Sync worker (Farm.Sync) sidecar: its config holds the Farm DB password and the read-only AFFiNE login.
+	copy_path note-sync-env note optional "$note_dir/sync.env"
+	copy_path note-sync-compose note optional "$note_dir/compose.sync.yml"
 	note_config="$(mount_source "$AFFINE_CONTAINER" /root/.affine/config)"
 	copy_path note-config note required "${note_config:-$note_dir/config}"
 	note_blobs="$(mount_source "$AFFINE_CONTAINER" /root/.affine/storage)"
@@ -403,6 +409,7 @@ restore_cmd() { # <zip path> <original path>
 	printf 'chown -R caddy:caddy %s/.local/share/caddy\ncaddy validate --config /etc/caddy/Caddyfile --adapter caddyfile\nsystemctl start caddy\n```\n\n' "$caddy_home"
 	printf '### Farm (main, eldervibe.dev)\n\nRedeploy with the `build-deploy-farm.yml` workflow. Restore static assets and PostgreSQL database if needed:\n\n'
 	printf '```bash\nrsync -a files%s/ %s/\nchown -R caddy:caddy %s\n' "$FARM_STATIC_ROOT" "$FARM_STATIC_ROOT" "$FARM_STATIC_ROOT"
+	printf '# Sign-in key ring (optional; without it users just sign in again):\ndocker volume create eldervibe-farm-keys >/dev/null; [ -d files/var/lib/docker/volumes/eldervibe-farm-keys/_data ] && rsync -a files/var/lib/docker/volumes/eldervibe-farm-keys/_data/ "$(docker volume inspect -f '"'"'{{.Mountpoint}}'"'"' eldervibe-farm-keys)/"\n'
 	printf 'if [[ -f /root/restore/dumps/farm-postgres.sql ]]; then\n  docker exec -i %s psql -U postgres -d aurafarming < /root/restore/dumps/farm-postgres.sql\nfi\n```\n\n' "$FARM_DB_CONTAINER"
 	printf '### Fences (identity)\n\n```bash\ndocker stop %s\n' "$FENCES_CONTAINER"
 	if [[ -n "${FENCES_DEPLOY_DIR:-}" ]]; then
@@ -432,12 +439,14 @@ restore_cmd() { # <zip path> <original path>
 	printf 'docker exec -i %s sh -c '\''set -- "$MYSQL_ROOT_PASSWORD"; MYSQL_PWD="$1" exec mariadb -uroot'\'' < /root/restore/dumps/seafile-mysql-all.sql\n' "$SEAFILE_DB_CONTAINER"
 	printf 'docker compose up -d\n```\n\n'
 	printf '### Note / AFFiNE\n\n```bash\ncd %s\ndocker compose -f compose.yml down\n' "$note_dir"
-	printf 'for p in .env compose.yml; do [ -e "/root/restore/files%s/$p" ] && cp -a "/root/restore/files%s/$p" ./; done\n' "$note_dir" "$note_dir"
+	printf 'for p in .env compose.yml sync.env compose.sync.yml; do [ -e "/root/restore/files%s/$p" ] && cp -a "/root/restore/files%s/$p" ./; done\n' "$note_dir" "$note_dir"
 	printf 'rsync -a /root/restore/files%s/ %s/\n' "${note_config:-$note_dir/config}" "${note_config:-$note_dir/config}"
 	printf 'rsync -a /root/restore/files%s/ %s/\n' "${note_blobs:-$note_dir/data/storage}" "${note_blobs:-$note_dir/data/storage}"
 	printf 'docker compose -f compose.yml up -d postgres && sleep 15\n'
 	printf 'docker exec -i %s sh -c '\''set -- "${POSTGRES_PASSWORD:-}"; PGPASSWORD="$1" exec psql -U "${POSTGRES_USER:-affine}" -d "${POSTGRES_DB:-affine}"'\'' < /root/restore/dumps/affine-postgres.sql\n' "$AFFINE_DB_CONTAINER"
-	printf 'docker compose -f compose.yml up -d\n```\n\n'
+	printf 'docker compose -f compose.yml up -d\n'
+	printf '# The affine_sync read-only role is not in the dump: recreate it with Farm.Sync/reader/provision-source-role.sql and the password from sync.env.\n'
+	printf '[ -e compose.sync.yml ] && docker compose -f compose.yml -f compose.sync.yml up -d affine-sync\n```\n\n'
 	printf '### banhve\n\n`sub/banhve` has no service of its own on the VPS; any `banhve` Caddy fragment is restored with the Caddy item.\n'
 } > "$staging/RESTORE.md"
 chmod 600 "$staging/RESTORE.md" "$manifest"
