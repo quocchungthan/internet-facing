@@ -219,3 +219,7 @@ dotnet run --project Farm.Sync -- --show-data                                   
 This only queries the target database. It does not apply migrations, read AFFiNE, sync rows, or touch the
 checkpoint, and it can run while the scheduler is active. `exec` reuses the running worker's connection
 configuration.
+
+## Setup check
+
+`AffineSync --check` is a read-only report (PASS/FAIL with a "->" fix per problem) covering the env keys, the Farm DB login, the AFFiNE read-only role, the workspace and the collection/page IDs. Run it in the container (`docker compose run --rm --no-deps affine-sync --check`) or via the `Deploy Note Sync` workflow with `check_only`. CI output shows counts only; add `--show-ids` in a private terminal to list candidate IDs and titles.
