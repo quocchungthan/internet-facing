@@ -193,3 +193,111 @@ jobs:
             echo "===== Diagnostics complete. No firewall, Docker, Caddy, or system state was modified. ====="'
 
           echo "VPS full-stack diagnostic run completed. Review the log above; no configuration, containers, or services were modified."
+
+  sync-preflight:
+    # Read-only checklist for the AFFiNE -> Farm sync. Runs after the diagnostics, even when they report problems.
+    needs: diagnose
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    environment: hostkey-server
+
+    steps:
+      - name: Check sync prerequisites over SSH (names and states only, never secret values)
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          AFFINE_DEPLOY_DIR: ${{ vars.AFFINE_DEPLOY_DIR }}
+          HAS_FENCES_OIDC_CLIENTS_JSON: ${{ secrets.FENCES_OIDC_CLIENTS_JSON != '' }}
+          HAS_FENCES_GITHUB_CLIENT_ID: ${{ secrets.FENCES_GITHUB_CLIENT_ID != '' }}
+          HAS_FENCES_GITHUB_CLIENT_SECRET: ${{ secrets.FENCES_GITHUB_CLIENT_SECRET != '' }}
+          HAS_ACME_EMAIL: ${{ (secrets.ACME_EMAIL || vars.ACME_EMAIL) != '' }}
+          HAS_FENCES_OIDC_ISSUER: ${{ vars.FENCES_OIDC_ISSUER != '' }}
+          HAS_FENCES_COOKIE_DOMAIN: ${{ vars.FENCES_COOKIE_DOMAIN != '' }}
+        run: |
+          set -euo pipefail
+          umask 077
+          ssh_key_file="$(mktemp)"
+          known_hosts_file="$(mktemp)"
+          trap 'rm -f -- "$ssh_key_file" "$known_hosts_file"' EXIT
+          for required in VPS_HOST VPS_PORT VPS_USER VPS_SSH_KEY VPS_KNOWN_HOSTS; do
+            [[ -n "${!required}" ]] || { echo "::error::Missing required hostkey-server value: $required" >&2; exit 1; }
+          done
+          [[ "$VPS_PORT" =~ ^[0-9]+$ ]] || { echo "::error::VPS_PORT must be numeric." >&2; exit 1; }
+          if [[ -n "${AFFINE_DEPLOY_DIR:-}" ]] && { [[ "$AFFINE_DEPLOY_DIR" != /* ]] || [[ ! "$AFFINE_DEPLOY_DIR" =~ ^[A-Za-z0-9._/-]+$ ]]; }; then
+            echo "::error::AFFINE_DEPLOY_DIR must be an absolute path of safe characters." >&2; exit 1
+          fi
+          printf '%s\n' "$VPS_SSH_KEY" > "$ssh_key_file"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > "$known_hosts_file"
+          chmod 600 "$ssh_key_file" "$known_hosts_file"
+
+          failures=0
+          check() { # check <label> <true|false>
+            if [[ "$2" == true ]]; then echo "PASS  $1"; else echo "FAIL  $1"; failures=$((failures + 1)); fi
+          }
+          echo "== GitHub environment (present / missing) =="
+          for name in FENCES_OIDC_CLIENTS_JSON FENCES_GITHUB_CLIENT_ID FENCES_GITHUB_CLIENT_SECRET ACME_EMAIL FENCES_OIDC_ISSUER FENCES_COOKIE_DOMAIN; do
+            flag="HAS_$name"; check "$name is set" "${!flag}"
+          done
+          check "AFFINE_DEPLOY_DIR variable is set" "$([[ -n "${AFFINE_DEPLOY_DIR:-}" ]] && echo true || echo false)"
+
+          echo "== VPS =="
+          remote_output="$(ssh -i "$ssh_key_file" -p "$VPS_PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$known_hosts_file" -o GlobalKnownHostsFile=/dev/null \
+            "$VPS_USER@$VPS_HOST" "AFFINE_DEPLOY_DIR='${AFFINE_DEPLOY_DIR:-}' bash -s" <<'REMOTE'
+          ok() { if "$@" >/dev/null 2>&1; then echo true; else echo false; fi; }
+          running() { [[ "$(docker inspect -f '{{.State.Running}}' "$1" 2>/dev/null)" == true ]] && echo true || echo false; }
+          out() { echo "$1|$2"; }
+          out "Farm DB password file /etc/farm/postgres.password exists" "$(ok test -s /etc/farm/postgres.password)"
+          out "Docker network farm-network exists" "$(ok docker network inspect farm-network)"
+          out "Container eldervibe-farm-postgres is running" "$(running eldervibe-farm-postgres)"
+          out "Container eldervibe-farm is running" "$(running eldervibe-farm)"
+          out "Container eldervibe-farm-mind is running" "$(running eldervibe-farm-mind)"
+          out "Farm DB accepts connections" "$(ok docker exec eldervibe-farm-postgres pg_isready -U postgres -d aurafarming)"
+          tables="$(docker exec eldervibe-farm-postgres psql -U postgres -d aurafarming -tAc "select count(*) from information_schema.tables where table_name in ('PortfolioProjects','PortfolioExperiences','WebsiteMetadata','PlatformBookmarks')" 2>/dev/null | tr -d '[:space:]')"
+          out "Farm DB has the AuraFarming and portfolio tables (4 expected)" "$([[ "$tables" == 4 ]] && echo true || echo false)"
+          mind="$(docker exec eldervibe-farm-postgres psql -U postgres -d aurafarming -tAc "select count(*) from information_schema.schemata where schema_name='mind'" 2>/dev/null | tr -d '[:space:]')"
+          out "Farm DB has the mind schema" "$([[ "$mind" == 1 ]] && echo true || echo false)"
+          dir="$AFFINE_DEPLOY_DIR"
+          out "AFFiNE deploy dir exists" "$([[ -n "$dir" ]] && ok test -d "$dir" || echo false)"
+          out "AFFiNE compose.yml exists" "$([[ -n "$dir" ]] && ok test -f "$dir/compose.yml" || echo false)"
+          if [[ -n "$dir" && -f "$dir/compose.yml" ]]; then
+            services="$(cd "$dir" && docker compose -f compose.yml ps --services --status running 2>/dev/null)"
+            out "AFFiNE compose service postgres is running" "$(grep -qx postgres <<<"$services" && echo true || echo false)"
+            out "AFFiNE compose service affine is running" "$(grep -qx affine <<<"$services" && echo true || echo false)"
+            out "AFFiNE database 'affine' exists" "$(cd "$dir" && ok docker compose -f compose.yml exec -T postgres psql -U postgres -d affine -c 'select 1')"
+          fi
+          out "sync.env exists in the AFFiNE deploy dir" "$([[ -n "$dir" ]] && ok test -f "$dir/sync.env" || echo false)"
+          for key in DATABASE_CONNECTION_STRING AFFINE_DATABASE_URL AFFINE_WORKSPACE_ID AFFINE_COLLECTION_ID AFFINE_META_DOC_ID AFFINE_FEEDS_DOC_ID AFFINE_FEEDS_BLOCK_ID AFFINE_PORTFOLIO_COLLECTION_ID AFFINE_GIGS_COLLECTION_ID; do
+            # Only the key name and whether it has a non-placeholder value are reported.
+            has="false"
+            if [[ -n "$dir" && -f "$dir/sync.env" ]]; then
+              value="$(grep -E "^$key=" "$dir/sync.env" | head -1 | cut -d= -f2-)"
+              [[ -n "$value" && "$value" != *"<"* && "$value" != *REPLACE* ]] && has=true
+            fi
+            out "sync.env sets $key" "$has"
+          done
+          state="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' affine-sync 2>/dev/null || true)"
+          [[ -n "$state" ]] || state="$(cd "${dir:-/}" && docker compose -f compose.yml -f compose.sync.yml ps -q affine-sync 2>/dev/null | head -1 | xargs -r docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' 2>/dev/null)"
+          out "affine-sync container is healthy (optional before the first sync deploy)" "$([[ "$state" == healthy ]] && echo true || echo false)"
+          REMOTE
+          )"
+          while IFS='|' read -r label result; do
+            [[ -n "$label" ]] || continue
+            check "$label" "$result"
+          done <<< "$remote_output"
+
+          echo "== Public endpoints =="
+          code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 https://eldervibe.dev/api/portfolio/projects || true)"
+          check "GET /api/portfolio/projects returns 200 (got $code)" "$([[ "$code" == 200 ]] && echo true || echo false)"
+          code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 -X POST -H 'content-type: application/json' -d '{}' https://eldervibe.dev/mcp || true)"
+          check "POST /mcp without a token returns 401 (got $code)" "$([[ "$code" == 401 ]] && echo true || echo false)"
+
+          echo
+          if [[ "$failures" -gt 0 ]]; then
+            echo "::warning::$failures sync prerequisite(s) not ready. The affine-sync health line only matters after the first sync deploy."
+            exit 1
+          fi
+          echo "All sync prerequisites are ready."
