@@ -10,11 +10,14 @@ public interface IDatabaseWriter
 
 public sealed class SyncRunner(ISnapshotReader reader, ICheckpointStore state, IDatabaseWriter database)
 {
+    public Action<string, string> ReportSkipped { get; init; } = (id, reason) =>
+        Console.Error.WriteLine($"{DateTimeOffset.UtcNow:O} Skipped document {id}: {reason}");
+
     public async Task<int> RunAsync(CancellationToken cancellationToken)
     {
         var checkpoint = await state.LoadAsync(cancellationToken);
         var snapshot = await reader.ReadAsync(cancellationToken);
-        snapshot.Validate();
+        snapshot = snapshot.WithoutInvalidDocuments(ReportSkipped);
         var documents = checkpoint.Documents is null
             ? new Dictionary<string, DocumentCheckpoint>(StringComparer.Ordinal)
             : new Dictionary<string, DocumentCheckpoint>(checkpoint.Documents, StringComparer.Ordinal);

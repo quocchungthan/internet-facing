@@ -59,13 +59,13 @@ Numbered so they can be tracked. "Branch" is where the change belongs.
 
 | # | Gap | Why it matters | Branch |
 | --- | --- | --- | --- |
-| G1 | **Farm DB password is never set.** No workflow passes `POSTGRES_PASSWORD`; `deploy-farm.sh` falls back to `postgres`. | The sidecar joins `farm-network`, so any container there can reach the database. The env var only takes effect when the container is first created; if it already exists, change it with `ALTER USER`. | main |
-| G2 | **Farm gets no auth settings.** `deploy-farm.sh` writes only the database settings to `/etc/farm/farm.env`, and mounts no shared key volume. | Sign-in stays off in production (L2). | main |
-| G3 | **One Caddy upstream per domain.** The common script writes `handle { reverse_proxy 127.0.0.1:<port> }` for the whole domain. | Farm.Mind must answer `/mcp`, `/api/memory/*` and `/.well-known/oauth-protected-resource*` on `eldervibe.dev` (decision 9). **Decided (2026-10-11): the AI feature is built and deployed from `main` and served on `eldervibe.dev` by path routes.** Needs a new optional `SERVICE_PATH_ROUTES` in the script (backward compatible). | main |
-| G4 | **No Farm.Mind deploy path.** | L3. Needs a wrapper script, a workflow, ports (for example 8182/8183, 8180/8181 are Farm's), the same cookie name and key volume as Farm. | main |
+| G1 | **Farm DB password.** **Done (main):** `deploy-farm.sh` generates it once at `/etc/farm/postgres.password` (root, 0600), reuses it, and applies `ALTER USER` only when it is new. No GitHub secret is needed. | The sidecar joins `farm-network`; read the password with `sudo cat /etc/farm/postgres.password` after the Farm deploy and put it in `sync.env`. | main (done) |
+| G2 | **Farm auth settings.** **Done (main):** `deploy-farm.sh` writes `FarmAuth__Authority/ClientId/PublicBaseUrl/DataProtectionKeysPath` and mounts the `eldervibe-farm-keys` volume at `/keys`. | Sign-in is on in production once Fences has the `farm` client (G5). | main (done) |
+| G3 | **Path routes in Caddy.** **Done (main):** `deploy-caddy-service.sh` supports `SERVICE_PATH_ROUTES`, a health path, and imports fragments from `/etc/caddy/farm-routes`. Farm.Mind answers `/mcp`, `/api/memory/*` and `/.well-known/oauth-protected-resource*` on `eldervibe.dev`. | Verified with real Caddy against the generated fragments. | main (done) |
+| G4 | **Farm.Mind deploy path.** **Done (main):** `Farm.Mind/scripts/deploy-farm-mind.sh` and the `deploy-mind` job in `build-deploy-farm.yml` (ports 8182/8183, shared key volume, `farm-network`). Run order: Fences, Farm, then Mind. | Mind refuses to deploy until the Farm deploy has created the password file. | main (done) |
 | G5 | **Fences has no Farm client.** `FENCES_OIDC_CLIENTS_JSON` needs a client for the site (redirect `https://eldervibe.dev/signin-oidc`, post-logout `https://eldervibe.dev/`), and `AllowedReturnHosts` / `AllowedCorsOrigins` lack `eldervibe.dev`. | L2. | identity (config only) |
-| G6 | **Fences cannot issue tokens Farm.Mind accepts.** Single flow, no `farm-mind` audience, access tokens are encrypted, no refresh tokens, no dynamic client registration. | L3: MCP clients register themselves and call with a bearer token. Options: disable token encryption and add the audience, or have Farm.Mind introspect. | identity (code) |
-| G7 | **The AI feature itself is a placeholder.** `/mcp` returns 501 after authentication; no MongoDB, no memory model. | L3. Needs a Mongo container (private network, authenticated, backed up) and the tools from decision 5 and the I/O draft. | main |
+| G6 | **Tokens Farm.Mind accepts.** **Done (identity):** dynamic client registration (RFC 7591), refresh tokens, RFC 8707 resource `https://eldervibe.dev/mcp` as audience (`IdentityApp__McpAudience`), unencrypted JWT access tokens validated via JWKS. | MCP clients such as VS Code register themselves and sign in through the browser. | identity (done) |
+| G7 | **The AI feature.** **Done (main):** Farm.Mind implements MCP tools (`get_briefing`, `search`, `get_memory`, `save_memory`, `update_memory`, `forget_memory`, `list_workspaces`, `link_workspace`) on **Postgres** (`mind` schema in the Farm database, full-text search; vectors later) instead of MongoDB. Every row is scoped to the Fences `sub`. | No extra database container to run or back up; `pg_dump` of the Farm DB covers it. | main (done) |
 | G8 | **Sidecar reaches the Farm DB over `farm-network`.** Fixed in this branch (it first used `host.docker.internal`, which cannot reach a loopback-only port). | Verify on the VPS that AFFiNE's compose project can join the external network. | note (done) |
 | G9 | **AFFiNE service name and DB are assumed** (`postgres`, database `affine`) from upstream; the submodule is not checked out here. | The read-only role and `AFFINE_DATABASE_URL` depend on them. Confirm on the VPS with `docker compose ps`. | note |
 | G10 | **Production AFFiNE is empty.** The collections live in the local instance. | Restore the workspace (`Farm.Sync/scripts/affine-collections.sh backup` locally, `restore` on the VPS). The workspace and page ids must be re-read afterwards if they changed. | note |
@@ -82,7 +82,7 @@ Caddy needs them resolvable before it can obtain certificates.
 **Secrets** (environment `hostkey-server`): `VPS_HOST`, `VPS_PORT`, `VPS_USER`, `VPS_SSH_KEY`,
 `VPS_KNOWN_HOSTS`, `ACME_EMAIL`, `FENCES_GITHUB_CLIENT_ID`, `FENCES_GITHUB_CLIENT_SECRET`,
 `FENCES_OIDC_CLIENTS_JSON` (JSON array, at least one client; add the site client from G5, and keep the
-`note` client that AFFiNE uses), and the Farm DB password once G1 is fixed.
+`note` client that AFFiNE uses). The Farm DB password is not a secret in GitHub: it is generated on the VPS (G1).
 
 **Variables**: `FENCES_BRAND_NAME`, `FENCES_COOKIE_DOMAIN` (`.eldervibe.dev`), `FENCES_OIDC_ISSUER`
 (`https://identity.eldervibe.dev`), `FENCES_PERSISTENT_LOGIN_DAYS`, `FENCES_ALLOWED_RETURN_HOST`,
@@ -90,12 +90,21 @@ Caddy needs them resolvable before it can obtain certificates.
 `FARM_PG_PORT` (optional, default 4554).
 
 **On the VPS**: `sync.env` in `AFFINE_DEPLOY_DIR`, built from `Farm.Sync/deploy/sync.env.example`. It holds
-the Farm DB connection string (container `eldervibe-farm-postgres`, port 4554), the read-only AFFiNE role URL
+the Farm DB connection string (password from `/etc/farm/postgres.password`) (container `eldervibe-farm-postgres`, port 4554), the read-only AFFiNE role URL
 and the AFFiNE ids. It is never committed (`sync.env` is gitignored; org policy also blocks reading env files here).
 
 **Pre-flight, locally**: `dotnet build PiggyFarm.slnx -warnaserror` and tests pass; the local stack comes up
 (`deployment/local/compose.yml` from main, then `Farm.Sync/compose.dev.yml` from this branch, Fences from
 `Fences/compose.dev.yml` on sub/identity).
+
+**AFFiNE hardening (decide before deploy):** the sync reads only the configured workspace, but anyone who is a
+member of that workspace can publish pages to the public site. Keep the production workspace owner-only and
+disable open sign-up on the self-hosted AFFiNE (`allowSignup` off) so additional users cannot join it.
+
+**Sync resilience (done):** a page or document that fails to parse or validate is skipped and logged while the
+others sync; the last good rows stay (the worker never deletes). Failed passes back off (up to 15 min), and the
+container has a healthcheck (`AffineSync.dll --healthcheck`) that fails when no pass has succeeded for ~35 min.
+If AFFiNE is not ready the pass simply fails and retries.
 
 ## 6. Phases
 
@@ -152,13 +161,13 @@ Each phase lists the action, how to verify, and how to undo.
 ### Phase 7: Farm.Mind and MCP (L3)
 - **Build first**: G3, G4, G6, G7. These are real work, not configuration; this phase is the first one
   that needs development before deployment.
-- **Run** the new Farm.Mind workflow, and Mongo, on `farm-network`.
+- **Run** the Farm.Mind deploy (job `deploy-mind`, after Farm) on `farm-network`; it stores memory in the Farm Postgres (`mind` schema), no Mongo.
 - **Verify** `GET /healthz`; `POST /mcp` without a token returns 401 with a `WWW-Authenticate` resource
   metadata hint; an MCP client completes the browser sign-in and `whoami` returns the `github:<id>` subject.
 - **Undo** remove the `/mcp` route from the Caddy fragment; the site is unaffected.
 
 ### Phase 8: backups and smoke checks
-- **Run** `backup-all.yml`; add the Farm.Mind Mongo dump and the sync checkpoint volume to it.
+- **Run** `backup-all.yml`; add the sync checkpoint volume to it.
 - **Smoke checks** after every deploy: `/` and `/healthz` on the main domain, `identity.../.well-known/...`,
   `note.eldervibe.dev`, the sync logs, and a test edit round trip.
 
