@@ -254,10 +254,6 @@ export const MicrosoftTab = () => {
         </p>
       </header>
 
-      <PortfolioSection />
-
-      <h3 className="ms-section-title">Live API</h3>
-
       {/* Block 1: GET /api/metadata */}
       {renderApiBlock(
         '/api/metadata',
@@ -273,6 +269,8 @@ export const MicrosoftTab = () => {
         feedsBlock,
         () => fetchEndpoint('/api/feeds', setFeedsBlock)
       )}
+
+      <PortfolioSection />
     </div>
   )
 }
