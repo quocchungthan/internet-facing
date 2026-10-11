@@ -60,6 +60,16 @@ Background: [ARCHITECTURE.md](ARCHITECTURE.md).
    Mongo to AFFiNE, and eventually two-way sync (conflict rules, ownership, per-user
    workspace, deletes). Not now; keep the document model sync-friendly (stable ids,
    updatedAt, soft delete, markdown body).
+   **Design agreed 2026-10-11 (now wanted, so users can edit AI learning in a visual editor):**
+   - Mongo is the source of truth for AI memory; AFFiNE is the visual editor. One AFFiNE page per item
+     (structured fields as properties, body limited to a lossy-safe markdown subset).
+   - Each item has `rev`, a synced hash and a tombstone (`DeletedAtUtc`); no hard deletes.
+   - Mongo -> AFFiNE on MCP write; AFFiNE -> Mongo via the reader. The synced hash prevents echo loops.
+   - Conflict rule (user): **latest write wins** (compare timestamps; keep the overwritten version in an
+     audit/history record so nothing is silently lost).
+   - Write path into AFFiNE (user): **AFFiNE API with a service token**. Never write its Yjs docs in
+     Postgres directly. Spike first to confirm the API can create/update pages and properties.
+   - Open: clock source for "latest" (server time, not client), per-user workspace mapping.
 
 ## Farm UI findings (user review of http://localhost:8080, 2026-10-10)
 
@@ -220,3 +230,4 @@ Same operations as REST under `/api/memory/*` for the Farm UI, behind the same t
 - 2026-10-11: Split into Farm (portfolio, GET) and Farm.Mind (AI, read/write) sharing Farm.Auth; Farm UI got sign in/out, /connect page, favicon, padding fix. See docs/SYSTEM-OVERVIEW.md.
 - 2026-10-11: Correction: production AFFiNE = note.eldervibe.dev (sub/note); local AFFiNE is dev only. Proposal under discussion: run the sync as a sidecar of the note AFFiNE deployment (see chat summary below).
 - 2026-10-11: Decision 10 - sync worker moves into sub/note as a sidecar with ProjectReference to Farm.Data.
+- 2026-10-11: Decision 8 expanded: two-way Mongo <-> AFFiNE sync; latest write wins; writes via AFFiNE API service token (spike first).
