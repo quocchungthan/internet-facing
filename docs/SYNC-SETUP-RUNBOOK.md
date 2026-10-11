@@ -5,8 +5,8 @@ Use the existing VPS workspace; do not restore a backup over it.
 
 ## 1. Put the files and image on the VPS
 The workflow lives only on `sub/note`, and GitHub's **Run workflow** button lists only workflows on the
-default branch. So it runs **automatically on every push to `sub/note`** that touches `Farm.Sync/**` (setup
-check only, nothing is started). To trigger it with no code change, push an empty commit:
+default branch. So it runs **automatically on every push to `sub/note`** (setup
+check only, nothing is started; a green run does NOT mean the sync is running). To trigger it with no code change, push an empty commit:
 `git commit --allow-empty -m "run sync check" && git push`. To also start the sync, put `[deploy-sync]`
 in the commit message. It:
 - loads the image (tagged with the commit and `eldervibe-affine-sync:latest`),
