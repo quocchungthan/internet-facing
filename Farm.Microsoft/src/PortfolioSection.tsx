@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 
 interface Project { id: number; title: string; slug: string; summary: string; description?: string | null; demoUrl?: string | null; sourceUrl?: string | null }
+interface Skill { id: number; name: string; category: string }
 interface Experience { id: number; company: string; jobTitle: string; description?: string | null; startDate: string; endDate?: string | null; isCurrent: boolean; displayOrder: number }
 
 interface PortfolioData {
   projects: Project[]
+  skills: Skill[]
   experiences: Experience[]
 }
 
@@ -35,12 +37,14 @@ export function PortfolioSection() {
     let cancelled = false
     Promise.all([
       getJson<Project[]>('/api/portfolio/projects'),
+      getJson<Skill[]>('/api/portfolio/skills'),
       getJson<Experience[]>('/api/portfolio/experiences'),
     ])
-      .then(([projects, experiences]) => {
+      .then(([projects, skills, experiences]) => {
         if (cancelled) return
         setData({
           projects,
+          skills,
           experiences: [...experiences].sort((a, b) => a.displayOrder - b.displayOrder),
         })
       })
@@ -55,7 +59,13 @@ export function PortfolioSection() {
   if (error) return <p className="ms-portfolio-note">Portfolio is unavailable right now ({error}).</p>
   if (!data) return <p className="ms-portfolio-note">Loading portfolio…</p>
 
-  const { projects, experiences } = data
+  const { projects, skills, experiences } = data
+  const skillGroups = Object.entries(
+    skills.reduce<Record<string, Skill[]>>((groups, skill) => {
+      ;(groups[skill.category] ??= []).push(skill)
+      return groups
+    }, {})
+  )
   return (
     <div className="ms-portfolio">
       {experiences.length > 0 && (
@@ -86,6 +96,18 @@ export function PortfolioSection() {
                 {project.demoUrl && <ExternalLink href={project.demoUrl}>Demo</ExternalLink>}
               </p>
             </article>
+          ))}
+        </section>
+      )}
+
+      {skillGroups.length > 0 && (
+        <section className="ms-portfolio-section" aria-label="Skills">
+          <h3>Skills</h3>
+          {skillGroups.map(([category, items]) => (
+            <p key={category}>
+              <span className="ms-portfolio-muted">{category}: </span>
+              {items.map((skill) => skill.name).join(', ')}
+            </p>
           ))}
         </section>
       )}
