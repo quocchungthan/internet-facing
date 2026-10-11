@@ -2,10 +2,11 @@ using AffineSync;
 using Farm.Data;
 using Microsoft.EntityFrameworkCore;
 
-if (args.Any(argument => argument is not ("--once" or "--show-data" or "--healthcheck")) ||
-    args.Length > 1)
+if (args.Any(argument => argument is not ("--once" or "--show-data" or "--healthcheck" or "--check" or "--show-ids")) ||
+    args.Length > 1 && !(args.Contains("--check") && args.Length == 2 && args.Contains("--show-ids")) ||
+    args.Contains("--show-ids") && !args.Contains("--check"))
 {
-    Console.Error.WriteLine("Usage: AffineSync [--once | --show-data | --healthcheck]");
+    Console.Error.WriteLine("Usage: AffineSync [--once | --show-data | --healthcheck | --check [--show-ids]]");
     return 1;
 }
 
@@ -25,6 +26,9 @@ try
         await DatabaseDisplay.WriteAsync(database, Console.Out, shutdown.Token);
         return 0;
     }
+    if (args.Contains("--check"))
+        return await SetupCheck.RunAsync(Environment.GetEnvironmentVariable("AFFINE_READER_PATH") ?? "reader/export.mjs",
+            args.Contains("--show-ids"), shutdown.Token);
     if (args.Contains("--healthcheck"))
     {
         var path = Environment.GetEnvironmentVariable("SYNC_STATE_PATH") ?? "/state/checkpoint.json";
