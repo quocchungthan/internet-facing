@@ -5,7 +5,7 @@
   width: 100%;
   max-width: var(--shell-max-width);
   min-height: 100svh;
-  padding: 12px var(--shell-gutter) 48px;
+  padding: 0 var(--shell-gutter) 48px;
 }
 
 .app-header {

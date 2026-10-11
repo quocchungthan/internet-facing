@@ -60,6 +60,11 @@ services:
       dockerfile: Farm.Mind/Dockerfile
     environment:
       <<: *auth
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: aurafarming
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the environment}
       FarmAuth__PublicBaseUrl: http://localhost:${MIND_HOST_PORT:-8081}
     extra_hosts:
       - "fences.localhost:host-gateway"
@@ -67,6 +72,9 @@ services:
       - "127.0.0.1:${MIND_HOST_PORT:-8081}:80"
     volumes:
       - farm-keys:/keys
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:
