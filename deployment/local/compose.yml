@@ -1,0 +1,74 @@
+# Local development stack for the main domain: Farm database, Farm website and Farm.Mind.
+# Run from the repository root:
+#   POSTGRES_PASSWORD=... docker compose -f deployment/local/compose.yml up -d --build
+#
+# Other branches attach to this stack instead of owning pieces of it:
+#   - sub/note  (Farm.Sync/compose.dev.yml) joins the `farm-local_default` network and writes to `postgres`.
+#   - sub/identity (Fences/compose.dev.yml) serves sign-in at http://fences.localhost:5188.
+# The auth defaults below match the `farm-local` client registered by Fences/compose.dev.yml.
+name: farm-local
+
+x-auth: &auth
+  FarmAuth__Authority: ${FARM_AUTH_AUTHORITY:-http://fences.localhost:5188}
+  FarmAuth__ClientId: ${FARM_AUTH_CLIENT_ID:-farm-local}
+  FarmAuth__DataProtectionKeysPath: /keys
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: aurafarming
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the environment}
+    ports:
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-4554}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  farm:
+    build:
+      context: ../..
+      dockerfile: Farm/Dockerfile
+    environment:
+      <<: *auth
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: aurafarming
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the environment}
+      FarmAuth__PublicBaseUrl: http://localhost:${FARM_HOST_PORT:-8080}
+    extra_hosts:
+      - "fences.localhost:host-gateway"
+    ports:
+      - "127.0.0.1:${FARM_HOST_PORT:-8080}:80"
+    volumes:
+      - farm-keys:/keys
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  mind:
+    build:
+      context: ../..
+      dockerfile: Farm.Mind/Dockerfile
+    environment:
+      <<: *auth
+      FarmAuth__PublicBaseUrl: http://localhost:${MIND_HOST_PORT:-8081}
+    extra_hosts:
+      - "fences.localhost:host-gateway"
+    ports:
+      - "127.0.0.1:${MIND_HOST_PORT:-8081}:80"
+    volumes:
+      - farm-keys:/keys
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  farm-keys:
