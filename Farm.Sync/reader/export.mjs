@@ -83,34 +83,41 @@ try {
     { id: feedsId, updatedAtUtc: feedsUpdated, metadata: [], bookmarks, contentHash: contentHash(bookmarks) },
   ];
   const titleOf = pageId => pages.find(page => page.id === pageId)?.title;
+  // One broken page must not stop the others: skip and report it. The worker never deletes rows, so the last
+  // good version of a skipped page stays on the site until the page is fixed.
+  const skipped = [];
   for (const pageId of pageIds) {
     const meta = pages.find(page => page.id === pageId);
     if (!meta || meta.trash) continue;
-    const properties = decodeDocument(records(propertiesId))[pageId] ?? {};
-    const kind = propertyReader({ [pageId]: properties }, decoded.get(definitionsId), pageId, '').read('Kind');
-    if (kind == null || kind === '') continue;
-    if (!KINDS.includes(kind)) throw new Error(`Page ${pageId} has unknown Kind "${kind}"; expected one of ${KINDS.join(', ')}`);
-    const p = propertyReader({ [pageId]: properties }, decoded.get(definitionsId), pageId, kind);
-    const ydoc = loadYDoc(records(pageId));
-    const rowsOf = { profiles: [], projects: [], experiences: [], skills: [], socialLinks: [], gigs: [] };
+    let kind = '';
+    let ydoc;
     try {
+      const properties = decodeDocument(records(propertiesId))[pageId] ?? {};
+      kind = propertyReader({ [pageId]: properties }, decoded.get(definitionsId), pageId, '').read('Kind');
+      if (kind == null || kind === '') continue;
+      if (!KINDS.includes(kind)) throw new Error(`unknown Kind "${kind}"; expected one of ${KINDS.join(', ')}`);
+      const p = propertyReader({ [pageId]: properties }, decoded.get(definitionsId), pageId, kind);
+      ydoc = loadYDoc(records(pageId));
+      const rowsOf = { profiles: [], projects: [], experiences: [], skills: [], socialLinks: [], gigs: [] };
       if (kind === 'Profile') rowsOf.profiles.push(mapProfile(p, pageId, bodyMarkdown(ydoc, titleOf)));
       else if (kind === 'Project') rowsOf.projects.push(mapProject(p, pageId, meta.title, bodyMarkdown(ydoc, titleOf)));
       else if (kind === 'Experience') rowsOf.experiences.push(mapExperience(p, pageId, meta.title, bodyMarkdown(ydoc, titleOf)));
       else if (kind === 'Gig') rowsOf.gigs.push(mapGig(p, pageId, meta.title, bodyNodes(ydoc, titleOf)));
       else if (kind === 'Skills') rowsOf.skills = mapSkills(ydoc, titleOf);
       else rowsOf.socialLinks = mapSocialLinks(ydoc, titleOf);
+      const pageUpdated = updated([pageId, propertiesId, definitionsId]);
+      documents.push({
+        id: pageId, updatedAtUtc: pageUpdated, metadata: [], bookmarks: [], ...rowsOf,
+        contentHash: contentHash({ kind, ...rowsOf }),
+      });
     } catch (error) {
-      throw new Error(`${kind} page "${meta.title}" (${pageId}): ${error.message}`);
+      skipped.push(pageId);
+      console.error(`Skipped ${kind || 'unclassified'} page "${meta.title}" (${pageId}): ${error.message}`);
     } finally {
-      ydoc.destroy();
+      ydoc?.destroy();
     }
-    const pageUpdated = updated([pageId, propertiesId, definitionsId]);
-    documents.push({
-      id: pageId, updatedAtUtc: pageUpdated, metadata: [], bookmarks: [], ...rowsOf,
-      contentHash: contentHash({ kind, ...rowsOf }),
-    });
   }
+  if (skipped.length) console.error(`Skipped ${skipped.length} page(s); their previously synced data is unchanged.`);
   process.stdout.write(JSON.stringify({
     capturedAtUtc: updated([...ids, ...pageIds.filter(pageId => records(pageId).length)]),
     documents,
