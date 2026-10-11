@@ -107,6 +107,7 @@ jobs:
           remote="$VPS_USER@$VPS_HOST"
 
           gunzip -c artifacts/affine-sync-image.tar.gz | ssh "${ssh_opts[@]}" "$remote" 'docker load'
+          ssh "${ssh_opts[@]}" "$remote" "docker tag '$IMAGE_TAG' eldervibe-affine-sync:latest"
           ssh "${ssh_opts[@]}" "$remote" "cat > '$AFFINE_DEPLOY_DIR/compose.sync.yml'" < Farm.Sync/deploy/compose.sync.yml
           ssh "${ssh_opts[@]}" "$remote" "cat > '$AFFINE_DEPLOY_DIR/sync.env.example'" < Farm.Sync/deploy/sync.env.example
 
