@@ -3,7 +3,7 @@
 # Browsers resolve *.localhost to loopback, so http://fences.localhost:5188 works without hosts changes.
 # Containers that must reach it (Farm, Farm.Mind) add `extra_hosts: ["fences.localhost:host-gateway"]`.
 # Sign-in goes through GitHub, so set FENCES_GITHUB_CLIENT_ID / FENCES_GITHUB_CLIENT_SECRET
-# (a GitHub OAuth app; without them the login page returns 500). Callback: http://fences.localhost:5188/signin-github).
+# (a GitHub OAuth app; without them the login page returns 500). Callback: http://fences.localhost:5188/signin-github
 services:
   fences:
     build:
