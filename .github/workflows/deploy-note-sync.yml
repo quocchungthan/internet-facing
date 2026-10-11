@@ -108,12 +108,18 @@ jobs:
 
           gunzip -c artifacts/affine-sync-image.tar.gz | ssh "${ssh_opts[@]}" "$remote" 'docker load'
           ssh "${ssh_opts[@]}" "$remote" "cat > '$AFFINE_DEPLOY_DIR/compose.sync.yml'" < Farm.Sync/deploy/compose.sync.yml
+          ssh "${ssh_opts[@]}" "$remote" "cat > '$AFFINE_DEPLOY_DIR/sync.env.example'" < Farm.Sync/deploy/sync.env.example
 
           ssh "${ssh_opts[@]}" "$remote" \
             "AFFINE_DEPLOY_DIR='$AFFINE_DEPLOY_DIR' AFFINE_SYNC_IMAGE='$IMAGE_TAG' CHECK_ONLY='${{ inputs.check_only }}' bash -s" <<'REMOTE'
           set -euo pipefail
           cd "$AFFINE_DEPLOY_DIR"
-          test -f sync.env || { echo "sync.env is missing in $AFFINE_DEPLOY_DIR" >&2; exit 1; }
+          if [ ! -f sync.env ]; then
+            install -m 600 sync.env.example sync.env
+            echo "sync.env did not exist, so it was created from sync.env.example in the AFFiNE deploy directory." >&2
+            echo "Fill in its values on the VPS (run the check with --show-ids to find the IDs), then run this workflow again." >&2
+            exit 1
+          fi
           if [ "$CHECK_ONLY" = true ]; then
             docker compose -f compose.yml -f compose.sync.yml run --rm --no-deps affine-sync --check
             exit 0
