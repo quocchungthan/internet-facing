@@ -2,7 +2,7 @@
 #   docker compose -f Fences/compose.dev.yml up -d --build
 # Browsers resolve *.localhost to loopback, so http://fences.localhost:5188 works without hosts changes.
 # Containers that must reach it (Farm, Farm.Mind) add `extra_hosts: ["fences.localhost:host-gateway"]`.
-# Registered clients: farm-local (Farm UI), note (local AFFiNE; needs FENCES_NOTE_CLIENT_SECRET), mcp-local (AI clients).
+# Variables: see dev.env.example. Registered clients: farm-local (Farm UI), note (local AFFiNE; needs FENCES_NOTE_CLIENT_SECRET), mcp-local (AI clients).
 # Sign-in goes through GitHub, so set FENCES_GITHUB_CLIENT_ID / FENCES_GITHUB_CLIENT_SECRET
 # (a GitHub OAuth app; without them the login page returns 500). Callback: http://fences.localhost:5188/signin-github
 services:
