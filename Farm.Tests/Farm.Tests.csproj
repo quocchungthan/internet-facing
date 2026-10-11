@@ -22,6 +22,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Farm\Farm.csproj" />
     <ProjectReference Include="..\Farm.Data\Farm.Data.csproj" />
+    <ProjectReference Include="..\Farm.Auth\Farm.Auth.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,5 +1,8 @@
 <Solution>
     <Project Path="Farm/Farm.csproj" />
+    <Project Path="Farm.Auth/Farm.Auth.csproj" />
     <Project Path="Farm.Data/Farm.Data.csproj" />
+    <Project Path="Farm.Mind/Farm.Mind.csproj" />
+    <Project Path="Farm.Mind.Tests/Farm.Mind.Tests.csproj" />
     <Project Path="Farm.Tests/Farm.Tests.csproj" />
 </Solution>

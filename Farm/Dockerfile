@@ -23,11 +23,13 @@ WORKDIR /src
 COPY PiggyFarm.slnx ./
 COPY Farm/Farm.csproj Farm/
 COPY Farm.Data/Farm.Data.csproj Farm.Data/
+COPY Farm.Auth/Farm.Auth.csproj Farm.Auth/
 RUN dotnet restore Farm/Farm.csproj
 
 # Copy C# sources and compiled frontend assets
 COPY Farm/ Farm/
 COPY Farm.Data/ Farm.Data/
+COPY Farm.Auth/ Farm.Auth/
 COPY --from=frontend-build /src/Farm/wwwroot/hanging-post/ /src/Farm/wwwroot/hanging-post/
 RUN dotnet publish Farm/Farm.csproj --configuration Release --no-restore --output /app/publish /p:UseAppHost=false
 

@@ -2,6 +2,9 @@ import { Component, useEffect, useState, type ErrorInfo, type ReactNode } from '
 import { MicrosoftTab } from '@farm/microsoft'
 import { BrickTracker } from './BrickTracker'
 import { WinchesterView } from './WinchesterView'
+import { AccountMenu } from './AccountMenu'
+import { ConnectAi } from './ConnectAi'
+import { useSession } from './session'
 import './App.css'
 import './themes/microsoft/microsoft.scss'
 import './themes/brick/brick.scss'
@@ -66,6 +69,7 @@ const tabs: TabDefinition[] = [
 
 function getPathname(): string {
   const path = window.location.pathname.toLowerCase()
+  if (path === '/connect') return '/connect'
   if (path === '/winchester') return '/winchester'
   if (path === '/tracker' || path === '/brick' || path === '/bricks') return '/tracker'
   return '/'
@@ -73,6 +77,7 @@ function getPathname(): string {
 
 export function App() {
   const [pathname, setPathname] = useState(getPathname)
+  const { status, session } = useSession()
 
   useEffect(() => {
     const handlePopState = () => setPathname(getPathname())
@@ -89,31 +94,35 @@ export function App() {
 
   return (
     <main className="app-shell">
-      <nav className="tab-list" aria-label="Primary navigation">
-        {tabs.map((tab) => {
-          const isActive = pathname === tab.path
-          return (
-            <a
-              key={tab.path}
-              href={tab.path}
-              aria-current={isActive ? 'page' : undefined}
-              className={`tab ${tab.themeClass}${isActive ? ' tabActive' : ''}`}
-              onClick={(event) => {
-                event.preventDefault()
-                navigate(tab.path)
-              }}
-            >
-              {tab.label}
-            </a>
-          )
-        })}
-      </nav>
+      <header className="app-header">
+        <nav className="tab-list" aria-label="Primary navigation">
+          {tabs.map((tab) => {
+            const isActive = pathname === tab.path
+            return (
+              <a
+                key={tab.path}
+                href={tab.path}
+                aria-current={isActive ? 'page' : undefined}
+                className={`tab ${tab.themeClass}${isActive ? ' tabActive' : ''}`}
+                onClick={(event) => {
+                  event.preventDefault()
+                  navigate(tab.path)
+                }}
+              >
+                {tab.label}
+              </a>
+            )
+          })}
+        </nav>
+        <AccountMenu session={session} loading={status === 'loading'} pathname={pathname} onNavigate={navigate} />
+      </header>
 
       <section className="tab-content" aria-live="polite">
         <ErrorBoundary>
           {pathname === '/' && <MicrosoftTab />}
           {pathname === '/tracker' && <BrickTracker />}
           {pathname === '/winchester' && <WinchesterView />}
+          {pathname === '/connect' && <ConnectAi session={session} loading={status === 'loading'} />}
         </ErrorBoundary>
       </section>
     </main>

@@ -1,19 +1,103 @@
 .app-shell {
-  margin: 0;
+  --shell-max-width: 1440px;
+  --shell-gutter: clamp(16px, 4vw, 48px);
+  margin: 0 auto;
   width: 100%;
-  max-width: 100%;
+  max-width: var(--shell-max-width);
   min-height: 100svh;
-  padding: 20px 32px 48px;
-  box-sizing: border-box;
+  padding: 12px var(--shell-gutter) 48px;
+}
+
+.app-header {
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  margin-bottom: 8px;
 }
 
 .tab-list {
-  border-bottom: 1px solid var(--border);
   display: flex;
-  justify-content: flex-start;
+  flex: 1 1 auto;
   gap: 8px;
-  width: 100%;
-  margin-bottom: 8px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tab-list::-webkit-scrollbar {
+  display: none;
+}
+
+.account {
+  align-items: center;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 12px;
+}
+
+.account form {
+  margin: 0;
+}
+
+.account-user {
+  align-items: center;
+  display: inline-flex;
+  font-size: 0.875rem;
+  gap: 8px;
+  max-width: 14rem;
+}
+
+.account-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-avatar {
+  border-radius: 50%;
+  display: block;
+}
+
+.account-link {
+  color: var(--link);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.account-link:hover {
+  color: var(--link-hover);
+}
+
+.account-button {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  padding: 6px 14px;
+  text-decoration: none;
+}
+
+.account-button:hover {
+  border-color: var(--brand);
+}
+
+.account-button-primary {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: var(--background);
+}
+
+.account-button:focus-visible,
+.account-link:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .tab {
@@ -45,9 +129,52 @@
 
 .tab-content {
   width: 100%;
-  max-width: 100%;
   padding: 20px 0 40px;
-  box-sizing: border-box;
+}
+
+.connect {
+  margin: 0 auto;
+  max-width: 720px;
+  padding: 24px 0;
+}
+
+.connect h1 {
+  font-size: 2rem;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+
+.connect-lead,
+.connect-hint {
+  color: var(--muted-text);
+  line-height: 1.5;
+}
+
+.connect-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-top: 16px;
+  padding: 16px 20px;
+}
+
+.connect-card h2 {
+  font-size: 1rem;
+  margin: 0 0 8px;
+}
+
+.connect-card p {
+  margin: 8px 0 0;
+}
+
+.connect-code {
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  display: block;
+  overflow-x: auto;
+  padding: 8px 12px;
+  user-select: all;
 }
 
 .content {
@@ -79,9 +206,16 @@
   max-width: 36rem;
 }
 
-@media (max-width: 480px) {
-  .app-shell {
-    padding: 20px 16px;
+@media (max-width: 640px) {
+  .app-header {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .account {
+    justify-content: flex-end;
+    padding: 8px 0;
   }
 
   .tab {

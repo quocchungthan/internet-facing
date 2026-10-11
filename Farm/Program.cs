@@ -1,3 +1,4 @@
+using Farm.Auth;
 using Farm.Data;
 using Farm.Services;
 using Microsoft.EntityFrameworkCore;
@@ -6,6 +7,9 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
+
+// Sign-in through Fences. Portfolio endpoints stay anonymous; only /auth/* and /api/me use it.
+builder.Services.AddFarmBrowserAuth(builder.Configuration);
 
 builder.Services.AddCors(options =>
 {
@@ -129,9 +133,12 @@ app.UseHttpsRedirection();
 app.UseCors();
 app.UseRouting();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapStaticAssets();
+
+app.MapFarmAuthEndpoints();
 
 app.MapControllers();
 

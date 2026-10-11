@@ -17,6 +17,12 @@ public class HomeController : Controller
         return View("Index");
     }
 
+    [HttpGet("connect")]
+    public IActionResult Connect()
+    {
+        return View("Index");
+    }
+
     [HttpGet("tracker")]
     [HttpGet("brick")]
     [HttpGet("bricks")]

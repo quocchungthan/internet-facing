@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Farm.Data\Farm.Data.csproj" />
+    <ProjectReference Include="..\Farm.Auth\Farm.Auth.csproj" />
   </ItemGroup>
 
   <ItemGroup>
