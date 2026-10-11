@@ -58,7 +58,71 @@ $ms-font-mono: 'Cascadia Code', 'Segoe UI Mono', Consolas, 'Courier New', monosp
   width: 100%;
   max-width: 100%;
   margin: 0;
-  padding: 0;
+  padding: 1.5rem 0 0;
+}
+
+.ms-section-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin: 0 0 1rem;
+}
+
+.ms-portfolio {
+  margin-bottom: 2.5rem;
+
+  a {
+    color: $ms-primary;
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+
+.ms-portfolio-section {
+  border-top: 1px solid $ms-border;
+  padding: 1.25rem 0;
+
+  h3 {
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin: 0 0 0.75rem;
+  }
+
+  p {
+    margin: 0.35rem 0;
+    line-height: 1.5;
+  }
+}
+
+.ms-portfolio-item {
+  margin-bottom: 1.25rem;
+
+  h4 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0;
+  }
+}
+
+.ms-portfolio-headline {
+  font-size: 1.0625rem;
+}
+
+.ms-portfolio-muted,
+.ms-portfolio-note {
+  color: $ms-text-secondary;
+}
+
+.ms-portfolio-text {
+  white-space: pre-line;
+}
+
+.ms-portfolio-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
 }
 
 .ms-header {
@@ -288,6 +352,11 @@ $ms-font-mono: 'Cascadia Code', 'Segoe UI Mono', Consolas, 'Courier New', monosp
 
   .json-null {
     color: #569cd6;
+  }
+
+  .json-link {
+    color: inherit;
+    text-decoration: underline;
   }
 }
 

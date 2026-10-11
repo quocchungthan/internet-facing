@@ -1,5 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import './themes/microsoft/microsoft.scss'
+import { JsonView } from './JsonView'
+import { PortfolioSection } from './PortfolioSection'
 
 interface ApiTracingMetrics {
   totalRequests: number | null
@@ -220,9 +222,13 @@ export const MicrosoftTab = () => {
 
         <div className="ms-code-block-wrapper">
           <pre tabIndex={0}>
-            {block.loading && !block.rawJson
-              ? '// Loading response data...'
-              : block.rawJson || '// Click GET to invoke request'}
+            {block.loading && !block.rawJson ? (
+              '// Loading response data...'
+            ) : block.rawJson ? (
+              <JsonView text={block.rawJson} />
+            ) : (
+              '// Click GET to invoke request'
+            )}
           </pre>
         </div>
 
@@ -247,6 +253,10 @@ export const MicrosoftTab = () => {
           If you are seeking for a software developer to talk to, it's me here.
         </p>
       </header>
+
+      <PortfolioSection />
+
+      <h3 className="ms-section-title">Live API</h3>
 
       {/* Block 1: GET /api/metadata */}
       {renderApiBlock(
