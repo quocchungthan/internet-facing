@@ -75,6 +75,20 @@ try {
   const pages = root.meta?.pages ?? [];
   pass(`The workspace has ${pages.filter(page => !page.trash).length} pages and ${collections.length} collections`);
 
+  const required = [
+    ['Meta page', env('AFFINE_META_DOC_ID'), 'AFFINE_META_DOC_ID must be the id of the Meta page.'],
+    ['Feeds page', env('AFFINE_FEEDS_DOC_ID'), 'AFFINE_FEEDS_DOC_ID must be the id of the Feeds page.'],
+    ['page-properties document', `db$${workspaceId}$docProperties`, 'AFFiNE creates it when a page gets a property (such as Kind); set a property on any page in the AFFiNE UI.'],
+    ['custom-property definitions', `db$${workspaceId}$docCustomPropertyInfo`, 'AFFiNE creates it when you add a custom property (such as Kind) in the AFFiNE UI.'],
+  ];
+  for (const [label, guid, fix] of required) {
+    const has = Number((await client.query(
+      'SELECT (SELECT count(*) FROM snapshots WHERE workspace_id = $1 AND guid = $2) + (SELECT count(*) FROM updates WHERE workspace_id = $1 AND guid = $2) AS n',
+      [workspaceId, guid])).rows[0].n);
+    if (has) pass(`The ${label} has stored data`);
+    else fail(`The ${label} has no stored data in the database`, fix);
+  }
+
   const titleOf = id => pages.find(page => page.id === id)?.title ?? '(unknown)';
   const collection = collections.find(c => c.id === env('AFFINE_COLLECTION_ID'));
   if (!collection) {
