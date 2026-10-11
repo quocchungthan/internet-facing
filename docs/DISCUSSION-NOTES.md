@@ -71,6 +71,13 @@ Background: [ARCHITECTURE.md](ARCHITECTURE.md).
      Postgres directly. Spike first to confirm the API can create/update pages and properties.
    - Open: clock source for "latest" (server time, not client), per-user workspace mapping.
 
+11. **AFFiNE stays the source of truth, handled carefully (2026-10-11, user):** concern that AFFiNE as
+   source of truth for everything is fragile. Decision: keep it, with safeguards: pin the AFFiNE
+   version; a `--check` mode (CI and before upgrades) that fails loudly when the page shape changes;
+   keep backups plus a plain-file export of Postgres/Mongo; the site reads Postgres only so an AFFiNE
+   outage never takes it down; sync never deletes. Applies to portfolio/Gigs; AI memory ownership
+   per decision 8 still to be reconciled (Mongo for serving, AFFiNE as editor).
+
 ## Farm UI findings (user review of http://localhost:8080, 2026-10-10)
 
 **Favicon.** Root cause: `Farm/Views/Home/Index.cshtml` sets `Layout = null` and hand-writes its
@@ -231,3 +238,4 @@ Same operations as REST under `/api/memory/*` for the Farm UI, behind the same t
 - 2026-10-11: Correction: production AFFiNE = note.eldervibe.dev (sub/note); local AFFiNE is dev only. Proposal under discussion: run the sync as a sidecar of the note AFFiNE deployment (see chat summary below).
 - 2026-10-11: Decision 10 - sync worker moves into sub/note as a sidecar with ProjectReference to Farm.Data.
 - 2026-10-11: Decision 8 expanded: two-way Mongo <-> AFFiNE sync; latest write wins; writes via AFFiNE API service token (spike first).
+- 2026-10-11: Decision 11 - AFFiNE remains source of truth, with fragility safeguards.
