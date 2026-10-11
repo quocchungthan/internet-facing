@@ -61,7 +61,7 @@ Numbered so they can be tracked. "Branch" is where the change belongs.
 | --- | --- | --- | --- |
 | G1 | **Farm DB password is never set.** No workflow passes `POSTGRES_PASSWORD`; `deploy-farm.sh` falls back to `postgres`. | The sidecar joins `farm-network`, so any container there can reach the database. The env var only takes effect when the container is first created; if it already exists, change it with `ALTER USER`. | main |
 | G2 | **Farm gets no auth settings.** `deploy-farm.sh` writes only the database settings to `/etc/farm/farm.env`, and mounts no shared key volume. | Sign-in stays off in production (L2). | main |
-| G3 | **One Caddy upstream per domain.** The common script writes `handle { reverse_proxy 127.0.0.1:<port> }` for the whole domain. | Farm.Mind must answer `/mcp`, `/api/memory/*` and `/.well-known/oauth-protected-resource*` on `eldervibe.dev` (decision 9). Needs path routes in the script (new optional `SERVICE_PATH_ROUTES`, backward compatible), or a separate subdomain. **Decision needed.** | main |
+| G3 | **One Caddy upstream per domain.** The common script writes `handle { reverse_proxy 127.0.0.1:<port> }` for the whole domain. | Farm.Mind must answer `/mcp`, `/api/memory/*` and `/.well-known/oauth-protected-resource*` on `eldervibe.dev` (decision 9). **Decided (2026-10-11): the AI feature is built and deployed from `main` and served on `eldervibe.dev` by path routes.** Needs a new optional `SERVICE_PATH_ROUTES` in the script (backward compatible). | main |
 | G4 | **No Farm.Mind deploy path.** | L3. Needs a wrapper script, a workflow, ports (for example 8182/8183, 8180/8181 are Farm's), the same cookie name and key volume as Farm. | main |
 | G5 | **Fences has no Farm client.** `FENCES_OIDC_CLIENTS_JSON` needs a client for the site (redirect `https://eldervibe.dev/signin-oidc`, post-logout `https://eldervibe.dev/`), and `AllowedReturnHosts` / `AllowedCorsOrigins` lack `eldervibe.dev`. | L2. | identity (config only) |
 | G6 | **Fences cannot issue tokens Farm.Mind accepts.** Single flow, no `farm-mind` audience, access tokens are encrypted, no refresh tokens, no dynamic client registration. | L3: MCP clients register themselves and call with a bearer token. Options: disable token encryption and add the audience, or have Farm.Mind introspect. | identity (code) |
@@ -178,8 +178,7 @@ per-tab navigation, the Gigs tab and 3D Impala, token refresh and client registr
 
 ## 9. Open decisions
 
-1. **G3**: path routing in the shared Caddy script (recommended: one domain, matches decision 9), or a
-   subdomain for Farm.Mind.
+1. ~~**G3**: path routing vs subdomain~~ **Decided:** Farm.Mind is part of `main`, one domain, path routes.
 2. **G6**: how Farm.Mind validates Fences tokens (unencrypted JWT with an audience, or introspection).
 3. **L3 scope for launch**: ship Phase 7 with the 501 placeholder only for the first release, or wait for
    the first real memory tools.
