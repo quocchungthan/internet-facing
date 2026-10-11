@@ -1,0 +1,114 @@
+name: Deploy Note Sync
+
+# Builds the AFFiNE -> AuraFarming sync worker and runs it as a sidecar of the production AFFiNE
+# stack (note.eldervibe.dev). Deliberately separate from "Deploy Note" so AFFiNE's own deployment
+# never depends on this worker. Prerequisite: sync.env in AFFINE_DEPLOY_DIR (Farm.Sync/deploy/sync.env.example).
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-note-production
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.x
+
+      - name: Test worker
+        run: dotnet test Farm.Sync.Tests/Farm.Sync.Tests.csproj --configuration Release
+
+      - name: Test reader
+        working-directory: Farm.Sync/reader
+        run: |
+          npm ci
+          npm test
+
+      - name: Build image
+        run: docker build --pull --tag eldervibe-affine-sync:${{ github.sha }} --file Farm.Sync/Dockerfile .
+
+      - name: Export image
+        run: |
+          mkdir -p artifacts
+          docker save eldervibe-affine-sync:${{ github.sha }} | gzip > artifacts/affine-sync-image.tar.gz
+
+      - name: Upload image
+        uses: actions/upload-artifact@v4
+        with:
+          name: affine-sync-image
+          path: artifacts/affine-sync-image.tar.gz
+          if-no-files-found: error
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: hostkey-server
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Download image
+        uses: actions/download-artifact@v4
+        with:
+          name: affine-sync-image
+          path: artifacts
+
+      - name: Validate AFFiNE deploy dir
+        env:
+          VAR_DEPLOY_DIR: ${{ vars.AFFINE_DEPLOY_DIR }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${VAR_DEPLOY_DIR:-}" ]] || [[ "$VAR_DEPLOY_DIR" != /* ]] || [[ "$VAR_DEPLOY_DIR" == "/" ]]; then
+            echo "::error::AFFINE_DEPLOY_DIR must be an absolute path other than '/'."
+            exit 1
+          fi
+          echo "AFFINE_DEPLOY_DIR=$VAR_DEPLOY_DIR" >> "$GITHUB_ENV"
+
+      - name: Configure SSH
+        env:
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$VPS_KNOWN_HOSTS"
+          test -n "$VPS_SSH_KEY"
+          mkdir -p "$HOME/.ssh"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+          eval "$(ssh-agent -s)"
+          ssh-add - <<< "$VPS_SSH_KEY"
+          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
+
+      - name: Load image and start the sidecar
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          IMAGE_TAG: eldervibe-affine-sync:${{ github.sha }}
+        run: |
+          set -euo pipefail
+          ssh_opts=(-p "$VPS_PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes)
+          remote="$VPS_USER@$VPS_HOST"
+
+          gunzip -c artifacts/affine-sync-image.tar.gz | ssh "${ssh_opts[@]}" "$remote" 'docker load'
+          ssh "${ssh_opts[@]}" "$remote" "cat > '$AFFINE_DEPLOY_DIR/compose.sync.yml'" < Farm.Sync/deploy/compose.sync.yml
+
+          ssh "${ssh_opts[@]}" "$remote" \
+            "AFFINE_DEPLOY_DIR='$AFFINE_DEPLOY_DIR' AFFINE_SYNC_IMAGE='$IMAGE_TAG' bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd "$AFFINE_DEPLOY_DIR"
+          test -f sync.env || { echo "sync.env is missing in $AFFINE_DEPLOY_DIR" >&2; exit 1; }
+          docker compose -f compose.yml -f compose.sync.yml up -d affine-sync
+          docker compose -f compose.yml -f compose.sync.yml ps affine-sync
+          REMOTE
