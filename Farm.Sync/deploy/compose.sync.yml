@@ -14,15 +14,22 @@ services:
     environment:
       SYNC_STATE_PATH: /state/checkpoint.json
       AFFINE_READER_PATH: /app/reader/export.mjs
-    extra_hosts:
-      # The Farm database is published on the host, not part of the AFFiNE compose project.
-      - "host.docker.internal:host-gateway"
+    networks:
+      # The Farm database container (eldervibe-farm-postgres) only publishes on the VPS loopback, so the
+      # worker joins the network Farm's deploy script creates and reaches it by container name.
+      - default
+      - farm-network
     depends_on:
       postgres:
         condition: service_healthy
     volumes:
       - affine-sync-state:/state
     restart: unless-stopped
+
+networks:
+  farm-network:
+    external: true
+    name: ${FARM_NETWORK:-farm-network}
 
 volumes:
   affine-sync-state:
