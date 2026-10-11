@@ -210,6 +210,7 @@ jobs:
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
           VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
           AFFINE_DEPLOY_DIR: ${{ vars.AFFINE_DEPLOY_DIR }}
+          FARM_PG_PORT: ${{ vars.FARM_PG_PORT }}
           HAS_FENCES_OIDC_CLIENTS_JSON: ${{ secrets.FENCES_OIDC_CLIENTS_JSON != '' }}
           HAS_FENCES_GITHUB_CLIENT_ID: ${{ secrets.FENCES_GITHUB_CLIENT_ID != '' }}
           HAS_FENCES_GITHUB_CLIENT_SECRET: ${{ secrets.FENCES_GITHUB_CLIENT_SECRET != '' }}
@@ -229,6 +230,8 @@ jobs:
           if [[ -n "${AFFINE_DEPLOY_DIR:-}" ]] && { [[ "$AFFINE_DEPLOY_DIR" != /* ]] || [[ ! "$AFFINE_DEPLOY_DIR" =~ ^[A-Za-z0-9._/-]+$ ]]; }; then
             echo "::error::AFFINE_DEPLOY_DIR must be an absolute path of safe characters." >&2; exit 1
           fi
+          farm_pg_port="${FARM_PG_PORT:-4554}"
+          [[ "$farm_pg_port" =~ ^[1-9][0-9]{0,4}$ && "$farm_pg_port" -le 65535 ]] || { echo "::error::FARM_PG_PORT must be an integer between 1 and 65535." >&2; exit 1; }
           printf '%s\n' "$VPS_SSH_KEY" > "$ssh_key_file"
           printf '%s\n' "$VPS_KNOWN_HOSTS" > "$known_hosts_file"
           chmod 600 "$ssh_key_file" "$known_hosts_file"
@@ -246,7 +249,7 @@ jobs:
           echo "== VPS =="
           remote_output="$(ssh -i "$ssh_key_file" -p "$VPS_PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes \
             -o UserKnownHostsFile="$known_hosts_file" -o GlobalKnownHostsFile=/dev/null \
-            "$VPS_USER@$VPS_HOST" "AFFINE_DEPLOY_DIR='${AFFINE_DEPLOY_DIR:-}' bash -s" <<'REMOTE'
+            "$VPS_USER@$VPS_HOST" "AFFINE_DEPLOY_DIR='${AFFINE_DEPLOY_DIR:-}' FARM_PG_PORT='$farm_pg_port' bash -s" <<'REMOTE'
           ok() { if "$@" >/dev/null 2>&1; then echo true; else echo false; fi; }
           running() { [[ "$(docker inspect -f '{{.State.Running}}' "$1" 2>/dev/null)" == true ]] && echo true || echo false; }
           out() { echo "$1|$2"; }
@@ -255,10 +258,10 @@ jobs:
           out "Container eldervibe-farm-postgres is running" "$(running eldervibe-farm-postgres)"
           out "Container eldervibe-farm is running" "$(running eldervibe-farm)"
           out "Container eldervibe-farm-mind is running" "$(running eldervibe-farm-mind)"
-          out "Farm DB accepts connections" "$(ok docker exec eldervibe-farm-postgres pg_isready -p 4554 -U postgres -d aurafarming)"
-          tables="$(docker exec eldervibe-farm-postgres psql -p 4554 -U postgres -d aurafarming -tAc "select count(*) from information_schema.tables where table_name in ('PortfolioProjects','PortfolioExperiences','WebsiteMetadata','PlatformBookmarks')" 2>/dev/null | tr -d '[:space:]')"
+          out "Farm DB accepts connections" "$(ok docker exec eldervibe-farm-postgres pg_isready -p "$FARM_PG_PORT" -U postgres -d aurafarming)"
+          tables="$(docker exec eldervibe-farm-postgres psql -p "$FARM_PG_PORT" -U postgres -d aurafarming -tAc "select count(*) from information_schema.tables where table_name in ('PortfolioProjects','PortfolioExperiences','WebsiteMetadata','PlatformBookmarks')" 2>/dev/null | tr -d '[:space:]')"
           out "Farm DB has the AuraFarming and portfolio tables (4 expected)" "$([[ "$tables" == 4 ]] && echo true || echo false)"
-          mind="$(docker exec eldervibe-farm-postgres psql -p 4554 -U postgres -d aurafarming -tAc "select count(*) from information_schema.schemata where schema_name='mind'" 2>/dev/null | tr -d '[:space:]')"
+          mind="$(docker exec eldervibe-farm-postgres psql -p "$FARM_PG_PORT" -U postgres -d aurafarming -tAc "select count(*) from information_schema.schemata where schema_name='mind'" 2>/dev/null | tr -d '[:space:]')"
           out "Farm DB has the mind schema" "$([[ "$mind" == 1 ]] && echo true || echo false)"
           dir="$AFFINE_DEPLOY_DIR"
           out "AFFiNE deploy dir exists" "$([[ -n "$dir" ]] && ok test -d "$dir" || echo false)"
