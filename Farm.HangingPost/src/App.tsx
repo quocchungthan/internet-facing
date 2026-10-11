@@ -115,7 +115,6 @@ export function App() {
             )
           })}
         </nav>
-        <ServicesMenu />
         <AccountMenu session={session} loading={status === 'loading'} pathname={pathname} onNavigate={navigate} />
       </header>
 
@@ -127,6 +126,8 @@ export function App() {
           {pathname === '/connect' && <ConnectAi session={session} loading={status === 'loading'} />}
         </ErrorBoundary>
       </section>
+
+      <ServicesMenu />
     </main>
   )
 }

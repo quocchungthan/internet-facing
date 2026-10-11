@@ -10,10 +10,6 @@
 
 .app-header {
   align-items: center;
-  background: var(--background);
-  position: sticky;
-  top: 0;
-  z-index: 20;
   border-bottom: 1px solid var(--border);
   display: flex;
   gap: 16px;
@@ -22,24 +18,29 @@
 }
 
 .services {
-  flex: 0 0 auto;
-  position: relative;
+  bottom: 24px;
+  position: fixed;
+  right: 24px;
+  z-index: 30;
 }
 
 .services-toggle {
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  color: var(--text);
+  align-items: center;
+  background: var(--brand);
+  border: none;
+  border-radius: 50%;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  color: var(--background);
   cursor: pointer;
-  font: inherit;
-  font-size: 0.875rem;
-  font-weight: 600;
-  padding: 6px 12px;
+  display: flex;
+  height: 48px;
+  justify-content: center;
+  padding: 0;
+  width: 48px;
 }
 
 .services-toggle:hover {
-  border-color: var(--brand);
+  filter: brightness(1.1);
 }
 
 .services-toggle:focus-visible,
@@ -49,7 +50,7 @@
 }
 
 .services-arrow {
-  display: inline-block;
+  display: block;
   transition: transform 0.15s;
 }
 
@@ -61,14 +62,14 @@
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 6px;
+  bottom: 100%;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
   list-style: none;
-  margin: 6px 0 0;
+  margin: 0 0 10px;
   min-width: 15rem;
   padding: 6px;
   position: absolute;
   right: 0;
-  top: 100%;
 }
 
 .services-list a {

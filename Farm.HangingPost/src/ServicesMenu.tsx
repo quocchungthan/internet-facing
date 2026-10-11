@@ -42,9 +42,12 @@ export function ServicesMenu() {
         aria-expanded={open}
         aria-controls={listId}
         aria-label="Elder Vibe services"
+        title="Elder Vibe services"
         onClick={() => setOpen((value) => !value)}
       >
-        Services <span className={`services-arrow${open ? ' services-arrow-open' : ''}`} aria-hidden="true">▾</span>
+        <svg className={`services-arrow${open ? ' services-arrow-open' : ''}`} viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+          <path d="M6 15l6-6 6 6" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
       </button>
       {open && (
         <ul id={listId} className="services-list">
