@@ -14,6 +14,12 @@ public sealed class IdentityAppOptions
     public string OidcEncryptionCertificatePath { get; init; } = string.Empty;
     public string OidcEncryptionCertificatePassword { get; init; } = string.Empty;
     public List<OidcClientOptions> OidcClients { get; init; } = [];
+    // Resource server that dynamically registered (MCP) clients may request tokens for.
+    public string McpAudience { get; init; } = "https://eldervibe.dev/mcp";
+    public bool AllowDynamicClientRegistration { get; init; } = true;
+    public int MaxDynamicClients { get; init; } = 500;
+    public List<string> DynamicClientRedirectSchemes { get; init; } = [];
+    public List<string> DynamicClientRedirectHosts { get; init; } = [];
     public int PersistentLoginDays { get; init; } = 30;
     public List<string> AllowedReturnHosts { get; init; } = [];
     public List<string> AllowedCorsOrigins { get; init; } = [];
@@ -28,6 +34,9 @@ public sealed class OidcClientOptions
     public string? ClientSecret { get; init; }
     // Public clients always require PKCE; this forces it for a confidential client too.
     public bool RequirePkce { get; init; }
+    // Resource servers (token audiences) this client may receive access tokens for, for example https://eldervibe.dev/mcp.
+    public List<string> Resources { get; init; } = [];
+    public bool AllowRefreshTokens { get; init; }
     public List<string> RedirectUris { get; init; } = [];
     public List<string> PostLogoutRedirectUris { get; init; } = [];
 }
