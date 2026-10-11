@@ -1,0 +1,28 @@
+# Sidecar for the production AFFiNE stack (note.eldervibe.dev).
+# Layered over AFFiNE's selfhost compose.yml, so it shares the compose network and reaches the
+# AFFiNE database by its service name (`postgres`):
+#
+#   docker compose -f compose.yml -f compose.sync.yml up -d affine-sync
+#
+# Configuration lives in sync.env next to this file on the VPS (never in git). See Farm.Sync/README.md.
+services:
+  affine-sync:
+    image: ${AFFINE_SYNC_IMAGE:-eldervibe-affine-sync:latest}
+    pull_policy: never
+    env_file:
+      - sync.env
+    environment:
+      SYNC_STATE_PATH: /state/checkpoint.json
+      AFFINE_READER_PATH: /app/reader/export.mjs
+    extra_hosts:
+      # The Farm database is published on the host, not part of the AFFiNE compose project.
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - affine-sync-state:/state
+    restart: unless-stopped
+
+volumes:
+  affine-sync-state:
