@@ -298,6 +298,52 @@ public sealed class SyncTests
     }
 
     [Fact]
+    public async Task InvalidDocumentIsSkippedAndOthersStillSync()
+    {
+        var state = new MemoryState();
+        var writer = new RecordingWriter();
+        var skipped = new List<string>();
+        var reader = new FixedReader(SnapshotOf(
+            Document("good", Timestamp), Document("bad", Timestamp, [Metadata(0)]), Document("good2", Timestamp, [Metadata(7)])));
+        var runner = new SyncRunner(reader, state, writer) { ReportSkipped = (id, _) => skipped.Add(id) };
+        Assert.Equal(2, await runner.RunAsync(Token));
+        Assert.Equal(["bad"], skipped);
+        Assert.Equal(["good", "good2"], writer.Documents.Select(document => document.Id).Order());
+    }
+
+    [Fact]
+    public async Task DuplicateIdAcrossDocumentsSkipsOnlyTheLaterOne()
+    {
+        var writer = new RecordingWriter();
+        var skipped = new List<string>();
+        var reader = new FixedReader(SnapshotOf(Document("a", Timestamp, [Metadata(1)]), Document("b", Timestamp, [Metadata(1)])));
+        Assert.Equal(1, await new SyncRunner(reader, new MemoryState(), writer) { ReportSkipped = (id, _) => skipped.Add(id) }.RunAsync(Token));
+        Assert.Equal(["b"], skipped);
+    }
+
+    [Fact]
+    public async Task SnapshotLevelFaultStillFailsThePass()
+    {
+        var future = SnapshotOf(Document("a", Timestamp)) with { CapturedAtUtc = DateTimeOffset.UtcNow.AddDays(1) };
+        await Assert.ThrowsAsync<InvalidDataException>(() => new SyncRunner(new FixedReader(future), new MemoryState(), new RecordingWriter()).RunAsync(Token));
+    }
+
+    [Fact]
+    public void HealthcheckTracksLastSuccessAndBackoffIsCapped()
+    {
+        using var files = new TestFiles();
+        var health = new SyncHealth(files.Path("state.json"));
+        var maxAge = SyncHealth.MaxAge(60);
+        Assert.False(health.IsHealthy(Timestamp, maxAge));
+        health.MarkSuccess(Timestamp);
+        Assert.True(health.IsHealthy(Timestamp.Add(maxAge), maxAge));
+        Assert.False(health.IsHealthy(Timestamp.Add(maxAge).AddSeconds(1), maxAge));
+        Assert.Equal(TimeSpan.FromSeconds(60), SyncHealth.Backoff(60, 0));
+        Assert.Equal(TimeSpan.FromSeconds(240), SyncHealth.Backoff(60, 2));
+        Assert.Equal(TimeSpan.FromSeconds(900), SyncHealth.Backoff(60, 30));
+    }
+
+    [Fact]
     public async Task NodeInvocationSupportsSpacesAndRejectsNonzeroExitAndBadJson()
     {
         using var files = new TestFiles();
