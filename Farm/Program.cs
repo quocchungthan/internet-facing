@@ -108,6 +108,10 @@ using (var scope = app.Services.CreateScope())
             logger.LogInformation("Applying AuraFarming database migrations on startup...");
             db.Database.Migrate();
             logger.LogInformation("AuraFarming database migrations applied successfully.");
+            // The portfolio tables are written by the sync worker, but the site reads them, so the site must not
+            // depend on the worker having run first.
+            scope.ServiceProvider.GetRequiredService<PortfolioDbContext>().Database.Migrate();
+            logger.LogInformation("Portfolio database migrations applied successfully.");
         }
         else
         {
