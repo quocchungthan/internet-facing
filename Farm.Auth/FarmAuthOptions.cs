@@ -16,8 +16,13 @@ public sealed class FarmAuthOptions
 
     public string? ClientSecret { get; set; }
 
-    /// <summary>Audience access tokens must carry when an MCP/API client calls Farm.Mind.</summary>
-    public string Audience { get; set; } = "farm-mind";
+    /// <summary>
+    /// Audience (RFC 8707 resource URI) access tokens must carry when an MCP/API client calls Farm.Mind.
+    /// Defaults to the public MCP URL, which is also what MCP clients send as the <c>resource</c> parameter.
+    /// </summary>
+    public string? Audience { get; set; }
+
+    public string ResolvedAudience => string.IsNullOrWhiteSpace(Audience) ? PublicBaseUrl.TrimEnd('/') + "/mcp" : Audience;
 
     /// <summary>Public origin of the main domain; used for return URLs and resource metadata.</summary>
     public string PublicBaseUrl { get; set; } = "https://eldervibe.dev";

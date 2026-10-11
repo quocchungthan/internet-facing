@@ -3,6 +3,10 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Farm.Auth;
+using Farm.Mind.Data;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -20,6 +24,7 @@ public class MindAuthTests : IClassFixture<WebApplicationFactory<Program>>
     private static readonly SymmetricSecurityKey SigningKey = new(new byte[32].Select((_, i) => (byte)(i + 1)).ToArray());
 
     private readonly WebApplicationFactory<Program> _factory;
+    private readonly string _databaseName = Guid.NewGuid().ToString();
 
     public MindAuthTests(WebApplicationFactory<Program> factory) => _factory = factory;
 
@@ -30,6 +35,9 @@ public class MindAuthTests : IClassFixture<WebApplicationFactory<Program>>
         builder.UseSetting("FarmAuth:PublicBaseUrl", "https://eldervibe.dev");
         builder.ConfigureServices(services =>
         {
+            services.RemoveAll<DbContextOptions<MindDbContext>>();
+            services.RemoveAll<IDbContextOptionsConfiguration<MindDbContext>>();
+            services.AddDbContext<MindDbContext>(options => options.UseInMemoryDatabase(_databaseName));
             // Use a local signing key instead of fetching discovery metadata from the issuer.
             services.PostConfigure<JwtBearerOptions>(FarmAuthSchemes.Bearer, options =>
             {
@@ -42,7 +50,7 @@ public class MindAuthTests : IClassFixture<WebApplicationFactory<Program>>
         });
     }).CreateClient();
 
-    private static string Token(string audience = "farm-mind", string subject = "github:42")
+    private static string Token(string audience = "https://eldervibe.dev/mcp", string subject = "github:42")
     {
         var descriptor = new SecurityTokenDescriptor
         {
@@ -83,7 +91,7 @@ public class MindAuthTests : IClassFixture<WebApplicationFactory<Program>>
     [Fact]
     public async Task Mcp_WithoutToken_Returns401WithResourceMetadataHint()
     {
-        var response = await CreateClient().PostAsync("/mcp", new StringContent("{}"));
+        var response = await CreateClient().PostAsync("/mcp", new StringContent("{}", System.Text.Encoding.UTF8, "application/json"));
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         var challenge = Assert.Single(response.Headers.WwwAuthenticate);
@@ -91,16 +99,40 @@ public class MindAuthTests : IClassFixture<WebApplicationFactory<Program>>
         Assert.Contains("resource_metadata=\"https://eldervibe.dev/.well-known/oauth-protected-resource\"", challenge.Parameter);
     }
 
-    [Fact]
-    public async Task Mcp_WithValidToken_ReachesPlaceholder()
+    private static async Task<JsonElement> CallToolAsync(HttpClient client, string name, object arguments)
     {
-        var client = CreateClient();
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Token());
+        var request = new HttpRequestMessage(HttpMethod.Post, "/mcp")
+        {
+            Content = JsonContent.Create(new { jsonrpc = "2.0", id = 1, method = "tools/call", @params = new { name, arguments } })
+        };
+        request.Headers.Accept.ParseAdd("application/json");
+        request.Headers.Accept.ParseAdd("text/event-stream");
 
-        var response = await client.PostAsync("/mcp", new StringContent("{}"));
+        var response = await client.SendAsync(request);
+        response.EnsureSuccessStatusCode();
 
-        Assert.Equal(HttpStatusCode.NotImplemented, response.StatusCode);
-        Assert.Contains("github:42", await response.Content.ReadAsStringAsync());
+        // Streamable HTTP may answer as a one-event SSE stream.
+        var body = await response.Content.ReadAsStringAsync();
+        var data = body.Split('\n').Where(line => line.StartsWith("data:")).Select(line => line[5..].Trim()).FirstOrDefault() ?? body;
+        return JsonDocument.Parse(data).RootElement.GetProperty("result");
+    }
+
+    [Fact]
+    public async Task Mcp_Tools_SaveAndSearch_AreScopedToTheSubject()
+    {
+        var alice = CreateClient();
+        alice.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Token(subject: "github:1"));
+        var bob = CreateClient();
+        bob.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Token(subject: "github:2"));
+
+        var saved = await CallToolAsync(alice, "save_memory", new { title = "Coffee", content = "Alice likes flat white", tags = new[] { "Food" } });
+        Assert.False(saved.TryGetProperty("isError", out var error) && error.GetBoolean());
+
+        var aliceHits = await CallToolAsync(alice, "search", new { query = "flat white" });
+        Assert.Contains("Alice likes flat white", aliceHits.GetRawText());
+
+        var bobHits = await CallToolAsync(bob, "search", new { query = "flat white" });
+        Assert.DoesNotContain("Alice likes flat white", bobHits.GetRawText());
     }
 
     [Fact]
@@ -109,7 +141,7 @@ public class MindAuthTests : IClassFixture<WebApplicationFactory<Program>>
         var client = CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Token(audience: "someone-else"));
 
-        var response = await client.PostAsync("/mcp", new StringContent("{}"));
+        var response = await client.PostAsync("/mcp", new StringContent("{}", System.Text.Encoding.UTF8, "application/json"));
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }

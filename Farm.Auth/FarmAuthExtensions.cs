@@ -151,7 +151,7 @@ public static class FarmAuthExtensions
     private static void ConfigureBearer(JwtBearerOptions bearer, FarmAuthOptions options)
     {
         bearer.Authority = options.NormalizedAuthority;
-        bearer.Audience = options.Audience;
+        bearer.Audience = options.ResolvedAudience;
         bearer.MapInboundClaims = false;
         bearer.RequireHttpsMetadata = options.NormalizedAuthority.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
         bearer.TokenValidationParameters.NameClaimType = "name";
