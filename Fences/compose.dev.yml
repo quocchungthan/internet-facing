@@ -4,7 +4,8 @@
 # Containers that must reach it (Farm, Farm.Mind) add `extra_hosts: ["fences.localhost:host-gateway"]`.
 # Variables: see dev.env.example. Registered clients: farm-local (Farm UI), note (local AFFiNE; needs FENCES_NOTE_CLIENT_SECRET), mcp-local (AI clients).
 # Sign-in goes through GitHub, so set FENCES_GITHUB_CLIENT_ID / FENCES_GITHUB_CLIENT_SECRET
-# (a GitHub OAuth app; without them the login page returns 500). Callback: http://fences.localhost:5188/signin-github
+# (a GitHub OAuth app; without them the login page returns 500). Its callback URL must be exactly
+# http://fences.localhost:5188/signin-github and Fences must be opened as fences.localhost:5188 (see dev.env.example)
 services:
   fences:
     build:
