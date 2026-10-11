@@ -8,12 +8,27 @@ public sealed partial record Snapshot
     [JsonPropertyName("capturedAtUtc")] public required DateTimeOffset CapturedAtUtc { get; init; }
     [JsonPropertyName("documents")] public required List<SourceDocument> Documents { get; init; }
 
-    public static Snapshot Parse(string json)
+    public static Snapshot Parse(string json) => ParseUnvalidated(json).Validated();
+
+    // The runner validates per document so one bad document does not discard the rest.
+    public static Snapshot ParseUnvalidated(string json) =>
+        JsonSerializer.Deserialize<Snapshot>(json) ?? throw new InvalidDataException("Reader returned a null snapshot.");
+
+    private Snapshot Validated() { Validate(); return this; }
+
+    // Keeps every document that validates (including the cross-document uniqueness rules) and reports the rest,
+    // so one bad document cannot block the others. Snapshot-level problems still throw.
+    public Snapshot WithoutInvalidDocuments(Action<string, string> reportSkipped)
     {
-        var snapshot = JsonSerializer.Deserialize<Snapshot>(json)
-            ?? throw new InvalidDataException("Reader returned a null snapshot.");
-        snapshot.Validate();
-        return snapshot;
+        if (Documents is null) throw new InvalidDataException("documents must be an array.");
+        (this with { Documents = [] }).Validate();
+        var kept = new List<SourceDocument>();
+        foreach (var document in Documents)
+        {
+            try { (this with { Documents = [.. kept, document] }).Validate(); kept.Add(document); }
+            catch (InvalidDataException exception) { reportSkipped(document?.Id ?? "(no id)", exception.Message); }
+        }
+        return this with { Documents = kept };
     }
 
     public void Validate()

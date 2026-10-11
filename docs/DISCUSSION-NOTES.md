@@ -240,3 +240,13 @@ Same operations as REST under `/api/memory/*` for the Farm UI, behind the same t
 - 2026-10-11: Decision 8 expanded: two-way Mongo <-> AFFiNE sync; latest write wins; writes via AFFiNE API service token (spike first).
 - 2026-10-11: Decision 11 - AFFiNE remains source of truth, with fragility safeguards.
 - 2026-10-11: Confirmed decision 9: the AI feature (Farm.Mind, MCP) is owned by main and served on eldervibe.dev via Caddy path routes.
+
+10. **Postgres instead of MongoDB for Farm.Mind (2026-10-11):** memory lives in the `mind` schema of the Farm
+    database (own `MindDbContext`, own migration history), searched with Postgres full-text; pgvector can be
+    added later (needs a pgvector image and an embeddings endpoint). One database to run and back up. The
+    earlier MongoDB mentions above are superseded; the AFFiNE <-> memory pipe idea is unchanged.
+11. **Audience is a resource URI (2026-10-11):** Fences issues access tokens for `https://eldervibe.dev/mcp`
+    (RFC 8707), and Farm.Mind derives the same value from `FarmAuth__PublicBaseUrl`. MCP clients register
+    dynamically (RFC 7591); no per-client pre-registration.
+12. **Sync resilience (2026-10-11):** bad pages/documents are skipped and logged, never deleted; failing passes
+    back off; a heartbeat healthcheck exposes a stuck worker. Production workspace is owner-only, sign-up closed.

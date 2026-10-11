@@ -36,7 +36,7 @@ public sealed class NodeReader(string path) : ISnapshotReader
                 Console.Error.WriteLine($"Reader stderr: {diagnostics.TrimEnd()}");
             if (process.ExitCode != 0)
                 throw new InvalidOperationException($"Node reader exited with code {process.ExitCode}.");
-            return Snapshot.Parse(output);
+            return Snapshot.ParseUnvalidated(output);
         }
         catch (OperationCanceledException)
         {
