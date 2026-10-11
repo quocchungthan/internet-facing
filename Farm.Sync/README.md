@@ -24,9 +24,6 @@ env files. Production values live in `sync.env` on the VPS
 | `SYNC_INTERVAL_SECONDS` | `60`; delay after an iteration completes |
 | `SYNC_STATE_PATH` | `/state/checkpoint.json`; persist independently of the container |
 | `AFFINE_READER_PATH` | `reader/export.mjs`; resolved from the working directory |
-| `POSTGRES_HOST_PORT` | `4554`; Compose binds localhost only |
-| `POSTGRES_USER` | `postgres`; Compose database username |
-| `POSTGRES_PASSWORD` | Required; supply privately |
 | `AFFINE_DATABASE_URL` | Required; `postgresql://affine_sync@affine_postgres:5432/affine` on the local trusted network |
 | `AFFINE_DOCKER_NETWORK` | Existing external AFFiNE network; default `affine_default` |
 | `AFFINE_WORKSPACE_ID` | Reader workspace; `da7da136-e099-4224-b64d-4fccd115eb89` |
@@ -91,7 +88,7 @@ model and the open design questions.
 | Environment | AFFiNE | Worker | How |
 | --- | --- | --- | --- |
 | Production | `note.eldervibe.dev` (this branch, `Streams/DaHang`) | sidecar `affine-sync` in the AFFiNE compose project | [`deploy/compose.sync.yml`](deploy/compose.sync.yml), workflow **Deploy Note Sync** |
-| Development | local Docker stack (`affine_default` network) | `sync` service | [`compose.dev.yml`](compose.dev.yml) |
+| Development | local AFFiNE stack (`affine_default`) + main's Farm database (`farm-local_default`) | `sync` service | [`compose.dev.yml`](compose.dev.yml) |
 
 ### Production sidecar
 
@@ -109,15 +106,20 @@ Run only one worker per checkpoint and database; it locks a sibling `.lock` file
 
 ### Development stack
 
+The Farm database and website belong to `main`; this branch only runs the worker and attaches to them.
+
 ```bash
+# 1. In main (internet-facing): Farm database, website, Farm.Mind
+POSTGRES_PASSWORD=... docker compose -f deployment/local/compose.yml up -d --build
+
+# 2. Here: the worker joins the `farm-local_default` and `affine_default` networks
 cd Farm.Sync
-# export POSTGRES_PASSWORD, DATABASE_CONNECTION_STRING (Host=postgres;Port=5432;Database=aurafarming;...)
-# and the AFFINE_* variables from the table above
-docker compose -f compose.dev.yml --profile sync --profile farm up -d --build
+# export DATABASE_CONNECTION_STRING (Host=postgres;Port=5432;Database=aurafarming;...) and the AFFINE_* variables above
+docker compose -f compose.dev.yml up -d --build
 ```
 
-The `farm` profile builds the website from this same repository (`Farm/Dockerfile`), so it is the same
-code that `main` deploys. `Meta.SpecifiedIssueUrl` (optional) must be a GitHub issue link such as
+Set `FARM_DOCKER_NETWORK` if main's compose project is named differently.
+`Meta.SpecifiedIssueUrl` (optional) must be a GitHub issue link such as
 `https://github.com/owner/repo/issues/1`.
 
 ### Without Docker
