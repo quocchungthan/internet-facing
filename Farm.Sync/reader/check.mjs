@@ -23,6 +23,18 @@ const REQUIRED = {
   AFFINE_FEEDS_DOC_ID: 'the id of the Feeds page',
   AFFINE_FEEDS_BLOCK_ID: 'the id of the block in the Feeds page',
 };
+
+// Property names the exporter reads, from portfolio.mjs / decode.mjs (type is how to create it in AFFiNE).
+const REQUIRED_PROPERTIES = {
+  'Kind (on every portfolio page; Select/Text with one of Profile, Project, Experience, Gig, Skills, SocialLinks)': ['Kind'],
+  'Meta page (Text)': ['DeveloperName', 'Title', 'Description', 'RepositoryUrl'],
+};
+const KIND_PROPERTIES = {
+  Profile: 'DisplayName*, Headline*, Location, ContactEmail, ProfileImageUrl, ResumeUrl (all Text)',
+  Project: 'Summary*, Slug, DemoUrl, SourceUrl, Role, Organization (Text); StartDate, EndDate (Date); IsFeatured (Checkbox); DisplayOrder (Number); Skills (Multi-select/Tags)',
+  Experience: 'Company* (Text); StartDate* , EndDate (Date); EmploymentType, WorkMode (Select); IsCurrent (Checkbox); DisplayOrder (Number)',
+  Gig: 'Category*, Summary* (Text); Slug (Text); SolvedOn (Date); DisplayOrder (Number); Skills (Multi-select/Tags); body headings "## Problem", "## Outcome", "## Steps"',
+};
 const OPTIONAL = ['AFFINE_PORTFOLIO_COLLECTION_ID', 'AFFINE_GIGS_COLLECTION_ID'];
 
 const env = name => process.env[name]?.trim() ?? '';
@@ -87,6 +99,22 @@ try {
       [workspaceId, guid])).rows[0].n);
     if (has) pass(`The ${label} has stored data`);
     else fail(`The ${label} has no stored data in the database`, fix);
+  }
+
+  const definitionRows = (await client.query(
+    'SELECT blob, updated_at AS timestamp FROM snapshots WHERE workspace_id = $1 AND guid = $2 UNION ALL SELECT blob, created_at FROM updates WHERE workspace_id = $1 AND guid = $2 ORDER BY timestamp',
+    [workspaceId, `db$${workspaceId}$docCustomPropertyInfo`])).rows;
+  if (definitionRows.length) {
+    const defined = new Set(Object.values(decodeDocument(definitionRows)).filter(d => !d.isDeleted).map(d => d.name));
+    for (const [label, names] of Object.entries(REQUIRED_PROPERTIES)) {
+      const missing = names.filter(name => !defined.has(name));
+      if (missing.length) fail(`AFFiNE has no page property named: ${missing.join(', ')}`,
+        `in AFFiNE open any page, click "Add property" in the page info panel, create it as ${label}. Names are case-sensitive.`);
+      else pass(`The ${label.split(' (')[0]} properties exist`);
+    }
+    const optional = Object.entries(KIND_PROPERTIES).map(([kind, text]) => `${kind}: ${text}`);
+    info('Properties per page Kind (* = required). Create the ones for the kinds you use:');
+    optional.forEach(line => info(`  ${line}`));
   }
 
   const titleOf = id => pages.find(page => page.id === id)?.title ?? '(unknown)';
