@@ -12,6 +12,8 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.HttpOverrides;
 using OpenIddict.Abstractions;
+using OpenIddict.Server;
+using Microsoft.AspNetCore.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.Configure<IdentityAppOptions>(builder.Configuration.GetSection("IdentityApp"));
@@ -37,9 +39,24 @@ builder.Services.AddOpenIddict()
         options.SetAuthorizationEndpointUris("/connect/authorize");
         options.SetTokenEndpointUris("/connect/token");
         options.SetUserInfoEndpointUris("/connect/userinfo");
+        // MCP clients look for RFC 8414 metadata first, so serve the same document at both well-known paths.
+        options.SetConfigurationEndpointUris("/.well-known/openid-configuration", "/.well-known/oauth-authorization-server");
         // PKCE is enforced per client through descriptor requirements (see SeedOidcClientsAsync).
-        options.AllowAuthorizationCodeFlow();
-        options.RegisterScopes(OpenIddictConstants.Scopes.OpenId, OpenIddictConstants.Scopes.Profile, OpenIddictConstants.Scopes.Email);
+        options.AllowAuthorizationCodeFlow().AllowRefreshTokenFlow();
+        options.RegisterScopes(OpenIddictConstants.Scopes.OpenId, OpenIddictConstants.Scopes.Profile, OpenIddictConstants.Scopes.Email, OpenIddictConstants.Scopes.OfflineAccess);
+        // Resource servers (Farm.Mind) validate signed JWT access tokens through the JWKS; they cannot decrypt them.
+        options.DisableAccessTokenEncryption();
+        options.RegisterResources(identityOptions.McpAudience);
+        if (identityOptions.AllowDynamicClientRegistration)
+        {
+            var registrationEndpoint = identityOptions.OidcIssuer.TrimEnd('/') + "/connect/register";
+            options.AddEventHandler<OpenIddictServerEvents.HandleConfigurationRequestContext>(handler =>
+                handler.UseInlineHandler(context =>
+                {
+                    context.Metadata["registration_endpoint"] = registrationEndpoint;
+                    return default;
+                }));
+        }
 
         if (builder.Environment.IsDevelopment())
         {
@@ -158,6 +175,13 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddAuthorization();
 builder.Services.AddControllersWithViews();
+builder.Services.AddRateLimiter(limiter => limiter.AddFixedWindowLimiter("client-registration", window =>
+{
+    window.PermitLimit = 20;
+    window.Window = TimeSpan.FromMinutes(1);
+    window.QueueLimit = 0;
+}));
+builder.Services.AddSingleton(identityOptions);
 builder.Services.AddHttpClient();
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
@@ -188,6 +212,7 @@ app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
 app.UseCors("IdentityCors");
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
@@ -221,6 +246,15 @@ static async Task SeedOidcClientsAsync(IServiceProvider services, IEnumerable<Oi
         };
         descriptor.RedirectUris.UnionWith(client.RedirectUris.Select(uri => new Uri(uri)));
         descriptor.PostLogoutRedirectUris.UnionWith(client.PostLogoutRedirectUris.Select(uri => new Uri(uri)));
+        if (client.AllowRefreshTokens)
+        {
+            descriptor.Permissions.Add(OpenIddictConstants.Permissions.GrantTypes.RefreshToken);
+            descriptor.Permissions.Add(OpenIddictConstants.Permissions.Prefixes.Scope + OpenIddictConstants.Scopes.OfflineAccess);
+        }
+        foreach (var resource in client.Resources.Where(resource => !string.IsNullOrWhiteSpace(resource)))
+        {
+            descriptor.Permissions.Add("rsrc:" + resource);
+        }
         descriptor.Permissions.UnionWith([
             OpenIddictConstants.Permissions.Endpoints.Authorization,
             OpenIddictConstants.Permissions.Endpoints.Token,
