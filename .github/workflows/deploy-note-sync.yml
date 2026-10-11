@@ -6,6 +6,11 @@ name: Deploy Note Sync
 
 on:
   workflow_dispatch:
+    inputs:
+      check_only:
+        description: Only run the setup check (no start/restart of the sync)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -105,10 +110,14 @@ jobs:
           ssh "${ssh_opts[@]}" "$remote" "cat > '$AFFINE_DEPLOY_DIR/compose.sync.yml'" < Farm.Sync/deploy/compose.sync.yml
 
           ssh "${ssh_opts[@]}" "$remote" \
-            "AFFINE_DEPLOY_DIR='$AFFINE_DEPLOY_DIR' AFFINE_SYNC_IMAGE='$IMAGE_TAG' bash -s" <<'REMOTE'
+            "AFFINE_DEPLOY_DIR='$AFFINE_DEPLOY_DIR' AFFINE_SYNC_IMAGE='$IMAGE_TAG' CHECK_ONLY='${{ inputs.check_only }}' bash -s" <<'REMOTE'
           set -euo pipefail
           cd "$AFFINE_DEPLOY_DIR"
           test -f sync.env || { echo "sync.env is missing in $AFFINE_DEPLOY_DIR" >&2; exit 1; }
+          if [ "$CHECK_ONLY" = true ]; then
+            docker compose -f compose.yml -f compose.sync.yml run --rm --no-deps affine-sync --check
+            exit 0
+          fi
           docker compose -f compose.yml -f compose.sync.yml up -d affine-sync
           docker compose -f compose.yml -f compose.sync.yml ps affine-sync
           REMOTE
