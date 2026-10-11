@@ -10,7 +10,7 @@ using OpenIddict.Validation.AspNetCore;
 
 namespace Fences.Controllers;
 
-public sealed class OidcController : Controller
+public sealed class OidcController(IOpenIddictApplicationManager applications) : Controller
 {
     [HttpGet("/connect/authorize")]
     [HttpPost("/connect/authorize")]
@@ -73,7 +73,7 @@ public sealed class OidcController : Controller
 
         var principal = new ClaimsPrincipal(identity);
         principal.SetScopes(request.GetScopes());
-        principal.SetResources("fences");
+        principal.SetResources(await ResolveResourcesAsync(request.ClientId));
         principal.SetDestinations(static claim => claim.Type switch
         {
             OpenIddictConstants.Claims.Name
@@ -86,6 +86,20 @@ public sealed class OidcController : Controller
         });
 
         return SignIn(principal, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+    }
+
+    // Access tokens always carry "fences" (userinfo); other audiences only when the client was granted them.
+    private async Task<IEnumerable<string>> ResolveResourcesAsync(string? clientId)
+    {
+        var resources = new List<string> { "fences" };
+        var application = string.IsNullOrEmpty(clientId) ? null : await applications.FindByClientIdAsync(clientId);
+        if (application is not null)
+        {
+            var permissions = await applications.GetPermissionsAsync(application);
+            resources.AddRange(permissions.Where(permission => permission.StartsWith("rsrc:", StringComparison.Ordinal)).Select(permission => permission[5..]));
+        }
+
+        return resources;
     }
 
     [Authorize(AuthenticationSchemes = OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme)]
