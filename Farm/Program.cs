@@ -91,6 +91,22 @@ builder.Services.AddDbContext<PortfolioDbContext>((services, options) =>
     }
 });
 
+// Outbound link click counters: own context and migration history, same database as Farm.
+builder.Services.AddDbContext<LinkClickDbContext>((services, options) =>
+{
+    if (useInMemory)
+    {
+        var name = builder.Configuration["InMemoryDatabaseName"] ?? "AuraFarmingInMemory";
+        options.UseInMemoryDatabase(name + "-LinkClicks");
+    }
+    else
+    {
+        var farm = services.GetRequiredService<AuraFarming>();
+        options.UseNpgsql(farm.Database.GetConnectionString(),
+            provider => provider.MigrationsHistoryTable("__LinkClickMigrationsHistory"));
+    }
+});
+
 // Register Client Tracing & Rate Limiting Service
 builder.Services.AddSingleton<IClientTracingService, ClientTracingService>();
 
@@ -112,6 +128,8 @@ using (var scope = app.Services.CreateScope())
             // depend on the worker having run first.
             scope.ServiceProvider.GetRequiredService<PortfolioDbContext>().Database.Migrate();
             logger.LogInformation("Portfolio database migrations applied successfully.");
+            scope.ServiceProvider.GetRequiredService<LinkClickDbContext>().Database.Migrate();
+            logger.LogInformation("Link click database migrations applied successfully.");
         }
         else
         {

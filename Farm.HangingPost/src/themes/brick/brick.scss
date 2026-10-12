@@ -145,7 +145,7 @@ $brick-muted: #7d716d;
 
   .tracker-grid-container {
     overflow-x: auto;
-    padding-bottom: 0.5rem;
+    padding: 6px 6px 0.75rem;
   }
 
   .tracker-grid {
@@ -154,7 +154,7 @@ $brick-muted: #7d716d;
     grid-auto-flow: column;
     grid-auto-columns: 14px;
     gap: 4px;
-    padding: 2px;
+    padding: 4px;
   }
 
   .tracker-brick {

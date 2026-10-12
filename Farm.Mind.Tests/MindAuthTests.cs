@@ -167,4 +167,24 @@ public class MindAuthTests : IClassFixture<WebApplicationFactory<Program>>
         var json = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("github:42", json.GetProperty("subject").GetString());
     }
+
+    [Fact]
+    public async Task Mcp_AndMemoryApi_AcceptAccessKey_ButKeyCannotManageKeys()
+    {
+        var client = CreateClient();
+        var options = new DbContextOptionsBuilder<MindDbContext>().UseInMemoryDatabase(_databaseName).Options;
+        var created = await new AccessKeyStore(new MindDbContext(options)).CreateAsync("github:7", "test");
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", created.Secret);
+        var whoami = await client.GetFromJsonAsync<JsonElement>("/api/memory/whoami");
+        Assert.Equal("github:7", whoami.GetProperty("subject").GetString());
+
+        var mcp = await client.PostAsync("/mcp", new StringContent("{}", System.Text.Encoding.UTF8, "application/json"));
+        Assert.NotEqual(HttpStatusCode.Unauthorized, mcp.StatusCode);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/memory/keys")).StatusCode);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "fmk_wrong");
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/memory/whoami")).StatusCode);
+    }
 }

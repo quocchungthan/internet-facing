@@ -11,27 +11,58 @@ interface PlatformBookmark {
   displayOrder: number
 }
 
-// Generate deterministic pseudo-activity for demo habit tracker visualization
-function generateContributionData(daysCount: number, seedBase: number) {
-  const data: number[] = []
-  for (let i = 0; i < daysCount; i++) {
-    const pseudoRandom = Math.sin((i + 1) * seedBase) * 10000
-    const val = Math.floor(Math.abs(pseudoRandom)) % 5 // Levels 0, 1, 2, 3, 4
-    data.push(val)
-  }
-  return data
+interface ClickRow {
+  platform: string
+  day: string
+  count: number
 }
+
+const dayKey = (d: Date) => d.toISOString().slice(0, 10)
+
+// Daily click counts for the last `daysCount` UTC days (oldest first).
+function buildDailyCounts(rows: ClickRow[], daysCount: number, platform: string) {
+  const byDay = new Map<string, number>()
+  for (const r of rows) {
+    if (platform !== 'all' && r.platform.toLowerCase() !== platform) continue
+    byDay.set(r.day, (byDay.get(r.day) ?? 0) + r.count)
+  }
+  const today = new Date()
+  const base = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())
+  const days: { date: string; count: number }[] = []
+  for (let i = daysCount - 1; i >= 0; i--) {
+    const date = dayKey(new Date(base - i * 86400000))
+    days.push({ date, count: byDay.get(date) ?? 0 })
+  }
+  return days
+}
+
+const levelOf = (count: number) => (count === 0 ? 0 : count <= 1 ? 1 : count <= 3 ? 2 : count <= 6 ? 3 : 4)
 
 export const BrickTracker = () => {
   const [platforms, setPlatforms] = useState<PlatformBookmark[]>([])
   const [selectedPlatform, setSelectedPlatform] = useState<string>('all')
+  const [clicks, setClicks] = useState<ClickRow[]>([])
   const [loading, setLoading] = useState(true)
 
+  const registerClick = (p: PlatformBookmark) => {
+    const day = dayKey(new Date())
+    setClicks((prev) => {
+      const hit = prev.find((r) => r.platform === p.platform && r.day === day)
+      return hit
+        ? prev.map((r) => (r === hit ? { ...r, count: r.count + 1 } : r))
+        : [...prev, { platform: p.platform, day, count: 1 }]
+    })
+    fetch(`/api/feeds/${encodeURIComponent(p.platform)}/click`, { method: 'POST', keepalive: true }).catch(() => {})
+  }
+
   useEffect(() => {
-    fetch('/api/feeds')
-      .then((res) => res.json())
-      .then((data: PlatformBookmark[]) => {
-        setPlatforms(data)
+    Promise.all([
+      fetch('/api/feeds').then((res) => res.json() as Promise<PlatformBookmark[]>),
+      fetch('/api/feeds/clicks').then((res) => (res.ok ? (res.json() as Promise<ClickRow[]>) : [])),
+    ])
+      .then(([feeds, rows]) => {
+        setPlatforms(feeds)
+        setClicks(rows)
         setLoading(false)
       })
       .catch((err) => {
@@ -46,14 +77,10 @@ export const BrickTracker = () => {
     return found ? found.color : '#b24c29'
   }, [platforms, selectedPlatform])
 
-  const seed = useMemo(() => {
-    return selectedPlatform.split('').reduce((acc, c) => acc + c.charCodeAt(0), 17)
-  }, [selectedPlatform])
-
   const weeks = 24
   const daysCount = weeks * 7
-  const contributions = useMemo(() => generateContributionData(daysCount, seed), [daysCount, seed])
-  const totalContributions = useMemo(() => contributions.reduce((a, b) => a + b, 0), [contributions])
+  const days = useMemo(() => buildDailyCounts(clicks, daysCount, selectedPlatform), [clicks, daysCount, selectedPlatform])
+  const totalContributions = useMemo(() => days.reduce((a, b) => a + b.count, 0), [days])
 
   return (
     <div className="brick-container">
@@ -64,7 +91,7 @@ export const BrickTracker = () => {
             <h2>Platform Habit Tracker &amp; Feeds</h2>
           </div>
           <p className="brick-subtitle">
-            Contributions and gig feeds across active platforms.
+            Link clicks and gig feeds across active platforms.
           </p>
         </div>
       </header>
@@ -108,7 +135,7 @@ export const BrickTracker = () => {
           </h3>
           <div className="tracker-stats">
             <span>
-              Total bricks: <strong>{totalContributions}</strong>
+              Total clicks: <strong>{totalContributions}</strong>
             </span>
             <span>
               Active weeks: <strong>{weeks}</strong>
@@ -118,7 +145,8 @@ export const BrickTracker = () => {
 
         <div className="tracker-grid-container">
           <div className="tracker-grid" role="grid">
-            {contributions.map((level, idx) => {
+            {days.map(({ date, count }, idx) => {
+              const level = levelOf(count)
               const bg =
                 level === 0
                   ? 'var(--brick-empty, #ebedf0)'
@@ -129,7 +157,7 @@ export const BrickTracker = () => {
                   key={idx}
                   className="tracker-brick"
                   style={{ backgroundColor: bg }}
-                  title={`Day ${idx + 1}: ${level * 3} activities (${selectedPlatform})`}
+                  title={`${date}: ${count} link clicks (${selectedPlatform})`}
                   role="gridcell"
                 />
               )
@@ -173,6 +201,7 @@ export const BrickTracker = () => {
                   target="_blank"
                   rel="noreferrer noopener"
                   className="feed-link"
+                  onClick={() => registerClick(p)}
                 >
                   Visit {p.platform} &rarr;
                 </a>

@@ -25,8 +25,12 @@ builder.Services.AddDbContext<MindDbContext>(options =>
     options.UseNpgsql(connection.ConnectionString, npgsql => npgsql.MigrationsHistoryTable("__MindMigrationsHistory", MindDbContext.Schema));
 });
 builder.Services.AddScoped<MemoryStore>();
+builder.Services.AddScoped<AccessKeyStore>();
+builder.Services.AddScoped<Farm.Auth.IAccessKeyValidator>(sp => sp.GetRequiredService<AccessKeyStore>());
 builder.Services.AddHttpContextAccessor();
-builder.Services.AddMcpServer().WithHttpTransport(http => http.Stateless = true).WithTools<MindTools>();
+builder.Services.AddMcpServer(options => options.ServerInstructions = MindGuidance.Text)
+    .WithHttpTransport(http => http.Stateless = true)
+    .WithTools<MindTools>();
 
 var app = builder.Build();
 
@@ -68,6 +72,22 @@ memory.MapGet("/{id:guid}", async (Guid id, MemoryStore store, ClaimsPrincipal u
 memory.MapDelete("/{id:guid}", async (Guid id, MemoryStore store, ClaimsPrincipal user, CancellationToken ct) =>
     await store.ForgetAsync(Subject(user), id, ct) ? Results.NoContent() : Results.NotFound());
 
+// Access keys for clients that cannot do the browser sign-in (e.g. Copilot CLI). Managing them needs the
+// browser session, so a key can never mint more keys.
+var keys = app.MapGroup("/api/memory/keys")
+    .RequireAuthorization(policy => policy.AddAuthenticationSchemes(FarmAuthSchemes.Cookie).RequireAuthenticatedUser());
+keys.MapGet("", async (AccessKeyStore store, ClaimsPrincipal user, CancellationToken ct) =>
+    Results.Ok(await store.ListAsync(Subject(user), ct)));
+keys.MapPost("", async (AccessKeyStore store, ClaimsPrincipal user, CreateKeyRequest request, CancellationToken ct) =>
+{
+    try { return Results.Ok(await store.CreateAsync(Subject(user), request.Name ?? "", ct)); }
+    catch (ArgumentException e) { return Results.BadRequest(new { error = e.Message }); }
+});
+keys.MapDelete("/{id:guid}", async (Guid id, AccessKeyStore store, ClaimsPrincipal user, CancellationToken ct) =>
+    await store.RevokeAsync(Subject(user), id, ct) ? Results.NoContent() : Results.NotFound());
+
 app.Run();
+
+public record CreateKeyRequest(string? Name);
 
 public partial class Program;

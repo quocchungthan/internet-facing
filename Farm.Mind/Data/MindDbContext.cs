@@ -26,6 +26,18 @@ public class LinkedWorkspace
     public DateTimeOffset CreatedAt { get; set; }
 }
 
+public class AccessKey
+{
+    public Guid Id { get; set; }
+    public string Subject { get; set; } = "";
+    public string Name { get; set; } = "";
+    // Only the SHA-256 of the key is stored; the key itself is shown once at creation.
+    public string Hash { get; set; } = "";
+    public string Preview { get; set; } = "";
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset? LastUsedAt { get; set; }
+}
+
 // Lives in its own "mind" schema with its own migration history, next to Farm's tables in the same database.
 public class MindDbContext(DbContextOptions<MindDbContext> options) : DbContext(options)
 {
@@ -33,6 +45,7 @@ public class MindDbContext(DbContextOptions<MindDbContext> options) : DbContext(
 
     public DbSet<Memory> Memories => Set<Memory>();
     public DbSet<LinkedWorkspace> Workspaces => Set<LinkedWorkspace>();
+    public DbSet<AccessKey> AccessKeys => Set<AccessKey>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -55,6 +68,16 @@ public class MindDbContext(DbContextOptions<MindDbContext> options) : DbContext(
             {
                 memory.Ignore(m => m.SearchVector);
             }
+        });
+
+        modelBuilder.Entity<AccessKey>(key =>
+        {
+            key.Property(k => k.Subject).HasMaxLength(200);
+            key.Property(k => k.Name).HasMaxLength(100);
+            key.Property(k => k.Hash).HasMaxLength(64);
+            key.Property(k => k.Preview).HasMaxLength(16);
+            key.HasIndex(k => k.Hash).IsUnique();
+            key.HasIndex(k => k.Subject);
         });
 
         modelBuilder.Entity<LinkedWorkspace>(workspace =>

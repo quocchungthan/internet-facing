@@ -12,10 +12,10 @@ public class MindTools(MemoryStore store, IHttpContextAccessor http)
     private string Subject => http.HttpContext?.User.FindFirstValue("sub")
         ?? throw new InvalidOperationException("No authenticated subject.");
 
-    [McpServerTool(Name = "get_briefing", ReadOnly = true), Description("Start here. Returns the most recent memories and the linked workspaces of the signed-in user.")]
+    [McpServerTool(Name = "get_briefing", ReadOnly = true), Description("CALL THIS FIRST at the start of every session or task, without being asked. Returns standing instructions on when to consult and save to this memory, plus the user's most recent memories and linked workspaces.")]
     public Task<Briefing> GetBriefing(CancellationToken ct) => store.BriefingAsync(Subject, ct);
 
-    [McpServerTool(Name = "search", ReadOnly = true), Description("Full-text search over the user's memories. An empty query returns the most recently updated ones.")]
+    [McpServerTool(Name = "search", ReadOnly = true), Description("Search the user's memories. Use before decisions about conventions, tooling, architecture or preferences, and before asking the user something they may have already answered. An empty query returns the most recently updated ones.")]
     public Task<IReadOnlyList<MemoryDto>> Search(
         [Description("Search terms; supports quoted phrases, OR and -exclusions.")] string query,
         [Description("Optional workspace name to restrict the search.")] string? workspace = null,
@@ -26,7 +26,7 @@ public class MindTools(MemoryStore store, IHttpContextAccessor http)
     public async Task<MemoryDto> GetMemory([Description("Memory id.")] Guid id, CancellationToken ct) =>
         await store.GetAsync(Subject, id, ct) ?? throw new McpException($"Memory {id} was not found.");
 
-    [McpServerTool(Name = "save_memory"), Description("Save a new memory for the signed-in user.")]
+    [McpServerTool(Name = "save_memory"), Description("Send what you learned: save a durable preference, rule, decision, correction or reusable project fact as soon as it appears, without asking permission. Search first and prefer update_memory over duplicates. Never store secrets or personal data.")]
     public Task<MemoryDto> SaveMemory(
         [Description("Short title.")] string title,
         [Description("Memory content (markdown allowed).")] string content,

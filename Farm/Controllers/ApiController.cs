@@ -95,6 +95,63 @@ public class ApiController : ControllerBase
         return Ok(bookmarks);
     }
 
+    [HttpGet("feeds/clicks")]
+    public async Task<IActionResult> GetClicks([FromServices] LinkClickDbContext clicks, CancellationToken cancellationToken)
+    {
+        var from = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-(24 * 7 - 1));
+        var rows = await clicks.LinkClicks
+            .AsNoTracking()
+            .Where(c => c.Day >= from)
+            .Select(c => new { platform = c.Platform, day = c.Day, count = c.Count })
+            .ToListAsync(cancellationToken);
+        return Ok(rows);
+    }
+
+    [HttpPost("feeds/{platform}/click")]
+    public async Task<IActionResult> RegisterClick(string platform, [FromServices] LinkClickDbContext clicks, CancellationToken cancellationToken)
+    {
+        var clientResult = _tracingService.ProcessRequest(HttpContext, "/api/feeds/click");
+        if (!clientResult.IsAllowed)
+        {
+            return StatusCode(StatusCodes.Status429TooManyRequests, new { error = "Too Many Requests" });
+        }
+
+        // Only known, active platforms can be counted.
+        var known = await _db.PlatformBookmarks
+            .AsNoTracking()
+            .Where(b => b.IsActive)
+            .Select(b => b.Platform)
+            .ToListAsync(cancellationToken);
+        var name = known.FirstOrDefault(p => string.Equals(p, platform, StringComparison.OrdinalIgnoreCase));
+        if (name is null) return NotFound();
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var row = await clicks.LinkClicks.FirstOrDefaultAsync(c => c.Platform == name && c.Day == today, cancellationToken);
+        if (row is null)
+        {
+            clicks.LinkClicks.Add(new Farm.Data.Entities.LinkClickDaily { Platform = name, Day = today, Count = 1 });
+        }
+        else
+        {
+            row.Count++;
+        }
+
+        try
+        {
+            await clicks.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            // Lost a race creating today's row; retry as an increment.
+            clicks.ChangeTracker.Clear();
+            var existing = await clicks.LinkClicks.FirstAsync(c => c.Platform == name && c.Day == today, cancellationToken);
+            existing.Count++;
+            await clicks.SaveChangesAsync(cancellationToken);
+        }
+
+        return NoContent();
+    }
+
     [HttpGet("metrics")]
     [HttpGet("tracing")]
     public IActionResult GetMetrics()

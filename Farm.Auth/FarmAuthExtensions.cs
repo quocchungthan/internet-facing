@@ -161,6 +161,25 @@ public static class FarmAuthExtensions
         var metadataUrl = options.PublicBaseUrl.TrimEnd('/') + ProtectedResourceMetadataPath;
         bearer.Events = new JwtBearerEvents
         {
+            OnMessageReceived = async context =>
+            {
+                var header = context.Request.Headers.Authorization.ToString();
+                const string scheme = "Bearer ";
+                if (!header.StartsWith(scheme, StringComparison.OrdinalIgnoreCase)) return;
+                var token = header[scheme.Length..].Trim();
+                if (!token.StartsWith(IAccessKeyValidator.Prefix, StringComparison.Ordinal)) return;
+
+                var validator = context.HttpContext.RequestServices.GetService<IAccessKeyValidator>();
+                var principal = validator is null ? null : await validator.ValidateAsync(token, context.HttpContext.RequestAborted);
+                if (principal is null)
+                {
+                    context.Fail("Invalid access key.");
+                    return;
+                }
+
+                context.Principal = principal;
+                context.Success();
+            },
             OnChallenge = context =>
             {
                 context.HandleResponse();

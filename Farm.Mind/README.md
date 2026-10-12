@@ -45,13 +45,21 @@ Every tool acts only on the signed-in user's data (the Fences subject, `github:<
 
 | Tool | Purpose |
 |---|---|
-| `get_briefing` | Start here: the 10 most recent memories and the linked workspaces. |
+| `get_briefing` | Call first, every session: standing guidance on when to consult and save (also sent as MCP server instructions), the 10 most recent memories and the linked workspaces. |
 | `search(query, workspace?, limit?)` | Full-text search (quoted phrases, `OR`, `-exclude`); an empty query returns recent memories. |
 | `get_memory(id)` | One memory. |
 | `save_memory(title, content, tags?, workspace?)` | Create a memory (written directly). |
 | `update_memory(id, ...)` | Change only the provided fields. |
 | `forget_memory(id)` | Permanently delete. |
 | `list_workspaces`, `link_workspace(name, affineWorkspaceId?)` | Named workspaces, optionally tied to an AFFiNE workspace. |
+
+## Access keys
+
+Clients that cannot do the browser sign-in (Copilot CLI, scripts) use a personal access key: create it on `/connect`
+(browser session required) and send it as `Authorization: Bearer fmk_...`. Only the SHA-256 is stored; the key is
+shown once, is scoped to your account, and can be revoked. `GET/POST /api/memory/keys` and `DELETE /api/memory/keys/{id}`
+manage them and accept the session cookie only, so a key cannot create keys. Farm.Auth accepts `fmk_` bearer tokens through
+`IAccessKeyValidator`; anything else is validated as a Fences JWT.
 
 ## Data model (PostgreSQL)
 

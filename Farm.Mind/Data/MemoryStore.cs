@@ -6,7 +6,7 @@ public record MemoryDto(Guid Id, string Title, string Content, string[] Tags, st
 
 public record WorkspaceDto(string Name, string? AffineWorkspaceId);
 
-public record Briefing(IReadOnlyList<MemoryDto> Recent, IReadOnlyList<WorkspaceDto> Workspaces);
+public record Briefing(string Guidance, IReadOnlyList<MemoryDto> Recent, IReadOnlyList<WorkspaceDto> Workspaces);
 
 // Every operation is scoped to the Fences subject, so one user can never read or change another user's memories.
 public class MemoryStore(MindDbContext db)
@@ -96,7 +96,7 @@ public class MemoryStore(MindDbContext db)
             .OrderByDescending(m => m.UpdatedAt)
             .Take(10)
             .ToListAsync(ct);
-        return new Briefing(recent.Select(ToDto).ToList(), await ListWorkspacesAsync(subject, ct));
+        return new Briefing(Mcp.MindGuidance.Text, recent.Select(ToDto).ToList(), await ListWorkspacesAsync(subject, ct));
     }
 
     public async Task<IReadOnlyList<WorkspaceDto>> ListWorkspacesAsync(string subject, CancellationToken ct = default)
