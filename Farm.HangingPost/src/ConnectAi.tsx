@@ -73,7 +73,7 @@ const CHART_HEIGHT = 260
 const CHART_PADDING = { top: 16, right: 16, bottom: 40, left: 68 }
 
 function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024) return `${Math.round(bytes)} B`
   const units = ['KB', 'MB', 'GB', 'TB']
   let value = bytes / 1024
   let unit = 0
@@ -81,7 +81,7 @@ function formatBytes(bytes: number): string {
     value /= 1024
     unit++
   }
-  return `${value.toFixed(1)} ${units[unit]}`
+  return `${value.toFixed(2)} ${units[unit]}`
 }
 
 function UsageHistory() {
