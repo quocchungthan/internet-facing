@@ -136,6 +136,27 @@ public class MindAuthTests : IClassFixture<WebApplicationFactory<Program>>
     }
 
     [Fact]
+    public async Task Mcp_Initialize_SendsGuidanceAsServerInstructions()
+    {
+        var client = CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Token());
+        var request = new HttpRequestMessage(HttpMethod.Post, "/mcp")
+        {
+            Content = JsonContent.Create(new
+            {
+                jsonrpc = "2.0", id = 1, method = "initialize",
+                @params = new { protocolVersion = "2025-06-18", capabilities = new { }, clientInfo = new { name = "t", version = "1" } }
+            })
+        };
+        request.Headers.Accept.ParseAdd("application/json");
+        request.Headers.Accept.ParseAdd("text/event-stream");
+
+        var body = await (await client.SendAsync(request)).Content.ReadAsStringAsync();
+        Assert.Contains("get_briefing", body);
+        Assert.Contains("instructions", body);
+    }
+
+    [Fact]
     public async Task Mcp_WithWrongAudience_Returns401()
     {
         var client = CreateClient();

@@ -120,7 +120,7 @@ export function ConnectAi({ session, loading }: ConnectAiProps) {
       </section>
 
       <section className="connect-card" aria-labelledby="connect-cli">
-        <h2 id="connect-cli">Access keys (Copilot CLI and headless clients)</h2>
+        <h2 id="connect-cli">Connected clients: access keys (Copilot CLI and headless clients)</h2>
         {session.isAuthenticated ? (
           <AccessKeys mcpUrl={mcpUrl} />
         ) : (
@@ -155,11 +155,6 @@ export function ConnectAi({ session, loading }: ConnectAiProps) {
         ) : (
           <p>Sign-in is not available on this server yet.</p>
         )}
-      </section>
-
-      <section className="connect-card" aria-labelledby="connect-clients">
-        <h2 id="connect-clients">Connected clients</h2>
-        <p className="connect-hint">Granted clients will be listed here so you can revoke them. Coming soon.</p>
       </section>
     </article>
   )
