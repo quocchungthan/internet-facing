@@ -25,6 +25,7 @@ builder.Services.AddDbContext<MindDbContext>(options =>
     options.UseNpgsql(connection.ConnectionString, npgsql => npgsql.MigrationsHistoryTable("__MindMigrationsHistory", MindDbContext.Schema));
 });
 builder.Services.AddScoped<MemoryStore>();
+builder.Services.AddScoped<McpUsageStore>();
 builder.Services.AddScoped<AccessKeyStore>();
 builder.Services.AddScoped<Farm.Auth.IAccessKeyValidator>(sp => sp.GetRequiredService<AccessKeyStore>());
 builder.Services.AddHttpContextAccessor();
@@ -43,6 +44,7 @@ using (var scope = app.Services.CreateScope())
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseMiddleware<McpUsageMiddleware>();
 
 app.MapGet("/healthz", () => Results.Ok(new { status = "ok", service = "farm-mind" }));
 
@@ -67,6 +69,12 @@ memory.MapGet("", async (MemoryStore store, ClaimsPrincipal user, string? q, str
     Results.Ok(await store.SearchAsync(Subject(user), q ?? "", workspace, limit ?? 10, ct)));
 memory.MapGet("/briefing", async (MemoryStore store, ClaimsPrincipal user, CancellationToken ct) =>
     Results.Ok(await store.BriefingAsync(Subject(user), ct)));
+memory.MapGet("/usage", async (McpUsageStore store, ClaimsPrincipal user, int? days, CancellationToken ct) =>
+{
+    var range = days ?? 30;
+    if (range is not (7 or 30 or 90)) return Results.BadRequest(new { error = "Range must be 7, 30 or 90 days." });
+    return Results.Ok(await store.GetAsync(Subject(user), range, ct));
+});
 memory.MapGet("/{id:guid}", async (Guid id, MemoryStore store, ClaimsPrincipal user, CancellationToken ct) =>
     await store.GetAsync(Subject(user), id, ct) is { } found ? Results.Ok(found) : Results.NotFound());
 memory.MapDelete("/{id:guid}", async (Guid id, MemoryStore store, ClaimsPrincipal user, CancellationToken ct) =>

@@ -96,6 +96,26 @@ namespace Farm.Mind.Data.Migrations
                     b.ToTable("Workspaces", "mind");
                 });
 
+            modelBuilder.Entity("Farm.Mind.Data.McpUsageDaily", b =>
+                {
+                    b.Property<string>("Subject")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateOnly>("Day")
+                        .HasColumnType("date");
+
+                    b.Property<long>("ReadBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("WriteBytes")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Subject", "Day");
+
+                    b.ToTable("McpUsage", "mind");
+                });
+
             modelBuilder.Entity("Farm.Mind.Data.Memory", b =>
                 {
                     b.Property<Guid>("Id")

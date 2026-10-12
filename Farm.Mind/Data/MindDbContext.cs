@@ -38,6 +38,14 @@ public class AccessKey
     public DateTimeOffset? LastUsedAt { get; set; }
 }
 
+public class McpUsageDaily
+{
+    public string Subject { get; set; } = "";
+    public DateOnly Day { get; set; }
+    public long ReadBytes { get; set; }
+    public long WriteBytes { get; set; }
+}
+
 // Lives in its own "mind" schema with its own migration history, next to Farm's tables in the same database.
 public class MindDbContext(DbContextOptions<MindDbContext> options) : DbContext(options)
 {
@@ -46,6 +54,7 @@ public class MindDbContext(DbContextOptions<MindDbContext> options) : DbContext(
     public DbSet<Memory> Memories => Set<Memory>();
     public DbSet<LinkedWorkspace> Workspaces => Set<LinkedWorkspace>();
     public DbSet<AccessKey> AccessKeys => Set<AccessKey>();
+    public DbSet<McpUsageDaily> McpUsage => Set<McpUsageDaily>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -85,6 +94,13 @@ public class MindDbContext(DbContextOptions<MindDbContext> options) : DbContext(
             workspace.Property(w => w.Subject).HasMaxLength(200);
             workspace.Property(w => w.Name).HasMaxLength(200);
             workspace.HasIndex(w => new { w.Subject, w.Name }).IsUnique();
+        });
+
+        modelBuilder.Entity<McpUsageDaily>(usage =>
+        {
+            usage.ToTable("McpUsage");
+            usage.HasKey(u => new { u.Subject, u.Day });
+            usage.Property(u => u.Subject).HasMaxLength(200);
         });
     }
 }

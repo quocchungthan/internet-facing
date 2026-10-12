@@ -208,4 +208,35 @@ public class MindAuthTests : IClassFixture<WebApplicationFactory<Program>>
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "fmk_wrong");
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/memory/whoami")).StatusCode);
     }
+
+    [Fact]
+    public async Task Mcp_UsageTracksOnlyAggregatedBytesAndIsScopedToTheSubject()
+    {
+        var alice = CreateClient();
+        alice.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Token(subject: "github:usage-alice"));
+        var bob = CreateClient();
+        bob.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Token(subject: "github:usage-bob"));
+
+        await CallToolAsync(alice, "get_briefing", new { });
+
+        var aliceUsage = await alice.GetFromJsonAsync<JsonElement>("/api/memory/usage");
+        var today = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd");
+        var todayUsage = Assert.Single(aliceUsage.EnumerateArray(), day => day.GetProperty("date").GetString() == today);
+        Assert.Equal(3, todayUsage.EnumerateObject().Count());
+        Assert.True(todayUsage.GetProperty("readBytes").GetInt64() > 0);
+        Assert.True(todayUsage.GetProperty("writeBytes").GetInt64() > 0);
+        var firstReadBytes = todayUsage.GetProperty("readBytes").GetInt64();
+        var firstWriteBytes = todayUsage.GetProperty("writeBytes").GetInt64();
+
+        await CallToolAsync(alice, "get_briefing", new { });
+        var aggregatedUsage = await alice.GetFromJsonAsync<JsonElement>("/api/memory/usage");
+        var aggregatedToday = Assert.Single(aggregatedUsage.EnumerateArray(), day => day.GetProperty("date").GetString() == today);
+        Assert.True(aggregatedToday.GetProperty("readBytes").GetInt64() > firstReadBytes);
+        Assert.True(aggregatedToday.GetProperty("writeBytes").GetInt64() > firstWriteBytes);
+
+        var bobUsage = await bob.GetFromJsonAsync<JsonElement>("/api/memory/usage");
+        Assert.Empty(bobUsage.EnumerateArray());
+        Assert.Equal(HttpStatusCode.BadRequest, (await alice.GetAsync("/api/memory/usage?days=8")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await CreateClient().GetAsync("/api/memory/usage")).StatusCode);
+    }
 }
