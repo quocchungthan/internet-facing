@@ -116,7 +116,7 @@ $brick-muted: #7d716d;
   background: #ffffff;
   border-top: 1px solid $brick-mortar;
   border-bottom: 1px solid $brick-mortar;
-  padding: 1.5rem 0;
+  padding: 1.5rem 1.25rem;
   margin-bottom: 2.5rem;
 
   .tracker-header {
@@ -145,6 +145,8 @@ $brick-muted: #7d716d;
 
   .tracker-grid-container {
     overflow-x: auto;
+    // Room for the hover scale without clipping, cancelled out so bricks align with the title.
+    margin: 0 -6px;
     padding: 6px 6px 0.75rem;
   }
 
@@ -154,7 +156,7 @@ $brick-muted: #7d716d;
     grid-auto-flow: column;
     grid-auto-columns: 14px;
     gap: 4px;
-    padding: 4px;
+    padding: 0;
   }
 
   .tracker-brick {
