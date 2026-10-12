@@ -254,6 +254,49 @@
   user-select: all;
 }
 
+.copy-block {
+  position: relative;
+}
+
+.copy-block .connect-code {
+  padding-right: 44px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.copy-btn {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  height: 28px;
+  justify-content: center;
+  position: absolute;
+  right: 6px;
+  top: 6px;
+  width: 28px;
+}
+
+.copy-btn:hover {
+  border-color: currentColor;
+}
+
+.toast {
+  background: #1f2937;
+  border-radius: 6px;
+  bottom: 24px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  color: #fff;
+  left: 50%;
+  padding: 10px 16px;
+  position: fixed;
+  transform: translateX(-50%);
+  z-index: 1000;
+}
+
 .content {
   margin: 0 auto;
   max-width: 720px;

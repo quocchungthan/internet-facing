@@ -1,5 +1,53 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { signInUrl, type Session } from './session'
+
+async function copyText(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text)
+    return true
+  } catch {
+    // Fallback for non-secure contexts or denied clipboard permission.
+    const area = document.createElement('textarea')
+    area.value = text
+    area.style.position = 'fixed'
+    area.style.opacity = '0'
+    document.body.appendChild(area)
+    area.select()
+    const ok = document.execCommand('copy')
+    area.remove()
+    return ok
+  }
+}
+
+function CodeBlock({ text }: { text: string }) {
+  const [toast, setToast] = useState<string | null>(null)
+  const timer = useRef<number>(0)
+
+  useEffect(() => () => window.clearTimeout(timer.current), [])
+
+  const copy = async () => {
+    setToast((await copyText(text)) ? 'Copied to clipboard' : 'Could not copy')
+    window.clearTimeout(timer.current)
+    timer.current = window.setTimeout(() => setToast(null), 2000)
+  }
+
+  return (
+    <div className="copy-block">
+      <code className="connect-code">{text}</code>
+      <button type="button" className="copy-btn" onClick={copy} aria-label="Copy to clipboard" title="Copy to clipboard">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <rect x="9" y="9" width="13" height="13" rx="2" />
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+        </svg>
+      </button>
+      {toast && (
+        <div className="toast" role="status">
+          {toast}
+        </div>
+      )}
+    </div>
+  )
+}
 
 interface ConnectAiProps {
   session: Session
@@ -74,7 +122,7 @@ function AccessKeys({ mcpUrl }: { mcpUrl: string }) {
       {secret && (
         <>
           <p className="connect-hint">Copy this now; it is shown only once. Put it in <code>~/.copilot/mcp-config.json</code>:</p>
-          <code className="connect-code" style={{ whiteSpace: 'pre-wrap', display: 'block' }}>{config}</code>
+          <CodeBlock text={config} />
         </>
       )}
       <ul>
@@ -115,7 +163,7 @@ export function ConnectAi({ session, loading }: ConnectAiProps) {
 
       <section className="connect-card" aria-labelledby="connect-endpoint">
         <h2 id="connect-endpoint">MCP endpoint</h2>
-        <code className="connect-code">{mcpUrl}</code>
+        <CodeBlock text={mcpUrl} />
         <p className="connect-hint">Transport: Streamable HTTP. Authentication: browser sign-in (OAuth, PKCE).</p>
       </section>
 
@@ -135,7 +183,7 @@ export function ConnectAi({ session, loading }: ConnectAiProps) {
           server instructions, so paste this into your global agent instructions too (for example
           <code> ~/.copilot/copilot-instructions.md</code> or <code>CLAUDE.md</code>).
         </p>
-        <code className="connect-code" style={{ whiteSpace: 'pre-wrap', display: 'block' }}>{AGENT_SNIPPET}</code>
+        <CodeBlock text={AGENT_SNIPPET} />
       </section>
 
       <section className="connect-card" aria-labelledby="connect-account">
