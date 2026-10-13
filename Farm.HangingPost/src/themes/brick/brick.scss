@@ -1,6 +1,6 @@
 // Brick theme: soft violet and lavender-grey. Light and dark follow the system preference.
 :root[data-theme='brick'] {
-  --background: #e5e0ed;
+  --background: #e4e4d2;
   --surface: #f0ecf6;
   --surface-2: #dcd5e9;
   --border: #cbc2dc;
@@ -20,7 +20,7 @@
 
 @media (prefers-color-scheme: dark) {
   :root[data-theme='brick'] {
-    --background: #0f0a1c;
+    --background: #12150e;
     --surface: #292435;
     --surface-2: #332d42;
     --border: #463e5c;
