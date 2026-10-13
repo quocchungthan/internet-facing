@@ -10,7 +10,7 @@
 
 .app-header {
   align-items: center;
-  border-bottom: 1px solid var(--border);
+  border-bottom: var(--header-rule);
   display: flex;
   gap: 16px;
   justify-content: space-between;
@@ -30,7 +30,7 @@
   border: none;
   border-radius: 50%;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
-  color: var(--background);
+  color: var(--brand-contrast);
   cursor: pointer;
   display: flex;
   height: 48px;
@@ -168,7 +168,7 @@
 .account-button-primary {
   background: var(--brand);
   border-color: var(--brand);
-  color: var(--background);
+  color: var(--brand-contrast);
 }
 
 .account-button:focus-visible,
@@ -177,19 +177,25 @@
   outline-offset: 2px;
 }
 
+/* One tab style for every tab; only the theme tokens change when the active tab changes. */
 .tab {
   border-bottom: 3px solid transparent;
-  color: var(--link);
-  font-size: 0.9375rem;
+  color: var(--muted-text);
+  font-family: var(--font-body);
+  font-size: var(--nav-size);
   font-weight: 600;
+  letter-spacing: var(--nav-tracking);
   line-height: 1.25;
   padding: 14px 20px 11px;
   text-align: center;
   text-decoration: none;
+  text-transform: var(--nav-transform);
+  transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
   white-space: nowrap;
 }
 
 .tab:hover {
+  background-color: var(--tab-hover-bg);
   color: var(--link-hover);
   text-decoration: none;
 }
@@ -199,9 +205,18 @@
   outline-offset: -3px;
 }
 
-.tabActive {
+.tabActive,
+.tabActive:hover {
+  background-color: var(--tab-active-bg);
   border-bottom-color: var(--brand);
   color: var(--text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tab,
+  body {
+    transition: none;
+  }
 }
 
 .tab-content {

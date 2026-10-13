@@ -59,13 +59,13 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 interface TabDefinition {
   label: string
   path: string
-  themeClass: string
+  theme: 'microsoft' | 'brick' | 'winchester'
 }
 
 const tabs: TabDefinition[] = [
-  { label: 'Elder Vibe Coder', path: '/', themeClass: 'tab-microsoft' },
-  { label: 'Brick Tracker', path: '/tracker', themeClass: 'tab-brick' },
-  { label: 'Winchester', path: '/winchester', themeClass: 'tab-winchester' },
+  { label: 'Elder Vibe Coder', path: '/', theme: 'microsoft' },
+  { label: 'Dashboard', path: '/tracker', theme: 'brick' },
+  { label: 'Cases', path: '/winchester', theme: 'winchester' },
 ]
 
 function getPathname(): string {
@@ -76,9 +76,37 @@ function getPathname(): string {
   return '/'
 }
 
+const LAST_THEME_KEY = 'farm.lastTheme'
+
+function loadLastTheme(): TabDefinition['theme'] {
+  try {
+    const saved = window.localStorage.getItem(LAST_THEME_KEY)
+    return tabs.find((tab) => tab.theme === saved)?.theme ?? 'microsoft'
+  } catch {
+    return 'microsoft'
+  }
+}
+
+function saveLastTheme(theme: TabDefinition['theme']) {
+  try {
+    window.localStorage.setItem(LAST_THEME_KEY, theme)
+  } catch {
+    // Storage can be blocked; the theme simply falls back to the default.
+  }
+}
+
 export function App() {
   const [pathname, setPathname] = useState(getPathname)
   const { status, session } = useSession()
+  const tabTheme = tabs.find((tab) => tab.path === pathname)?.theme
+  // Pages that are not tabs (like /connect) keep the theme of the last tab the user opened.
+  const theme = tabTheme ?? loadLastTheme()
+
+  // The theme is applied to <html> so the whole page, nav and tab content restyle together.
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+    if (tabTheme) saveLastTheme(tabTheme)
+  }, [theme, tabTheme])
 
   useEffect(() => {
     const handlePopState = () => setPathname(getPathname())
@@ -104,7 +132,7 @@ export function App() {
                 key={tab.path}
                 href={tab.path}
                 aria-current={isActive ? 'page' : undefined}
-                className={`tab ${tab.themeClass}${isActive ? ' tabActive' : ''}`}
+                className={`tab${isActive ? ' tabActive' : ''}`}
                 onClick={(event) => {
                   event.preventDefault()
                   navigate(tab.path)

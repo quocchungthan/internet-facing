@@ -8,10 +8,22 @@
   --link: #005ea8;
   --link-hover: #003e70;
   --muted-text: #505050;
+  --surface-2: #f3f2f1;
+  --brand-contrast: #ffffff;
   --text: #1a1a1a;
+  --radius: 6px;
+  --font-body: 'Segoe UI', SegoeUI, -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-display: var(--font-body);
+  --nav-transform: none;
+  --nav-tracking: normal;
+  --nav-size: 0.9375rem;
+  --header-rule: 1px solid var(--border);
+  --tab-hover-bg: color-mix(in srgb, var(--brand) 8%, transparent);
+  --tab-active-bg: color-mix(in srgb, var(--brand) 12%, transparent);
+  --page-pattern: none;
   background: var(--background);
   color: var(--text);
-  font-family: 'Segoe UI', SegoeUI, -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-family: var(--font-body);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -27,6 +39,8 @@
     --link: #4cc2ff;
     --link-hover: #70d1ff;
     --muted-text: #a8a8a8;
+    --surface-2: #2a2a2a;
+    --brand-contrast: #141414;
     --text: #f0f0f0;
   }
 }
@@ -38,6 +52,9 @@
 body {
   margin: 0;
   background-color: var(--background);
+  background-image: var(--page-pattern);
+  background-attachment: fixed;
   color: var(--text);
   min-height: 100vh;
+  transition: background-color 0.25s ease, color 0.25s ease;
 }

@@ -1,207 +1,193 @@
-// Winchester Theme - Sam and Dean Case Solving Style
-$winchester-primary: #8b5a2b; // Leather brown
-$winchester-dark: #2c221e;
-$winchester-parchment: #fdfaf5;
-$winchester-border: #d4c5b9;
-$winchester-blood-red: #8b0000;
-$winchester-accent: #c49a45; // Hunter brass
-$winchester-muted: #6e645e;
+// Winchester theme: a hunter's journal in a dark bunker. Always dark, regardless of the system preference.
+// Palette: weathered leather and ink, hunter brass for accents, blood red reserved for danger/status.
+:root[data-theme='winchester'] {
+  color-scheme: dark;
+  --background: #0e0a08;
+  --surface: #1a1310;
+  --surface-2: #261b16;
+  --border: #3d2d24;
+  --brand: #c9a14a;
+  --brand-contrast: #17100c;
+  --focus: #f3e5c0;
+  --link: #d9b45f;
+  --link-hover: #ecd08a;
+  --muted-text: #ab9c8c;
+  --text: #ebe0cb;
+  --danger: #e0645f;
+  --radius: 3px;
+  --font-body: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
+  --font-display: var(--font-body);
+  --nav-transform: uppercase;
+  --nav-tracking: 0.1em;
+  --nav-size: 0.8125rem;
+  --header-rule: 1px solid var(--brand);
+  --tab-hover-bg: color-mix(in srgb, var(--brand) 8%, transparent);
+  --tab-active-bg: color-mix(in srgb, var(--brand) 14%, transparent);
+  --page-pattern:
+    radial-gradient(ellipse at 50% -10%, rgb(201 161 74 / 10%), transparent 55%),
+    radial-gradient(ellipse at 50% 120%, rgb(0 0 0 / 60%), transparent 60%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200' fill='none' stroke='%23c9a14a' stroke-opacity='.09' stroke-width='1.2'%3E%3Ccircle cx='100' cy='100' r='94'/%3E%3Ccircle cx='100' cy='100' r='80'/%3E%3Cpolygon points='100,22 144,157 30,74 170,74 56,157'/%3E%3C/svg%3E")
+      no-repeat right -140px bottom -140px / 620px;
+}
 
-.tab-winchester {
-  font-family: 'Georgia', 'Times New Roman', serif;
-  color: #5c4e43;
-  font-weight: 600;
-  position: relative;
-  transition: all 0.2s ease;
+:root[data-theme='winchester'] .app-header {
+  box-shadow: 0 1px 0 rgb(201 161 74 / 25%), 0 8px 24px -12px rgb(201 161 74 / 35%);
+}
 
-  &:hover {
-    color: $winchester-primary;
-    background-color: rgba($winchester-primary, 0.05);
-  }
-
-  &.tabActive {
-    color: $winchester-dark;
-    font-weight: 700;
-    border-bottom: 3px solid $winchester-primary;
-    background-color: rgba($winchester-primary, 0.08);
+// A candle-like flicker on the active tab; skipped for reduced-motion users.
+@media (prefers-reduced-motion: no-preference) {
+  :root[data-theme='winchester'] .tabActive {
+    animation: winchester-flicker 4s ease-in-out infinite;
   }
 }
 
-.winchester-container {
-  width: 100%;
-  max-width: 100%;
-  margin: 0;
-  padding: 0;
+@keyframes winchester-flicker {
+  0%,
+  100% {
+    box-shadow: 0 6px 12px -8px rgb(201 161 74 / 70%);
+  }
+  45% {
+    box-shadow: 0 6px 16px -7px rgb(201 161 74 / 95%);
+  }
+  70% {
+    box-shadow: 0 5px 10px -8px rgb(201 161 74 / 55%);
+  }
+}
+
+// Winchester page content
+.winchester {
+  display: grid;
+  gap: clamp(20px, 3vw, 36px);
   text-align: left;
-  font-family: 'Georgia', 'Times New Roman', serif;
 }
 
 .winchester-header {
-  border-bottom: 2px solid $winchester-border;
-  padding-bottom: 1.5rem;
-  margin-bottom: 2rem;
+  align-items: center;
+  border-bottom: 1px dashed var(--border);
+  display: flex;
+  gap: clamp(16px, 3vw, 32px);
+  padding-bottom: clamp(16px, 2vw, 28px);
+
+  .winchester-seal {
+    color: var(--brand);
+    flex: 0 0 auto;
+    height: clamp(72px, 10vw, 120px);
+    width: clamp(72px, 10vw, 120px);
+  }
 
   .journal-badge {
+    border: 1px solid var(--brand);
+    color: var(--brand);
     display: inline-block;
-    background: $winchester-dark;
-    color: $winchester-accent;
     font-size: 0.75rem;
-    font-family: -apple-system, sans-serif;
     font-weight: 700;
+    letter-spacing: 0.14em;
+    padding: 3px 10px;
     text-transform: uppercase;
-    letter-spacing: 0.1em;
-    padding: 0.25rem 0.6rem;
-    border-radius: 3px;
-    margin-bottom: 0.5rem;
   }
 
   h1 {
-    font-size: 2.25rem;
-    margin: 0.25rem 0;
-    color: $winchester-dark;
-    letter-spacing: -0.02em;
+    font-size: clamp(1.75rem, 1.2rem + 2.5vw, 2.75rem);
+    letter-spacing: 0.01em;
+    line-height: 1.15;
+    margin: 12px 0 6px;
   }
 
   p {
-    font-style: italic;
-    color: $winchester-muted;
-    margin: 0.25rem 0 0;
+    color: var(--muted-text);
     font-size: 1.0625rem;
+    font-style: italic;
+    margin: 0;
+    max-width: 52ch;
   }
 }
 
-.winchester-case-board {
+.winchester-board {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
+}
+
+// Case files: paper-dark cards with a brass pin and a stamped status
+.case-file {
+  background: linear-gradient(180deg, var(--surface-2), var(--surface));
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--brand);
+  border-radius: var(--radius);
   display: flex;
   flex-direction: column;
-  width: 100%;
-  border-top: 1px solid $winchester-border;
-}
+  gap: 12px;
+  padding: 20px 22px;
+  position: relative;
+  transition: border-color 0.2s ease, transform 0.2s ease;
 
-.case-entry {
-  background: transparent;
-  border-bottom: 1px solid $winchester-border;
-  padding: 1.25rem 0;
-  display: flex;
-  justify-content: space-between;
-  gap: 2rem;
-  align-items: flex-start;
-  transition: background-color 0.12s ease;
+  &::before {
+    background: radial-gradient(circle at 35% 35%, #ecd08a, var(--brand) 55%, #6b5320);
+    border-radius: 50%;
+    box-shadow: 0 2px 3px rgb(0 0 0 / 60%);
+    content: '';
+    height: 10px;
+    position: absolute;
+    right: 14px;
+    top: -6px;
+    width: 10px;
+  }
 
   &:hover {
-    background-color: rgba(139, 90, 43, 0.03);
+    border-color: color-mix(in srgb, var(--brand) 50%, var(--border));
+    transform: translateY(-2px);
   }
 
-  .case-main {
+  h2 {
+    font-size: 1.25rem;
+    line-height: 1.3;
+    margin: 0;
+  }
+
+  p {
+    color: var(--muted-text);
     flex: 1;
-
-    .case-status {
-      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-      font-size: 0.75rem;
-      font-weight: 700;
-      color: $winchester-blood-red;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      margin-bottom: 0.25rem;
-    }
-
-    h3 {
-      margin: 0 0 0.35rem;
-      font-size: 1.25rem;
-      color: $winchester-dark;
-    }
-
-    p {
-      font-size: 0.9375rem;
-      color: $winchester-muted;
-      line-height: 1.5;
-      margin: 0;
-    }
+    line-height: 1.6;
+    margin: 0;
   }
 
-  .case-meta {
-    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  footer {
+    border-top: 1px dashed var(--border);
+    color: var(--muted-text);
     font-size: 0.8125rem;
-    color: #8c827a;
-    min-width: 220px;
-    text-align: right;
+    letter-spacing: 0.02em;
+    padding-top: 10px;
   }
-}
 
-@media (max-width: 768px) {
-  .case-entry {
-    flex-direction: column;
-    gap: 0.5rem;
-    .case-meta {
-      text-align: left;
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+
+    &:hover {
+      transform: none;
     }
   }
 }
 
-@media (prefers-color-scheme: dark) {
-  .tab-winchester {
-    color: #b09f90;
+.case-status {
+  align-self: flex-start;
+  border: 2px solid currentColor;
+  border-radius: 2px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  padding: 2px 8px;
+  text-transform: uppercase;
+  transform: rotate(-2deg);
 
-    &:hover {
-      color: #c49a45;
-      background-color: rgba(196, 154, 69, 0.08);
-    }
-
-    &.tabActive {
-      color: #f3e5d0;
-      border-bottom-color: #c49a45;
-      background-color: rgba(196, 154, 69, 0.12);
-    }
+  &[data-state='solved'] {
+    color: var(--brand);
   }
 
-  .winchester-container {
-    color: #eadecb;
+  &[data-state='open'] {
+    color: var(--danger);
   }
 
-  .winchester-header {
-    border-color: #3d332c;
-
-    .journal-badge {
-      background: #120e0c;
-      color: #e5b869;
-      border: 1px solid #3d332c;
-    }
-
-    h1 {
-      color: #f3e5d0;
-    }
-
-    p {
-      color: #a69a8f;
-    }
-  }
-
-  .winchester-case-board {
-    border-color: #3d332c;
-  }
-
-  .case-entry {
-    border-color: #3d332c;
-
-    &:hover {
-      background-color: rgba(196, 154, 69, 0.04);
-    }
-
-    .case-main {
-      .case-status {
-        color: #e0524c;
-      }
-
-      h3 {
-        color: #f3e5d0;
-      }
-
-      p {
-        color: #c9bdb0;
-      }
-    }
-
-    .case-meta {
-      color: #9c8e82;
-    }
+  &[data-state='pending'] {
+    color: var(--muted-text);
   }
 }
