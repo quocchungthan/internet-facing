@@ -277,6 +277,66 @@ public sealed class SyncTests
     }
 
     [Fact]
+    public async Task LocalhostToolsUpsertsAreIdempotentAndVerticallyIsolated()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<AuraFarming>().UseSqlite(connection).Options;
+        await using (var database = new AuraFarming(options))
+        {
+            await database.Database.EnsureCreatedAsync();
+            await database.LocalhostTools.ExecuteDeleteAsync();
+        }
+        var writer = new DatabaseWriter(() => new AuraFarming(options));
+        var first = Document("tools-doc", Timestamp, tools: [
+            Tool(1, "SearchCollect"),
+            Tool(2, "ConvertTransformCompose")
+        ]);
+        await writer.WriteAsync([first], Token);
+        await writer.WriteAsync([first], Token); // Idempotent repeat
+
+        await using (var verify = new AuraFarming(options))
+        {
+            Assert.Equal(2, await verify.LocalhostTools.CountAsync());
+            var tool1 = await verify.LocalhostTools.SingleAsync(t => t.Id == 1);
+            Assert.Equal("Tool 1", tool1.Name);
+            Assert.Equal("SearchCollect", tool1.Category);
+            Assert.Equal("http://localhost:8001", tool1.DirectUrl);
+        }
+
+        var update = Document("tools-doc", Timestamp.AddDays(1), tools: [
+            Tool(1, "SearchCollect") with { Name = "Updated Tool 1", DisplayOrder = 99 },
+            Tool(3, "ObserveWatching")
+        ]);
+        await writer.WriteAsync([update], Token);
+
+        await using (var verify2 = new AuraFarming(options))
+        {
+            Assert.Equal(3, await verify2.LocalhostTools.CountAsync()); // Existing tool 2 retained
+            var tool1 = await verify2.LocalhostTools.SingleAsync(t => t.Id == 1);
+            Assert.Equal("Updated Tool 1", tool1.Name);
+            Assert.Equal(99, tool1.DisplayOrder);
+            var tool3 = await verify2.LocalhostTools.SingleAsync(t => t.Id == 3);
+            Assert.Equal("ObserveWatching", tool3.Category);
+        }
+    }
+
+    [Fact]
+    public void SnapshotValidationRejectsInvalidToolCategories()
+    {
+        var invalid = SnapshotOf(Document("doc", Timestamp, tools: [Tool(1, "InvalidCategory")]));
+        Assert.Throws<InvalidDataException>(invalid.Validate);
+
+        var valid = SnapshotOf(Document("doc", Timestamp, tools: [
+            Tool(1, "SearchCollect"),
+            Tool(2, "ConvertTransformCompose"),
+            Tool(3, "ObserveWatching"),
+            Tool(4, "CalculatingAnalysing")
+        ]));
+        valid.Validate(); // Should not throw
+    }
+
+    [Fact]
     public async Task FailureRollsBackAllDocuments()
     {
         await using var connection = new SqliteConnection("Data Source=:memory:");
@@ -380,8 +440,8 @@ public sealed class SyncTests
 
     private static Snapshot SnapshotOf(params SourceDocument[] documents) =>
         new() { CapturedAtUtc = Timestamp.AddDays(1), Documents = documents.ToList() };
-    private static SourceDocument Document(string id, DateTimeOffset updated, List<MetadataRow>? metadata = null, List<BookmarkRow>? bookmarks = null) =>
-        new() { Id = id, UpdatedAtUtc = updated, Metadata = metadata ?? [], Bookmarks = bookmarks ?? [] };
+    private static SourceDocument Document(string id, DateTimeOffset updated, List<MetadataRow>? metadata = null, List<BookmarkRow>? bookmarks = null, List<ToolRow>? tools = null) =>
+        new() { Id = id, UpdatedAtUtc = updated, Metadata = metadata ?? [], Bookmarks = bookmarks ?? [], Tools = tools ?? [] };
     private static MetadataRow Metadata(int id) => new()
     {
         Id = id, DeveloperName = "Developer", Title = "Title", Description = "Description",
@@ -392,6 +452,20 @@ public sealed class SyncTests
     {
         Id = id, Platform = "GitHub", Url = "https://github.com/example", PlatformId = "example",
         Description = "", Color = "#000000", DisplayOrder = 0, IsActive = false, CreatedAtUtc = Timestamp.AddDays(-1)
+    };
+    private static ToolRow Tool(int id, string category = "SearchCollect", string? repo = "https://github.com/org/repo", string? issue = "https://github.com/org/repo/issues/1") => new()
+    {
+        Id = id,
+        Name = $"Tool {id}",
+        Description = "Local dev tool",
+        Category = category,
+        DirectUrl = $"http://localhost:{8000 + id}",
+        RepositoryUrl = repo,
+        IssueUrl = issue,
+        DisplayOrder = id,
+        IsActive = true,
+        CreatedAtUtc = Timestamp.AddDays(-1),
+        UpdatedAtUtc = Timestamp
     };
 
     private sealed class FixedReader(Snapshot snapshot) : ISnapshotReader
