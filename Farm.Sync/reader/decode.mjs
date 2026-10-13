@@ -102,6 +102,60 @@ export function mapBookmarks(document, blockId, page, defaultIsActive) {
   });
 }
 
+export function mapTools(document, blockId, page, defaultIsActive = true) {
+  const blocks = document.blocks;
+  const database = blockId ? blocks?.[blockId] : Object.values(blocks ?? {}).find(b => b?.['sys:flavour'] === 'affine:database');
+  if (database?.['sys:flavour'] !== 'affine:database') throw new Error(`Missing Tools database block ${blockId ?? ''}`);
+  const columns = database['prop:columns'];
+  if (!Array.isArray(columns)) throw new Error('Tools database columns are missing');
+  const byName = new Map();
+  for (const column of columns) {
+    if (byName.has(column.name)) throw new Error(`Duplicate Tools column ${column.name}`);
+    byName.set(column.name, column);
+  }
+  const ids = new Set();
+  return (database['sys:children'] ?? []).map(rowId => {
+    const row = blocks[rowId];
+    if (!row) throw new Error(`Missing Tools row ${rowId}`);
+    const cells = database['prop:cells']?.[rowId] ?? {};
+    function value(name, optional = false) {
+      const column = byName.get(name);
+      if (!column) {
+        if (optional) return undefined;
+        throw new Error(`Missing Tools column ${name}`);
+      }
+      let v = column.type === 'title' ? row['prop:text'] : cells[column.id]?.value;
+      if (column.type === 'select' && v != null) {
+        const option = column.data?.options?.find(option => option.id === v);
+        if (!option) throw new Error(`Unknown option for Tools.${name} in row ${rowId}`);
+        v = option.value;
+      }
+      return v;
+    }
+    const id = integer(value('Id'), 'Tools.Id');
+    if (id <= 0 || ids.has(id)) throw new Error(`Invalid/duplicate Tools.Id ${id}`);
+    ids.add(id);
+    const active = value('IsActive', true);
+    if (active !== undefined && typeof active !== 'boolean') throw new Error(`Invalid Tools.IsActive for ${id}`);
+    const rawName = byName.has('Name') ? value('Name') : (row['prop:text'] ?? value('Title', true));
+    const repo = value('RepositoryUrl', true);
+    const issue = value('IssueUrl', true);
+    return {
+      Id: id,
+      Name: requiredText(rawName, 'Tools.Name'),
+      Description: requiredText(value('Description'), 'Tools.Description'),
+      Category: requiredText(value('Category'), 'Tools.Category'),
+      DirectUrl: requiredText(value('DirectUrl'), 'Tools.DirectUrl'),
+      RepositoryUrl: typeof repo === 'string' && repo.trim() ? repo.trim() : undefined,
+      IssueUrl: typeof issue === 'string' && issue.trim() ? issue.trim() : undefined,
+      DisplayOrder: integer(value('DisplayOrder', true) ?? 0, 'Tools.DisplayOrder'),
+      IsActive: active ?? defaultIsActive,
+      CreatedAtUtc: timestamp(row['prop:meta:createdAt'] ?? page.createDate, 'Tools.CreatedAtUtc'),
+      UpdatedAtUtc: timestamp(row['prop:meta:updatedAt'] ?? row['prop:meta:createdAt'] ?? page.createDate, 'Tools.UpdatedAtUtc'),
+    };
+  });
+}
+
 export function contentHash(value) {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex');
 }

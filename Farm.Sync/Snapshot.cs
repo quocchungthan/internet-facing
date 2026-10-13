@@ -40,6 +40,7 @@ public sealed partial record Snapshot
         var documentIds = new HashSet<string>(StringComparer.Ordinal);
         var metadataIds = new HashSet<int>();
         var bookmarkIds = new HashSet<int>();
+        var toolIds = new HashSet<int>();
         var sourceDocIds = new HashSet<string>(StringComparer.Ordinal);
         var slugs = new HashSet<string>(StringComparer.Ordinal);
         foreach (var document in Documents)
@@ -85,6 +86,25 @@ public sealed partial record Snapshot
                 if (row.CreatedAtUtc > document.UpdatedAtUtc)
                     throw new InvalidDataException("Bookmark CreatedAtUtc cannot be newer than its document.");
             }
+            foreach (var row in document.Tools)
+            {
+                if (row is null) throw new InvalidDataException("Tool rows cannot be null.");
+                ValidateId(row.Id, toolIds);
+                ValidateString(row.Name, 128, "Tool.Name");
+                ValidateString(row.Description, 1024, "Tool.Description");
+                ValidateString(row.Category, 64, "Tool.Category");
+                if (!ValidToolCategories.Contains(row.Category))
+                    throw new InvalidDataException($"Tool.Category must be one of {string.Join(", ", ValidToolCategories)}: {row.Category}");
+                ValidateString(row.DirectUrl, 512, "Tool.DirectUrl");
+                if (row.RepositoryUrl is not null)
+                    ValidateString(row.RepositoryUrl, 512, "Tool.RepositoryUrl");
+                if (row.IssueUrl is not null)
+                    ValidateString(row.IssueUrl, 512, "Tool.IssueUrl");
+                ValidateTimestamp(row.CreatedAtUtc, "Tool.CreatedAtUtc");
+                ValidateTimestamp(row.UpdatedAtUtc, "Tool.UpdatedAtUtc");
+                if (row.CreatedAtUtc > document.UpdatedAtUtc)
+                    throw new InvalidDataException("Tool CreatedAtUtc cannot be newer than its document.");
+            }
             PortfolioValidation.Validate(document, sourceDocIds, slugs);
         }
     }
@@ -99,6 +119,11 @@ public sealed partial record Snapshot
         if (value.Length > maximum || (required && string.IsNullOrWhiteSpace(value)))
             throw new InvalidDataException($"{field} must be a{(required ? " nonempty" : "")} string of at most {maximum} characters.");
     }
+
+    private static readonly HashSet<string> ValidToolCategories = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "SearchCollect", "ConvertTransformCompose", "ObserveWatching", "CalculatingAnalysing"
+    };
 
     private static void ValidateId(int id, HashSet<int> ids)
     {
@@ -135,6 +160,7 @@ public sealed record SourceDocument
     [JsonPropertyName("skills")] public List<SkillRow> Skills { get; init; } = [];
     [JsonPropertyName("socialLinks")] public List<SocialLinkRow> SocialLinks { get; init; } = [];
     [JsonPropertyName("gigs")] public List<GigRow> Gigs { get; init; } = [];
+    [JsonPropertyName("tools")] public List<ToolRow> Tools { get; init; } = [];
 
     public bool HasPortfolioRows =>
         Profiles.Count + Projects.Count + Experiences.Count + Skills.Count + SocialLinks.Count + Gigs.Count > 0;
@@ -163,6 +189,21 @@ public sealed record BookmarkRow
     public required int DisplayOrder { get; init; }
     public required bool IsActive { get; init; }
     public required DateTimeOffset CreatedAtUtc { get; init; }
+}
+
+public sealed record ToolRow
+{
+    public required int Id { get; init; }
+    public required string Name { get; init; }
+    public required string Description { get; init; }
+    public required string Category { get; init; }
+    public required string DirectUrl { get; init; }
+    public string? RepositoryUrl { get; init; }
+    public string? IssueUrl { get; init; }
+    public required int DisplayOrder { get; init; }
+    public required bool IsActive { get; init; }
+    public required DateTimeOffset CreatedAtUtc { get; init; }
+    public required DateTimeOffset UpdatedAtUtc { get; init; }
 }
 
 public sealed record ProfileRow

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import * as Y from 'yjs';
-import { decodeDocument, mapBookmarks, mapMetadata, contentHash } from './decode.mjs';
+import { decodeDocument, mapBookmarks, mapMetadata, mapTools, contentHash } from './decode.mjs';
 
 test('merges snapshot and pending CRDT updates', () => {
   const doc = new Y.Doc();
@@ -64,4 +64,57 @@ test('rejects missing fields and duplicate identifiers', () => {
 
 test('hash detects changes without relying on source timestamps', () => {
   assert.notEqual(contentHash({ Title: 'a' }), contentHash({ Title: 'b' }));
+});
+
+function toolsFixture() {
+  const columns = [
+    { name: 'Id', id: 'col_id', type: 'number' },
+    { name: 'Name', id: 'col_name', type: 'title' },
+    { name: 'Description', id: 'col_desc', type: 'rich-text' },
+    { name: 'Category', id: 'col_cat', type: 'select', data: { options: [{ id: 'opt_sc', value: 'SearchCollect' }] } },
+    { name: 'DirectUrl', id: 'col_url', type: 'rich-text' },
+    { name: 'RepositoryUrl', id: 'col_repo', type: 'rich-text' },
+    { name: 'IssueUrl', id: 'col_issue', type: 'rich-text' },
+    { name: 'DisplayOrder', id: 'col_order', type: 'number' },
+    { name: 'IsActive', id: 'col_active', type: 'checkbox' },
+  ];
+  const values = {
+    col_id: { value: 10 },
+    col_desc: { value: 'Code Search tool' },
+    col_cat: { value: 'opt_sc' },
+    col_url: { value: 'http://localhost:5000' },
+    col_repo: { value: 'https://github.com/org/repo' },
+    col_issue: { value: 'https://github.com/org/repo/issues/1' },
+    col_order: { value: 2 },
+    col_active: { value: true },
+  };
+  return {
+    blocks: {
+      db: {
+        'sys:flavour': 'affine:database',
+        'sys:children': ['row1'],
+        'prop:columns': columns,
+        'prop:cells': { row1: values },
+      },
+      row1: { 'prop:text': 'Search Tool', 'prop:meta:createdAt': '2026-01-01T00:00:00.000Z' },
+    },
+  };
+}
+
+test('maps tools database table columns and select options correctly', () => {
+  const result = mapTools(toolsFixture(), 'db', { createDate: 0 }, true)[0];
+  assert.equal(result.Id, 10);
+  assert.equal(result.Name, 'Search Tool');
+  assert.equal(result.Category, 'SearchCollect');
+  assert.equal(result.DirectUrl, 'http://localhost:5000');
+  assert.equal(result.RepositoryUrl, 'https://github.com/org/repo');
+  assert.equal(result.IssueUrl, 'https://github.com/org/repo/issues/1');
+  assert.equal(result.DisplayOrder, 2);
+  assert.equal(result.IsActive, true);
+});
+
+test('auto-discovers affine:database block when blockId is not passed to mapTools', () => {
+  const result = mapTools(toolsFixture(), undefined, { createDate: 0 }, true)[0];
+  assert.equal(result.Id, 10);
+  assert.equal(result.Name, 'Search Tool');
 });

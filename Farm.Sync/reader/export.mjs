@@ -1,5 +1,5 @@
 import pg from 'pg';
-import { contentHash, decodeDocument, mapBookmarks, mapMetadata } from './decode.mjs';
+import { contentHash, decodeDocument, mapBookmarks, mapMetadata, mapTools } from './decode.mjs';
 import {
   KINDS, bodyMarkdown, bodyNodes, loadYDoc, mapExperience, mapGig, mapProfile, mapProject,
   mapSkills, mapSocialLinks, propertyReader,
@@ -14,9 +14,12 @@ function required(name) {
 const workspaceId = required('AFFINE_WORKSPACE_ID');
 const metaId = required('AFFINE_META_DOC_ID');
 const feedsId = required('AFFINE_FEEDS_DOC_ID');
+const toolsId = process.env.AFFINE_TOOLS_DOC_ID?.trim();
+const toolsBlockId = process.env.AFFINE_TOOLS_BLOCK_ID?.trim();
 const propertiesId = `db$${workspaceId}$docProperties`;
 const definitionsId = `db$${workspaceId}$docCustomPropertyInfo`;
 const ids = [workspaceId, metaId, feedsId, propertiesId, definitionsId];
+if (toolsId && !ids.includes(toolsId)) ids.push(toolsId);
 const client = new pg.Client({
   connectionString: required('AFFINE_DATABASE_URL'),
   connectionTimeoutMillis: 15000,
@@ -79,9 +82,21 @@ try {
   )];
   const bookmarks = mapBookmarks(decoded.get(feedsId), required('AFFINE_FEEDS_BLOCK_ID'), page(feedsId), active === 'true');
   const documents = [
-    { id: metaId, updatedAtUtc: metaUpdated, metadata, bookmarks: [], contentHash: contentHash(metadata) },
-    { id: feedsId, updatedAtUtc: feedsUpdated, metadata: [], bookmarks, contentHash: contentHash(bookmarks) },
+    { id: metaId, updatedAtUtc: metaUpdated, metadata, bookmarks: [], tools: [], contentHash: contentHash(metadata) },
+    { id: feedsId, updatedAtUtc: feedsUpdated, metadata: [], bookmarks, tools: [], contentHash: contentHash(bookmarks) },
   ];
+  if (toolsId && decoded.has(toolsId)) {
+    const toolsUpdated = updated([toolsId, workspaceId]);
+    const tools = mapTools(decoded.get(toolsId), toolsBlockId, page(toolsId), active === 'true');
+    documents.push({
+      id: toolsId,
+      updatedAtUtc: toolsUpdated,
+      metadata: [],
+      bookmarks: [],
+      tools,
+      contentHash: contentHash(tools),
+    });
+  }
   const titleOf = pageId => pages.find(page => page.id === pageId)?.title;
   // One broken page must not stop the others: skip and report it. The worker never deletes rows, so the last
   // good version of a skipped page stays on the site until the page is fixed.
@@ -96,6 +111,20 @@ try {
       kind = propertyReader({ [pageId]: properties }, decoded.get(definitionsId), pageId, '').read('Kind');
       if (kind == null || kind === '') continue;
       if (!KINDS.includes(kind)) throw new Error(`unknown Kind "${kind}"; expected one of ${KINDS.join(', ')}`);
+      const pageUpdated = updated([pageId, propertiesId, definitionsId]);
+      if (kind === 'Tools') {
+        const docObj = decodeDocument(records(pageId));
+        const tools = mapTools(docObj, null, meta, active === 'true');
+        documents.push({
+          id: pageId,
+          updatedAtUtc: pageUpdated,
+          metadata: [],
+          bookmarks: [],
+          tools,
+          contentHash: contentHash({ kind, tools }),
+        });
+        continue;
+      }
       const p = propertyReader({ [pageId]: properties }, decoded.get(definitionsId), pageId, kind);
       ydoc = loadYDoc(records(pageId));
       const rowsOf = { profiles: [], projects: [], experiences: [], skills: [], socialLinks: [], gigs: [] };
@@ -105,9 +134,8 @@ try {
       else if (kind === 'Gig') rowsOf.gigs.push(mapGig(p, pageId, meta.title, bodyNodes(ydoc, titleOf)));
       else if (kind === 'Skills') rowsOf.skills = mapSkills(ydoc, titleOf);
       else rowsOf.socialLinks = mapSocialLinks(ydoc, titleOf);
-      const pageUpdated = updated([pageId, propertiesId, definitionsId]);
       documents.push({
-        id: pageId, updatedAtUtc: pageUpdated, metadata: [], bookmarks: [], ...rowsOf,
+        id: pageId, updatedAtUtc: pageUpdated, metadata: [], bookmarks: [], tools: [], ...rowsOf,
         contentHash: contentHash({ kind, ...rowsOf }),
       });
     } catch (error) {
