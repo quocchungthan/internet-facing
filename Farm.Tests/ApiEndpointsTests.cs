@@ -71,6 +71,30 @@ public class ApiEndpointsTests : IClassFixture<WebApplicationFactory<Program>>
     }
 
     [Fact]
+    public async Task GetTools_Returns_SeededLocalhostTools()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync("/api/tools");
+        response.EnsureSuccessStatusCode();
+
+        var tools = await response.Content.ReadFromJsonAsync<List<JsonElement>>();
+        Assert.NotNull(tools);
+        Assert.True(tools.Count >= 4);
+
+        var categories = tools.Select(t => t.GetProperty("category").GetString()).Distinct().ToList();
+        Assert.Contains("SearchCollect", categories);
+        Assert.Contains("ConvertTransformCompose", categories);
+        Assert.Contains("ObserveWatching", categories);
+        Assert.Contains("CalculatingAnalysing", categories);
+
+        var collector = tools.First(t => t.GetProperty("name").GetString() == "Web & Repo Collector");
+        Assert.Equal("http://localhost:5120", collector.GetProperty("directUrl").GetString());
+        Assert.Equal("https://github.com/quocchungthan/internet-facing", collector.GetProperty("repositoryUrl").GetString());
+        Assert.False(string.IsNullOrWhiteSpace(collector.GetProperty("issueUrl").GetString()));
+    }
+
+    [Fact]
     public async Task GetMetrics_Returns_ValidTracingNumbers()
     {
         var client = _factory.CreateClient();

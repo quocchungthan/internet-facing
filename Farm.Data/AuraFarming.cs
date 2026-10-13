@@ -11,6 +11,7 @@ public class AuraFarming : DbContext
 
     public DbSet<WebsiteMetadata> WebsiteMetadata => Set<WebsiteMetadata>();
     public DbSet<PlatformBookmark> PlatformBookmarks => Set<PlatformBookmark>();
+    public DbSet<LocalhostTool> LocalhostTools => Set<LocalhostTool>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -122,6 +123,79 @@ public class AuraFarming : DbContext
                     DisplayOrder = 6,
                     IsActive = true,
                     CreatedAtUtc = new DateTime(2026, 10, 4, 0, 0, 0, DateTimeKind.Utc)
+                }
+            );
+        });
+
+        modelBuilder.Entity<LocalhostTool>(entity =>
+        {
+            entity.ToTable("LocalhostTools");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).HasMaxLength(128).IsRequired();
+            entity.Property(e => e.Description).HasMaxLength(1024).IsRequired();
+            entity.Property(e => e.Category).HasMaxLength(64).IsRequired();
+            entity.Property(e => e.DirectUrl).HasMaxLength(512).IsRequired();
+            entity.Property(e => e.RepositoryUrl).HasMaxLength(512).IsRequired();
+            entity.Property(e => e.IssueUrl).HasMaxLength(512);
+            entity.Property(e => e.DisplayOrder).HasDefaultValue(0);
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
+
+            entity.HasData(
+                new LocalhostTool
+                {
+                    Id = 1,
+                    Name = "Web & Repo Collector",
+                    Description = "Locally collect web documentation and repo patterns for AI context retrieval",
+                    Category = "SearchCollect",
+                    DirectUrl = "http://localhost:5120",
+                    RepositoryUrl = "https://github.com/quocchungthan/internet-facing",
+                    IssueUrl = "https://github.com/quocchungthan/internet-facing/issues",
+                    DisplayOrder = 1,
+                    IsActive = true,
+                    CreatedAtUtc = new DateTime(2026, 10, 13, 0, 0, 0, DateTimeKind.Utc),
+                    UpdatedAtUtc = new DateTime(2026, 10, 13, 0, 0, 0, DateTimeKind.Utc)
+                },
+                new LocalhostTool
+                {
+                    Id = 2,
+                    Name = "Prompt & Markdown Transformer",
+                    Description = "Transforms raw note AST and Yjs payloads into structured LLM prompts and markdown",
+                    Category = "ConvertTransformCompose",
+                    DirectUrl = "http://localhost:5121",
+                    RepositoryUrl = "https://github.com/quocchungthan/internet-facing",
+                    IssueUrl = "https://github.com/quocchungthan/internet-facing/issues",
+                    DisplayOrder = 2,
+                    IsActive = true,
+                    CreatedAtUtc = new DateTime(2026, 10, 13, 0, 0, 0, DateTimeKind.Utc),
+                    UpdatedAtUtc = new DateTime(2026, 10, 13, 0, 0, 0, DateTimeKind.Utc)
+                },
+                new LocalhostTool
+                {
+                    Id = 3,
+                    Name = "Realtime Stream Watcher",
+                    Description = "Observes SSE streams, worker jobs and container health telemetry",
+                    Category = "ObserveWatching",
+                    DirectUrl = "http://localhost:5122",
+                    RepositoryUrl = "https://github.com/quocchungthan/internet-facing",
+                    IssueUrl = "https://github.com/quocchungthan/internet-facing/issues",
+                    DisplayOrder = 3,
+                    IsActive = true,
+                    CreatedAtUtc = new DateTime(2026, 10, 13, 0, 0, 0, DateTimeKind.Utc),
+                    UpdatedAtUtc = new DateTime(2026, 10, 13, 0, 0, 0, DateTimeKind.Utc)
+                },
+                new LocalhostTool
+                {
+                    Id = 4,
+                    Name = "Habit & Click Analyzer",
+                    Description = "Calculates activity distributions and aggregates habit metrics across platforms",
+                    Category = "CalculatingAnalysing",
+                    DirectUrl = "http://localhost:5123",
+                    RepositoryUrl = "https://github.com/quocchungthan/internet-facing",
+                    IssueUrl = "https://github.com/quocchungthan/internet-facing/issues",
+                    DisplayOrder = 4,
+                    IsActive = true,
+                    CreatedAtUtc = new DateTime(2026, 10, 13, 0, 0, 0, DateTimeKind.Utc),
+                    UpdatedAtUtc = new DateTime(2026, 10, 13, 0, 0, 0, DateTimeKind.Utc)
                 }
             );
         });

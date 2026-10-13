@@ -95,6 +95,44 @@ public class ApiController : ControllerBase
         return Ok(bookmarks);
     }
 
+    [HttpGet("tools")]
+    public async Task<IActionResult> GetTools(CancellationToken cancellationToken)
+    {
+        const string endpoint = "/api/tools";
+        var clientResult = _tracingService.ProcessRequest(HttpContext, endpoint);
+
+        if (!clientResult.IsAllowed)
+        {
+            return StatusCode(StatusCodes.Status429TooManyRequests, new
+            {
+                error = "Too Many Requests",
+                message = $"Rate limit of {clientResult.Limit} requests exceeded. Please retry in {clientResult.ResetSeconds} seconds.",
+                rateLimit = clientResult
+            });
+        }
+
+        var tools = await _db.LocalhostTools
+            .AsNoTracking()
+            .Where(t => t.IsActive)
+            .OrderBy(t => t.Category)
+            .ThenBy(t => t.DisplayOrder)
+            .ThenBy(t => t.Id)
+            .Select(t => new
+            {
+                id = t.Id,
+                name = t.Name,
+                description = t.Description,
+                category = t.Category,
+                directUrl = t.DirectUrl,
+                repositoryUrl = t.RepositoryUrl,
+                issueUrl = t.IssueUrl,
+                displayOrder = t.DisplayOrder
+            })
+            .ToListAsync(cancellationToken);
+
+        return Ok(tools);
+    }
+
     [HttpGet("feeds/clicks")]
     public async Task<IActionResult> GetClicks([FromServices] LinkClickDbContext clicks, CancellationToken cancellationToken)
     {

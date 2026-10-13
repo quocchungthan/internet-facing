@@ -22,6 +22,122 @@ namespace Farm.Data.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Farm.Data.Entities.LocalhostTool", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
+
+                    b.Property<string>("DirectUrl")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<int>("DisplayOrder")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<string>("IssueUrl")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("RepositoryUrl")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("LocalhostTools", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Category = "SearchCollect",
+                            CreatedAtUtc = new DateTime(2026, 10, 13, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Locally collect web documentation and repo patterns for AI context retrieval",
+                            DirectUrl = "http://localhost:5120",
+                            DisplayOrder = 1,
+                            IsActive = true,
+                            IssueUrl = "https://github.com/quocchungthan/internet-facing/issues",
+                            Name = "Web & Repo Collector",
+                            RepositoryUrl = "https://github.com/quocchungthan/internet-facing",
+                            UpdatedAtUtc = new DateTime(2026, 10, 13, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Category = "ConvertTransformCompose",
+                            CreatedAtUtc = new DateTime(2026, 10, 13, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Transforms raw note AST and Yjs payloads into structured LLM prompts and markdown",
+                            DirectUrl = "http://localhost:5121",
+                            DisplayOrder = 2,
+                            IsActive = true,
+                            IssueUrl = "https://github.com/quocchungthan/internet-facing/issues",
+                            Name = "Prompt & Markdown Transformer",
+                            RepositoryUrl = "https://github.com/quocchungthan/internet-facing",
+                            UpdatedAtUtc = new DateTime(2026, 10, 13, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Category = "ObserveWatching",
+                            CreatedAtUtc = new DateTime(2026, 10, 13, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Observes SSE streams, worker jobs and container health telemetry",
+                            DirectUrl = "http://localhost:5122",
+                            DisplayOrder = 3,
+                            IsActive = true,
+                            IssueUrl = "https://github.com/quocchungthan/internet-facing/issues",
+                            Name = "Realtime Stream Watcher",
+                            RepositoryUrl = "https://github.com/quocchungthan/internet-facing",
+                            UpdatedAtUtc = new DateTime(2026, 10, 13, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Category = "CalculatingAnalysing",
+                            CreatedAtUtc = new DateTime(2026, 10, 13, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Calculates activity distributions and aggregates habit metrics across platforms",
+                            DirectUrl = "http://localhost:5123",
+                            DisplayOrder = 4,
+                            IsActive = true,
+                            IssueUrl = "https://github.com/quocchungthan/internet-facing/issues",
+                            Name = "Habit & Click Analyzer",
+                            RepositoryUrl = "https://github.com/quocchungthan/internet-facing",
+                            UpdatedAtUtc = new DateTime(2026, 10, 13, 0, 0, 0, 0, DateTimeKind.Utc)
+                        });
+                });
+
             modelBuilder.Entity("Farm.Data.Entities.PlatformBookmark", b =>
                 {
                     b.Property<int>("Id")

@@ -1,6 +1,6 @@
 import { Component, useEffect, useState, type ErrorInfo, type ReactNode } from 'react'
 import { MicrosoftTab } from '@farm/microsoft'
-import { BrickTracker } from './BrickTracker'
+import { BrickTracker } from '@farm/brick-tracker'
 import { WinchesterView } from './WinchesterView'
 import { AccountMenu } from './AccountMenu'
 import { ServicesMenu } from './ServicesMenu'
