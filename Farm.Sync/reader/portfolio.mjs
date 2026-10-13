@@ -2,7 +2,7 @@ import * as Y from 'yjs';
 
 // Page-as-record mapping: page properties hold scalar values, the page body holds prose.
 
-export const KINDS = ['Profile', 'Project', 'Experience', 'Gig', 'Skills', 'SocialLinks'];
+export const KINDS = ['Profile', 'Project', 'Experience', 'Gig', 'Skills', 'SocialLinks', 'Tools'];
 const EMPLOYMENT_TYPES = ['FullTime', 'PartTime', 'Contract', 'Freelance', 'Internship'];
 const WORK_MODES = ['OnSite', 'Hybrid', 'Remote'];
 
