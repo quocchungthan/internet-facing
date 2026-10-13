@@ -173,7 +173,7 @@ export const BrickTracker = () => {
         </div>
       </section>
 
-      <section className="bt-section" aria-labelledby="bt-tools-title">
+      <section className="bt-section bt-tools" aria-labelledby="bt-tools-title">
         <div className="bt-section-head bt-section-head-row">
           <div>
             <h3 id="bt-tools-title">My local tools</h3>

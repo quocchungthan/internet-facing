@@ -372,3 +372,10 @@
 }
 
 .bt-open { flex: none; background: var(--bt-surface); border-color: var(--bt-border); color: var(--bt-text); }
+
+@media (max-width: 520px) {
+  .bt-tool {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    .bt-tool-actions { grid-column: 1 / -1; justify-content: flex-start; }
+  }
+}
