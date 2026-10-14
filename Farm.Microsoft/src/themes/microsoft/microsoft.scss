@@ -162,12 +162,21 @@ $ms-font-mono: 'Cascadia Code', 'Segoe UI Mono', Consolas, 'Courier New', monosp
   }
 }
 
+// Blocks sit side by side when there is room (two columns from ~1000px) and stack on narrow screens.
+.ms-api-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 28rem), 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2.5rem;
+  align-items: start;
+}
+
 .ms-get-block {
+  min-width: 0;
   width: 100%;
   background: $ms-surface;
-  border-top: 1px solid $ms-border;
-  border-bottom: 1px solid $ms-border;
-  margin-bottom: 2.5rem;
+  border: 1px solid $ms-border;
+  border-radius: 6px;
   overflow: hidden;
 }
 
@@ -320,7 +329,7 @@ $ms-font-mono: 'Cascadia Code', 'Segoe UI Mono', Consolas, 'Courier New', monosp
   background: $ms-code-bg;
   padding: 0;
   position: relative;
-  max-height: 420px;
+  max-height: min(320px, 50vh);
   overflow: auto;
 
   pre {
@@ -331,7 +340,7 @@ $ms-font-mono: 'Cascadia Code', 'Segoe UI Mono', Consolas, 'Courier New', monosp
     line-height: 1.5;
     color: $ms-code-text;
     white-space: pre-wrap;
-    word-break: break-all;
+    overflow-wrap: anywhere;
   }
 
   .json-key {
@@ -405,6 +414,11 @@ $ms-font-mono: 'Cascadia Code', 'Segoe UI Mono', Consolas, 'Courier New', monosp
 
   .ms-get-block {
     background: #1e1e1e;
+    border-color: #333333;
+  }
+
+  .ms-api-bar,
+  .ms-block-footer {
     border-color: #333333;
   }
 

@@ -254,21 +254,21 @@ export const MicrosoftTab = () => {
         </p>
       </header>
 
-      {/* Block 1: GET /api/metadata */}
-      {renderApiBlock(
-        '/api/metadata',
-        'Metadata',
-        metadataBlock,
-        () => fetchEndpoint('/api/metadata', setMetadataBlock)
-      )}
+      <div className="ms-api-grid">
+        {renderApiBlock(
+          '/api/metadata',
+          'Metadata',
+          metadataBlock,
+          () => fetchEndpoint('/api/metadata', setMetadataBlock)
+        )}
 
-      {/* Block 2: GET /api/feeds */}
-      {renderApiBlock(
-        '/api/feeds',
-        'Feeds',
-        feedsBlock,
-        () => fetchEndpoint('/api/feeds', setFeedsBlock)
-      )}
+        {renderApiBlock(
+          '/api/feeds',
+          'Feeds',
+          feedsBlock,
+          () => fetchEndpoint('/api/feeds', setFeedsBlock)
+        )}
+      </div>
 
       <PortfolioSection />
     </div>
