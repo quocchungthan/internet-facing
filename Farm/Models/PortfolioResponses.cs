@@ -99,6 +99,7 @@ public sealed record GigResponse
     public required string Slug { get; init; }
     public required string Category { get; init; }
     public required string Summary { get; init; }
+    public string? BodyMarkdown { get; init; }
     public string? Problem { get; init; }
     public string? Outcome { get; init; }
     public DateOnly? SolvedOn { get; init; }
