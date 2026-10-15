@@ -19,7 +19,7 @@ export interface LocalhostTool {
   id: number
   name: string
   description: string
-  category: 'SearchCollect' | 'ConvertTransformCompose' | 'ObserveWatching' | 'CalculatingAnalysing' | string
+  category: 'SearchCollect' | 'ConvertTransformCompose' | 'ObserveWatching' | 'CalculatingAnalysing' | 'WriteExecute' | string
   directUrl: string
   repositoryUrl: string
   issueUrl?: string | null
@@ -33,7 +33,8 @@ const CATEGORIES: { key: string; label: string; description: string }[] = [
   { key: 'ConvertTransformCompose', label: 'Convert & Compose', description: 'Translators, converters, composers' },
   { key: 'ObserveWatching', label: 'Observe & Watch', description: 'Telemetry, logs, health monitors' },
   { key: 'CalculatingAnalysing', label: 'Calculate & Analyze', description: 'Metrics, analyzers, scorers' },
-]
+    { key: 'WriteExecute', label: 'Write & Execute', description: 'Create or update documents and other content' },
+  ]
 
 const HISTORY_WEEKS = 14
 const STATUS_LABEL: Record<ToolStatus | 'unknown', string> = {

@@ -89,6 +89,14 @@ export function CategoryIcon({ category }: { category: string }) {
       </Svg>
     )
   }
+  if (category === 'WriteExecute') {
+    return (
+      <Svg>
+        <path d="M12 20h9" />
+        <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z" />
+      </Svg>
+    )
+  }
   return (
     <Svg>
       <rect x="4" y="2" width="16" height="20" rx="2" />
