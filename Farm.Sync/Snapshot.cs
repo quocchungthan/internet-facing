@@ -122,7 +122,7 @@ public sealed partial record Snapshot
 
     private static readonly HashSet<string> ValidToolCategories = new(StringComparer.OrdinalIgnoreCase)
     {
-        "SearchCollect", "ConvertTransformCompose", "ObserveWatching", "CalculatingAnalysing"
+        "SearchCollect", "ConvertTransformCompose", "ObserveWatching", "CalculatingAnalysing", "WriteExecute"
     };
 
     private static void ValidateId(int id, HashSet<int> ids)

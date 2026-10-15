@@ -331,7 +331,8 @@ public sealed class SyncTests
             Tool(1, "SearchCollect"),
             Tool(2, "ConvertTransformCompose"),
             Tool(3, "ObserveWatching"),
-            Tool(4, "CalculatingAnalysing")
+            Tool(4, "CalculatingAnalysing"),
+            Tool(5, "WriteExecute")
         ]));
         valid.Validate(); // Should not throw
     }
