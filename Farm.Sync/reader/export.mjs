@@ -1,5 +1,5 @@
 import pg from 'pg';
-import { contentHash, decodeDocument, mapBookmarks, mapMetadata, mapTools } from './decode.mjs';
+import { contentHash, decodeDocument, findToolsPage, mapBookmarks, mapMetadata, mapTools } from './decode.mjs';
 import {
   KINDS, bodyMarkdown, bodyNodes, loadYDoc, mapExperience, mapGig, mapProfile, mapProject,
   mapSkills, mapSocialLinks, propertyReader,
@@ -14,12 +14,11 @@ function required(name) {
 const workspaceId = required('AFFINE_WORKSPACE_ID');
 const metaId = required('AFFINE_META_DOC_ID');
 const feedsId = required('AFFINE_FEEDS_DOC_ID');
-const toolsId = process.env.AFFINE_TOOLS_DOC_ID?.trim();
+const configuredToolsId = process.env.AFFINE_TOOLS_DOC_ID?.trim();
 const toolsBlockId = process.env.AFFINE_TOOLS_BLOCK_ID?.trim();
 const propertiesId = `db$${workspaceId}$docProperties`;
 const definitionsId = `db$${workspaceId}$docCustomPropertyInfo`;
 const ids = [workspaceId, metaId, feedsId, propertiesId, definitionsId];
-if (toolsId && !ids.includes(toolsId)) ids.push(toolsId);
 const client = new pg.Client({
   connectionString: required('AFFINE_DATABASE_URL'),
   connectionTimeoutMillis: 15000,
@@ -43,15 +42,19 @@ try {
     .map(name => process.env[name]?.trim()).filter(Boolean);
   const rootRecords = rows.filter(row => row.id === workspaceId);
   const rootForPages = rootRecords.length ? decodeDocument(rootRecords) : {};
+  const toolsPage = findToolsPage(rootForPages, required('AFFINE_COLLECTION_ID'), configuredToolsId);
+  const toolsId = toolsPage?.id;
   const pageIds = [...new Set(extraCollectionIds.flatMap(collectionId => {
     const found = rootForPages.setting?.collections?.find(c => c.id === collectionId);
     if (!found) throw new Error(`Collection ${collectionId} was not found`);
     return found.allowList ?? [];
-  }))].filter(pageId => !ids.includes(pageId));
-  if (pageIds.length) rows = rows.concat((await client.query(SQL, [workspaceId, pageIds])).rows);
+  }))].filter(pageId => !ids.includes(pageId) && pageId !== toolsId);
+  const additionalIds = [...pageIds, ...(toolsId ? [toolsId] : [])];
+  if (additionalIds.length) rows = rows.concat((await client.query(SQL, [workspaceId, additionalIds])).rows);
+  if (toolsId && !ids.includes(toolsId)) ids.push(toolsId);
   await client.query('COMMIT');
   const records = id => rows.filter(row => row.id === id);
-  const decoded = new Map(ids.map(id => [id, decodeDocument(records(id))]));
+  const decoded = new Map(ids.filter(id => id !== toolsId).map(id => [id, decodeDocument(records(id))]));
   const root = decoded.get(workspaceId);
   const pages = root.meta?.pages;
   if (!Array.isArray(pages)) throw new Error('Workspace page metadata is missing');
@@ -85,22 +88,26 @@ try {
     { id: metaId, updatedAtUtc: metaUpdated, metadata, bookmarks: [], tools: [], contentHash: contentHash(metadata) },
     { id: feedsId, updatedAtUtc: feedsUpdated, metadata: [], bookmarks, tools: [], contentHash: contentHash(bookmarks) },
   ];
-  if (toolsId && decoded.has(toolsId)) {
-    const toolsUpdated = updated([toolsId, workspaceId]);
-    const tools = mapTools(decoded.get(toolsId), toolsBlockId, page(toolsId), active === 'true');
-    documents.push({
-      id: toolsId,
-      updatedAtUtc: toolsUpdated,
-      metadata: [],
-      bookmarks: [],
-      tools,
-      contentHash: contentHash(tools),
-    });
+  const skipped = [];
+  function reportSkipped(meta, kind, error) {
+    skipped.push({ id: meta.id, title: meta.title, kind: kind || 'unclassified', reason: error.message });
+    console.error(`Skipped ${kind || 'unclassified'} page "${meta.title}" (${meta.id}): ${error.message}`);
+  }
+  if (toolsId) {
+    try {
+      const toolsUpdated = updated([toolsId, workspaceId]);
+      const tools = mapTools(decodeDocument(records(toolsId)), toolsBlockId, toolsPage, active === 'true');
+      documents.push({
+        id: toolsId, updatedAtUtc: toolsUpdated, metadata: [], bookmarks: [], tools,
+        contentHash: contentHash(tools),
+      });
+    } catch (error) {
+      reportSkipped(toolsPage, 'Tools', error);
+    }
   }
   const titleOf = pageId => pages.find(page => page.id === pageId)?.title;
   // One broken page must not stop the others: skip and report it. The worker never deletes rows, so the last
   // good version of a skipped page stays on the site until the page is fixed.
-  const skipped = [];
   for (const pageId of pageIds) {
     const meta = pages.find(page => page.id === pageId);
     if (!meta || meta.trash) continue;
@@ -139,8 +146,7 @@ try {
         contentHash: contentHash({ kind, ...rowsOf }),
       });
     } catch (error) {
-      skipped.push(pageId);
-      console.error(`Skipped ${kind || 'unclassified'} page "${meta.title}" (${pageId}): ${error.message}`);
+      reportSkipped(meta, kind, error);
     } finally {
       ydoc?.destroy();
     }
@@ -149,6 +155,7 @@ try {
   process.stdout.write(JSON.stringify({
     capturedAtUtc: updated([...ids, ...pageIds.filter(pageId => records(pageId).length)]),
     documents,
+    skippedDocuments: skipped,
   }));
 } catch (error) {
   console.error(`AFFiNE export failed: ${error.message}`);
