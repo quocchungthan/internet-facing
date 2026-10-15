@@ -2,11 +2,11 @@ using AffineSync;
 using Farm.Data;
 using Microsoft.EntityFrameworkCore;
 
-if (args.Any(argument => argument is not ("--once" or "--show-data" or "--healthcheck" or "--check" or "--show-ids")) ||
+if (args.Any(argument => argument is not ("--once" or "--show-data" or "--healthcheck" or "--check" or "--show-ids" or "--verify-gigs")) ||
     args.Length > 1 && !(args.Contains("--check") && args.Length == 2 && args.Contains("--show-ids")) ||
     args.Contains("--show-ids") && !args.Contains("--check"))
 {
-    Console.Error.WriteLine("Usage: AffineSync [--once | --show-data | --healthcheck | --check [--show-ids]]");
+    Console.Error.WriteLine("Usage: AffineSync [--once | --show-data | --healthcheck | --check [--show-ids] | --verify-gigs]");
     return 1;
 }
 
@@ -16,6 +16,18 @@ using var terminate = System.Runtime.InteropServices.PosixSignalRegistration.Cre
     System.Runtime.InteropServices.PosixSignal.SIGTERM, signal => { signal.Cancel = true; shutdown.Cancel(); });
 try
 {
+    if (args.Contains("--verify-gigs"))
+    {
+        var connectionString = Environment.GetEnvironmentVariable("DATABASE_CONNECTION_STRING");
+        if (string.IsNullOrWhiteSpace(connectionString))
+            throw new InvalidOperationException("DATABASE_CONNECTION_STRING is required.");
+        var readerPath = Environment.GetEnvironmentVariable("AFFINE_READER_PATH") ?? "reader/export.mjs";
+        var snapshot = await new NodeReader(readerPath).ReadAsync(shutdown.Token);
+        var readOptions = new DbContextOptionsBuilder<PortfolioDbContext>().UseNpgsql(connectionString).Options;
+        await using var database = new PortfolioDbContext(readOptions);
+        await GigBodyVerification.VerifyAsync(database, snapshot, Console.Out, shutdown.Token);
+        return 0;
+    }
     if (args.Contains("--show-data"))
     {
         var connectionString = Environment.GetEnvironmentVariable("DATABASE_CONNECTION_STRING");
