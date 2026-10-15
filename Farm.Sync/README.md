@@ -271,6 +271,19 @@ transaction; replay after an interrupted checkpoint update is expected.
 
 ## View the target database
 
+After deployment, verify that full Gig bodies are persisted:
+
+```bash
+docker compose -f compose.yml -f compose.sync.yml exec -T affine-sync dotnet AffineSync.dll --verify-gigs
+```
+
+This read-only command compares each exported Gig's complete `BodyMarkdown` with
+the stored value, failing on missing/different bodies. It prints only counts and
+total character length, not page identities or content, and does not write rows,
+apply migrations or change checkpoints. Real deployments run it after worker
+health succeeds. If source pages change during verification, wait for the next
+sync pass and retry.
+
 ```bash
 docker compose -f compose.sync.yml exec affine-sync dotnet AffineSync.dll --show-data   # production sidecar
 dotnet run --project Farm.Sync -- --show-data                                            # local
