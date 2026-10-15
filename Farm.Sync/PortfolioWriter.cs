@@ -111,6 +111,7 @@ public static class PortfolioWriter
             gig.Slug = row.Slug;
             gig.Category = row.Category;
             gig.Summary = row.Summary;
+            gig.BodyMarkdown = row.BodyMarkdown;
             gig.Problem = row.Problem;
             gig.Outcome = row.Outcome;
             gig.SolvedOn = row.SolvedOn;

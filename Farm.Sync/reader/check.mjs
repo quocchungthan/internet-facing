@@ -33,7 +33,7 @@ const KIND_PROPERTIES = {
   Profile: 'DisplayName*, Headline*, Location, ContactEmail, ProfileImageUrl, ResumeUrl (all Text)',
   Project: 'Summary*, Slug, DemoUrl, SourceUrl, Role, Organization (Text); StartDate, EndDate (Text YYYY-MM-DD); IsFeatured (Checkbox); DisplayOrder (Number); Skills (comma-separated Text)',
   Experience: 'Company* (Text); StartDate*, EndDate (Text YYYY-MM-DD); EmploymentType*, WorkMode* (Text); IsCurrent (Checkbox); DisplayOrder (Number)',
-  Gig: 'Category*, Summary* (Text); Slug (Text); SolvedOn (Text YYYY-MM-DD); DisplayOrder (Number); Skills (comma-separated Text); body headings "## Problem", "## Outcome", "## Steps"',
+  Gig: 'Category*, Summary* (Text); Slug (Text); SolvedOn (Text YYYY-MM-DD); DisplayOrder (Number); Skills (comma-separated Text); body is free Markdown (no required headings or list structure)',
 };
 const OPTIONAL = ['AFFINE_PORTFOLIO_COLLECTION_ID', 'AFFINE_GIGS_COLLECTION_ID'];
 
