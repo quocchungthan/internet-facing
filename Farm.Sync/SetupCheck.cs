@@ -6,7 +6,7 @@ namespace AffineSync;
 // `--check`: read-only report that tells you what is missing before (or after) the sync runs.
 public static class SetupCheck
 {
-    private static readonly string[] RequiredTables = ["WebsiteMetadata", "PlatformBookmarks", "PortfolioProjects", "PortfolioExperiences"];
+    private static readonly string[] RequiredTables = ["WebsiteMetadata", "PlatformBookmarks", "LocalhostTools", "PortfolioProjects", "PortfolioExperiences"];
 
     public static async Task<int> RunAsync(string readerPath, bool showIds, CancellationToken cancellationToken)
     {
