@@ -28,6 +28,9 @@ public class PortfolioModelTests
         Assert.DoesNotContain(model.GetEntityTypes(), e => e.ClrType == typeof(PlatformBookmark));
         Assert.Equal("text", model.FindEntityType(typeof(PortfolioProfile))!
             .FindProperty(nameof(PortfolioProfile.AvatarSvg))!.GetColumnType());
+        var body = model.FindEntityType(typeof(GigProblem))!.FindProperty(nameof(GigProblem.BodyMarkdown))!;
+        Assert.Equal("text", body.GetColumnType());
+        Assert.Null(body.GetMaxLength());
     }
 
     [Theory]
@@ -121,7 +124,7 @@ public class PortfolioModelTests
     {
         using var db = CreateContext();
         Assert.False(db.Database.HasPendingModelChanges());
-        Assert.Equal(2, db.Database.GetMigrations().Count());
+        Assert.Equal(3, db.Database.GetMigrations().Count());
         var script = db.GetService<IMigrator>().GenerateScript();
         Assert.Contains("__PortfolioMigrationsHistory", script);
         Assert.DoesNotContain("INSERT INTO \"Portfolio", script);
@@ -139,6 +142,7 @@ public class PortfolioModelTests
     [Theory]
     [InlineData("Profiles")]
     [InlineData("Projects")]
+    [InlineData("Gigs")]
     [InlineData("Skills")]
     [InlineData("Experiences")]
     [InlineData("SocialLinks")]

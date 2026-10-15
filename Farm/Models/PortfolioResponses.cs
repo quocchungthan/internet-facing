@@ -43,6 +43,20 @@ public sealed record SkillResponse
     public required string Category { get; init; }
 }
 
+public sealed record GigResponse
+{
+    public int Id { get; init; }
+    public required string Title { get; init; }
+    public required string Slug { get; init; }
+    public required string Category { get; init; }
+    public required string Summary { get; init; }
+    public string? BodyMarkdown { get; init; }
+    public string? Problem { get; init; }
+    public string? Outcome { get; init; }
+    public DateOnly? SolvedOn { get; init; }
+    public int DisplayOrder { get; init; }
+}
+
 public sealed record ExperienceResponse
 {
     public int Id { get; init; }

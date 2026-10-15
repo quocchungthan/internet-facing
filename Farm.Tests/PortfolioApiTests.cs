@@ -42,6 +42,11 @@ public sealed class PortfolioApiFixture : WebApplicationFactory<Program>
         }));
         for (var id = 3; id >= 1; id--)
         {
+            db.GigProblems.Add(new GigProblem
+            {
+                Id = id, Title = $"Gig {id}", Slug = $"gig-{id}", Category = "Data", Summary = "A free body",
+                BodyMarkdown = "Intro\n\n## Arbitrary heading\n\n- Work\n\n```cs\nvar x = 1;\n```"
+            });
             db.Projects.Add(new PortfolioProject
                 { Id = id, Title = $"Project {id}", Slug = $"test-{id}", Summary = "Test" });
             db.Skills.Add(new PortfolioSkill { Id = id, Name = $"Skill {id}", Category = "Test" });
@@ -82,7 +87,7 @@ public class PortfolioApiTests(PortfolioApiFixture fixture) : IClassFixture<Port
     public static TheoryData<string, string> Routes => new()
     {
         { "profiles", "1" }, { "projects", "1" }, { "skills", "1" },
-        { "experiences", "1" }, { "social-links", "1" },
+        { "experiences", "1" }, { "social-links", "1" }, { "gigs", "1" },
         { "profile-projects", "1/1" }, { "profile-skills", "1/1" }, { "project-skills", "1/1" }
     };
 
@@ -208,6 +213,17 @@ public class PortfolioApiTests(PortfolioApiFixture fixture) : IClassFixture<Port
         Assert.Equal(JsonValueKind.Null, row.GetProperty("endDate").ValueKind);
         Assert.True(row.GetProperty("isFeatured").GetBoolean());
         Assert.Equal(1, row.GetProperty("displayOrder").GetInt32());
+    }
+
+    [Fact]
+    public async Task Gig_FreeMarkdownIsReturnedWithEmptyLegacyFields()
+    {
+        using var client = fixture.NewClient();
+        var row = await client.GetFromJsonAsync<JsonElement>("/api/portfolio/gigs/1");
+        Assert.Contains("## Arbitrary heading", row.GetProperty("bodyMarkdown").GetString());
+        Assert.Contains("```cs", row.GetProperty("bodyMarkdown").GetString());
+        Assert.Equal(JsonValueKind.Null, row.GetProperty("problem").ValueKind);
+        Assert.Equal(JsonValueKind.Null, row.GetProperty("outcome").ValueKind);
     }
 
     [Fact]

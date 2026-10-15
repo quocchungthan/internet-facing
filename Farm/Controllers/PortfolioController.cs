@@ -20,6 +20,10 @@ public class PortfolioController(PortfolioDbContext db, IClientTracingService tr
             Summary = p.Summary, Description = p.Description, DemoUrl = p.DemoUrl, SourceUrl = p.SourceUrl });
     private IQueryable<SkillResponse> Skills => db.Skills.AsNoTracking()
         .Select(p => new SkillResponse { Id = p.Id, Name = p.Name, Category = p.Category });
+    private IQueryable<GigResponse> Gigs => db.GigProblems.AsNoTracking()
+        .Select(p => new GigResponse { Id = p.Id, Title = p.Title, Slug = p.Slug,
+            Category = p.Category, Summary = p.Summary, BodyMarkdown = p.BodyMarkdown,
+            Problem = p.Problem, Outcome = p.Outcome, SolvedOn = p.SolvedOn, DisplayOrder = p.DisplayOrder });
     private IQueryable<ExperienceResponse> Experiences => db.Experiences.AsNoTracking()
         .Select(p => new ExperienceResponse { Id = p.Id, ProfileId = p.ProfileId, Company = p.Company,
             JobTitle = p.JobTitle, Description = p.Description, EmploymentType = p.EmploymentType,
@@ -57,6 +61,14 @@ public class PortfolioController(PortfolioDbContext db, IClientTracingService tr
     [HttpGet("skills")]
     public Task<IActionResult> GetSkills([FromQuery] PortfolioPage pagination, CancellationToken token) =>
         ListAsync(Skills.OrderBy(p => p.Id), pagination, token);
+
+    [HttpGet("gigs")]
+    public Task<IActionResult> GetGigs([FromQuery] PortfolioPage pagination, CancellationToken token) =>
+        ListAsync(Gigs.OrderBy(p => p.DisplayOrder).ThenBy(p => p.Id), pagination, token);
+
+    [HttpGet("gigs/{id:int}")]
+    public Task<IActionResult> GetGig([Range(1, int.MaxValue)] int id, CancellationToken token) =>
+        OneAsync(Gigs.Where(p => p.Id == id), token);
 
     [HttpGet("skills/{id:int}")]
     public Task<IActionResult> GetSkill([Range(1, int.MaxValue)] int id, CancellationToken token) =>
