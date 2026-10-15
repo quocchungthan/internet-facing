@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import * as Y from 'yjs';
-import { decodeDocument, mapBookmarks, mapMetadata, mapTools, contentHash } from './decode.mjs';
+import { decodeDocument, findToolsPage, mapBookmarks, mapMetadata, mapTools, contentHash, skippedPageDiagnostic } from './decode.mjs';
 
 test('merges snapshot and pending CRDT updates', () => {
   const doc = new Y.Doc();
@@ -92,6 +92,7 @@ function toolsFixture() {
     blocks: {
       db: {
         'sys:flavour': 'affine:database',
+        'prop:title': 'Tools',
         'sys:children': ['row1'],
         'prop:columns': columns,
         'prop:cells': { row1: values },
@@ -113,8 +114,99 @@ test('maps tools database table columns and select options correctly', () => {
   assert.equal(result.IsActive, true);
 });
 
-test('auto-discovers affine:database block when blockId is not passed to mapTools', () => {
+test('auto-discovers database block titled Tools when blockId is not passed', () => {
   const result = mapTools(toolsFixture(), undefined, { createDate: 0 }, true)[0];
   assert.equal(result.Id, 10);
   assert.equal(result.Name, 'Search Tool');
+});
+
+test('finds Tools only among explicit active members of the configured data collection, without Kind', () => {
+  const root = {
+    meta: { pages: [
+      { id: 'outside', title: 'Tools' },
+      { id: 'trashed', title: 'Tools', trash: true },
+      { id: 'tools', title: 'Tools', createDate: Date.parse('2026-01-01') },
+    ] },
+    setting: { collections: [{ id: 'production', name: 'Production Data Set', allowList: ['tools', 'trashed'] }] },
+  };
+  assert.equal(findToolsPage(root, 'production').id, 'tools');
+  assert.throws(() => findToolsPage(root, 'production', 'outside'), /explicit member/);
+  assert.throws(() => findToolsPage(root, 'production', 'trashed'), /explicit member/);
+  root.meta.pages.push({ id: 'second', title: 'Tools' });
+  root.setting.collections[0].allowList.push('second');
+  assert.throws(() => findToolsPage(root, 'production'), /More than one Tools page/);
+  assert.equal(findToolsPage(root, 'production', 'tools').id, 'tools');
+  root.meta.pages[2].title = 'Renamed Tools';
+  assert.equal(findToolsPage(root, 'production', 'tools').id, 'tools');
+  assert.equal(findToolsPage({ ...root, meta: { pages: [] } }, 'production'), undefined);
+});
+
+test('selects Tools by block title rather than the first unrelated database, and rejects ambiguity', () => {
+  const fixture = toolsFixture();
+  fixture.blocks = { other: { 'sys:flavour': 'affine:database', 'prop:title': 'Other' }, ...fixture.blocks };
+  assert.equal(mapTools(fixture, undefined, { createDate: 0 })[0].Id, 10);
+  fixture.blocks.second = { ...fixture.blocks.db };
+  assert.throws(() => mapTools(fixture, undefined, { createDate: 0 }), /More than one database/);
+  assert.equal(mapTools(fixture, 'db', { createDate: 0 })[0].Id, 10);
+  delete fixture.blocks.second;
+  fixture.blocks.db['prop:title'] = 'Renamed';
+  assert.throws(() => mapTools(fixture, undefined, { createDate: 0 }), /Missing Tools/);
+  assert.equal(mapTools(fixture, 'db', { createDate: 0 })[0].Id, 10);
+});
+
+test('decodes real CRDT title/text, number and link columns for the three production tools', () => {
+  const doc = new Y.Doc();
+  const blocks = doc.getMap('blocks');
+  const db = new Y.Map();
+  blocks.set('db', db);
+  db.set('sys:flavour', 'affine:database');
+  db.set('prop:title', new Y.Text('Tools'));
+  db.set('prop:columns', Y.Array.from([
+    { id: 'name', name: 'Name', type: 'title' },
+    { id: 'id', name: 'Id', type: 'number' },
+    { id: 'category', name: 'Category', type: 'rich-text' },
+    { id: 'url', name: 'DirectUrl', type: 'link' },
+    { id: 'description', name: 'Description', type: 'rich-text' },
+  ]));
+  const samples = [
+    ['PARA Bridge', 'ObserveWatching', 'https://quocchungthan.github.io/para-bridge/'],
+    ['Production Core Aids', 'ObserveWatching', 'https://quocchungthan.github.io/tools-w-productioncore-aids/'],
+    ['Exploring Local', 'SearchCollect', 'https://quocchungthan.github.io/tools-s-exploring-local/'],
+  ];
+  const cells = new Y.Map();
+  db.set('prop:cells', cells);
+  db.set('sys:children', Y.Array.from(samples.map((_, index) => `row${index}`)));
+  samples.forEach(([name, category, url], index) => {
+    const row = new Y.Map();
+    blocks.set(`row${index}`, row);
+    row.set('prop:text', new Y.Text(name));
+    const values = new Y.Map();
+    cells.set(`row${index}`, values);
+    for (const [key, value] of Object.entries({
+      id: index + 1, category: new Y.Text(category), url, description: new Y.Text(''),
+    })) {
+      const cell = new Y.Map();
+      values.set(key, cell);
+      cell.set('value', value);
+    }
+  });
+  const decoded = decodeDocument([{ blob: Y.encodeStateAsUpdate(doc) }]);
+  const result = mapTools(decoded, undefined, { createDate: Date.parse('2026-01-01') });
+  assert.deepEqual(result.map(row => [row.Name, row.Category, row.DirectUrl]), samples);
+  assert.deepEqual(result.map(row => row.Id), [1, 2, 3]);
+  assert.ok(result.every(row => row.IsActive && row.DisplayOrder === 0 && row.Description === ''));
+  decoded.blocks.db['prop:columns'][0].type = 'rich-text';
+  decoded.blocks.db['sys:children'] = ['row0'];
+  decoded.blocks.db['prop:cells'].row0.name = { value: 'Text Name' };
+  assert.equal(mapTools(decoded, undefined, { createDate: 0 })[0].Name, 'Text Name');
+  doc.destroy();
+});
+
+test('skipped-page reports expose reasons without leaking page titles or IDs in CI', () => {
+  const page = { id: 'private-id', title: 'Private title', kind: 'Experience',
+    reason: 'Invalid Experience.StartDate (page private-id): expected YYYY-MM-DD' };
+  const redacted = skippedPageDiagnostic(page, false);
+  assert.match(redacted, /Experience.StartDate/);
+  assert.ok(!redacted.includes(page.id) && !redacted.includes(page.title));
+  assert.match(skippedPageDiagnostic(page, true), /private-id/);
 });
