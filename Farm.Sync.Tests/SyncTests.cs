@@ -322,6 +322,55 @@ public sealed class SyncTests
     }
 
     [Fact]
+    public async Task ProductionToolsSyncDespiteAnInvalidPageAndReplayIdempotently()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<AuraFarming>().UseSqlite(connection).Options;
+        await using (var database = new AuraFarming(options))
+        {
+            await database.Database.EnsureCreatedAsync();
+            await database.LocalhostTools.ExecuteDeleteAsync();
+        }
+        var tools = new List<ToolRow>
+        {
+            Tool(1, "ObserveWatching", repo: null, issue: null) with
+            {
+                Name = "PARA Bridge", Description = "", DirectUrl = "https://quocchungthan.github.io/para-bridge/"
+            },
+            Tool(2, "ObserveWatching", repo: null, issue: null) with
+            {
+                Name = "Production Core Aids", Description = "",
+                DirectUrl = "https://quocchungthan.github.io/tools-w-productioncore-aids/"
+            },
+            Tool(3, "SearchCollect", repo: null, issue: null) with
+            {
+                Name = "Exploring Local", Description = "",
+                DirectUrl = "https://quocchungthan.github.io/tools-s-exploring-local/"
+            }
+        };
+        var source = SnapshotOf(Document("tools", Timestamp, tools: tools), Document("invalid", Timestamp, [Metadata(0)]));
+        var skipped = new List<string>();
+        var state = new MemoryState();
+        var writer = new DatabaseWriter(() => new AuraFarming(options));
+        var runner = new SyncRunner(new FixedReader(source), state, writer)
+        {
+            ReportSkipped = (id, _) => skipped.Add(id)
+        };
+        Assert.Equal(1, await runner.RunAsync(Token));
+        Assert.Equal(0, await runner.RunAsync(Token));
+        Assert.Equal(["invalid", "invalid"], skipped);
+        Assert.True(state.Documents!.ContainsKey("tools"));
+        Assert.False(state.Documents.ContainsKey("invalid"));
+        await writer.WriteAsync([source.Documents[0]], Token);
+        await using var verify = new AuraFarming(options);
+        var persisted = await verify.LocalhostTools.OrderBy(row => row.Id).ToListAsync();
+        Assert.Equal(3, persisted.Count);
+        Assert.Equal(tools.Select(row => row.DirectUrl), persisted.Select(row => row.DirectUrl));
+        Assert.All(persisted, row => Assert.Equal("", row.RepositoryUrl));
+    }
+
+    [Fact]
     public void SnapshotValidationRejectsInvalidToolCategories()
     {
         var invalid = SnapshotOf(Document("doc", Timestamp, tools: [Tool(1, "InvalidCategory")]));
