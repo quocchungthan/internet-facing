@@ -58,6 +58,20 @@ function getOrCreateClientId(): string {
   }
 }
 
+const HIDDEN_UI_KEYS = new Set(['specifiedIssueUrl', 'displayOrder', 'color', 'platformId'])
+
+const stripHiddenKeys = (value: unknown): unknown => {
+  if (Array.isArray(value)) return value.map(stripHiddenKeys)
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .filter(([key]) => !HIDDEN_UI_KEYS.has(key))
+        .map(([key, v]) => [key, stripHiddenKeys(v)])
+    )
+  }
+  return value
+}
+
 export const MicrosoftTab = () => {
   const [metadataBlock, setMetadataBlock] = useState<ApiBlockState>(initialBlockState)
   const [feedsBlock, setFeedsBlock] = useState<ApiBlockState>(initialBlockState)
@@ -97,7 +111,7 @@ export const MicrosoftTab = () => {
 
         try {
           parsedData = await response.json()
-          jsonString = JSON.stringify(parsedData, null, 2)
+          jsonString = JSON.stringify(stripHiddenKeys(parsedData), null, 2)
         } catch {
           jsonString = await response.text()
         }
