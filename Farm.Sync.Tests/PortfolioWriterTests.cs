@@ -90,6 +90,22 @@ public sealed class PortfolioWriterTests
         await using var read = new PortfolioDbContext(options);
         var persisted = await read.GigProblems.SingleAsync();
         Assert.Equal(body, persisted.BodyMarkdown);
+        using var report = new StringWriter();
+        await GigBodyVerification.VerifyAsync(read, snapshot, report, Token);
+        Assert.Contains("All 1 stored Gig BodyMarkdown values exactly match", report.ToString());
+        Assert.DoesNotContain(body, report.ToString());
+        Assert.DoesNotContain(read.ChangeTracker.Entries(), entry => entry.State != EntityState.Unchanged);
+        var different = snapshot with
+        {
+            Documents = [snapshot.Documents[0] with { Gigs = [free with { BodyMarkdown = "Changed" }] }]
+        };
+        await Assert.ThrowsAsync<InvalidDataException>(() =>
+            GigBodyVerification.VerifyAsync(read, different, report, Token));
+        await Assert.ThrowsAsync<InvalidDataException>(() =>
+            GigBodyVerification.VerifyAsync(read, snapshot with
+            {
+                Documents = [snapshot.Documents[0] with { Gigs = [free with { SourceDocId = "missing" }] }]
+            }, report, Token));
         Assert.Null(persisted.Problem);
         Assert.Null(persisted.Outcome);
         Assert.Empty(await read.GigSteps.ToListAsync());
