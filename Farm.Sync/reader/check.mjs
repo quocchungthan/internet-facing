@@ -3,7 +3,7 @@
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
-import { decodeDocument } from './decode.mjs';
+import { decodeDocument, findToolsPage, skippedPageDiagnostic } from './decode.mjs';
 
 const showIds = process.argv.includes('--show-ids');
 let failures = 0;
@@ -26,14 +26,14 @@ const REQUIRED = {
 
 // Property names the exporter reads, from portfolio.mjs / decode.mjs (type is how to create it in AFFiNE).
 const REQUIRED_PROPERTIES = {
-  'Kind (on every portfolio page; Select/Text with one of Profile, Project, Experience, Gig, Skills, SocialLinks)': ['Kind'],
+  'Kind (on every portfolio page; Text with one of Profile, Project, Experience, Gig, Skills, SocialLinks, Tools)': ['Kind'],
   'Meta page (Text)': ['DeveloperName', 'Title', 'Description', 'RepositoryUrl'],
 };
 const KIND_PROPERTIES = {
   Profile: 'DisplayName*, Headline*, Location, ContactEmail, ProfileImageUrl, ResumeUrl (all Text)',
-  Project: 'Summary*, Slug, DemoUrl, SourceUrl, Role, Organization (Text); StartDate, EndDate (Date); IsFeatured (Checkbox); DisplayOrder (Number); Skills (Multi-select/Tags)',
-  Experience: 'Company* (Text); StartDate* , EndDate (Date); EmploymentType, WorkMode (Select); IsCurrent (Checkbox); DisplayOrder (Number)',
-  Gig: 'Category*, Summary* (Text); Slug (Text); SolvedOn (Date); DisplayOrder (Number); Skills (Multi-select/Tags); body headings "## Problem", "## Outcome", "## Steps"',
+  Project: 'Summary*, Slug, DemoUrl, SourceUrl, Role, Organization (Text); StartDate, EndDate (Text YYYY-MM-DD); IsFeatured (Checkbox); DisplayOrder (Number); Skills (comma-separated Text)',
+  Experience: 'Company* (Text); StartDate*, EndDate (Text YYYY-MM-DD); EmploymentType*, WorkMode* (Text); IsCurrent (Checkbox); DisplayOrder (Number)',
+  Gig: 'Category*, Summary* (Text); Slug (Text); SolvedOn (Text YYYY-MM-DD); DisplayOrder (Number); Skills (comma-separated Text); body headings "## Problem", "## Outcome", "## Steps"',
 };
 const OPTIONAL = ['AFFINE_PORTFOLIO_COLLECTION_ID', 'AFFINE_GIGS_COLLECTION_ID'];
 
@@ -86,6 +86,17 @@ try {
   const collections = root.setting?.collections ?? [];
   const pages = root.meta?.pages ?? [];
   pass(`The workspace has ${pages.filter(page => !page.trash).length} pages and ${collections.length} collections`);
+  try {
+    const toolsPage = findToolsPage(root, env('AFFINE_COLLECTION_ID'), env('AFFINE_TOOLS_DOC_ID'));
+    if (toolsPage) {
+      pass('The Tools page exists and is in AFFINE_COLLECTION_ID');
+      if (showIds) info(`Tools page: ${toolsPage.title} (${toolsPage.id})`);
+    } else if (env('AFFINE_TOOLS_BLOCK_ID')) {
+      fail('AFFINE_TOOLS_BLOCK_ID is set but no Tools page was found', 'add a Tools page to AFFINE_COLLECTION_ID or set AFFINE_TOOLS_DOC_ID.');
+    } else info('No Tools page in AFFINE_COLLECTION_ID; add a page titled Tools to sync LocalhostTools (no Kind property required).');
+  } catch (error) {
+    fail(error.message, 'add the Tools page to AFFINE_COLLECTION_ID and set AFFINE_TOOLS_DOC_ID if its title is not unique.');
+  }
 
   const required = [
     ['Meta page', env('AFFINE_META_DOC_ID'), 'AFFINE_META_DOC_ID must be the id of the Meta page.'],
@@ -156,21 +167,22 @@ if (!failures) {
   const run = spawnSync('node', [fileURLToPath(new URL('./export.mjs', import.meta.url))], {
     encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, env: process.env,
   });
-  const skipped = (run.stderr ?? '').split('\n').filter(line => line.startsWith('Skipped '));
   if (run.status !== 0) {
     fail('The exporter failed', showIds ? (run.stderr ?? '').split('\n').find(line => line.trim()) : 'run the check with --show-ids in a private terminal to see the reason.');
   } else {
     try {
-      const documents = JSON.parse(run.stdout).documents;
+      const snapshot = JSON.parse(run.stdout);
+      const documents = snapshot.documents;
       const rows = key => documents.reduce((total, document) => total + (document[key]?.length ?? 0), 0);
-      pass(`Export works: ${documents.length} documents (profiles ${rows('profiles')}, projects ${rows('projects')}, experiences ${rows('experiences')}, skills ${rows('skills')}, social links ${rows('socialLinks')}, gigs ${rows('gigs')}, metadata ${rows('metadata')}, bookmarks ${rows('bookmarks')})`);
+      pass(`Export works: ${documents.length} documents (profiles ${rows('profiles')}, projects ${rows('projects')}, experiences ${rows('experiences')}, skills ${rows('skills')}, social links ${rows('socialLinks')}, gigs ${rows('gigs')}, metadata ${rows('metadata')}, bookmarks ${rows('bookmarks')}, tools ${rows('tools')})`);
+      const skipped = snapshot.skippedDocuments ?? [];
+      if (skipped.length) {
+        fail(`${skipped.length} page(s) would be skipped because their content is invalid`,
+          'fix the reported page properties in AFFiNE; the sync keeps the last good version meanwhile. Run with --show-ids in a private terminal to identify the pages.');
+        skipped.forEach(page => info(skippedPageDiagnostic(page, showIds)));
+      }
     } catch {
       fail('The exporter returned unreadable output');
-    }
-    if (skipped.length) {
-      fail(`${skipped.length} page(s) would be skipped because their content is invalid`,
-        'fix the page properties in AFFiNE; the sync keeps the last good version meanwhile. Run with --show-ids to see which pages.');
-      if (showIds) skipped.forEach(line => info(line));
     }
   }
 }
