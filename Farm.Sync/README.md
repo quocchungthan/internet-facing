@@ -1,7 +1,7 @@
 # Farm.Sync: AFFiNE to AuraFarming sync (sidecar of the note AFFiNE)
 
 .NET 10 worker invoking the Node reader in `reader`, then upserting PostgreSQL
-`WebsiteMetadata` and `PlatformBookmark` rows by integer `Id`. The database context,
+`WebsiteMetadata`, `PlatformBookmark` and `LocalhostTool` rows by integer `Id`. The database context,
 schema, and startup migrations come exclusively from the `Farm.Data` project in this
 repository (a `ProjectReference`, not a package), so the worker always compiles against the
 schema on this branch. `sub/note` rebases from `main`, which keeps it current without waiting
@@ -31,6 +31,8 @@ env files. Production values live in `sync.env` on the VPS
 | `AFFINE_META_DOC_ID` | Metadata document; `H5y_LGDY5d0uP9TLHN2BS` |
 | `AFFINE_FEEDS_DOC_ID` | Feeds document; `e0cfaCrD_RsruYoDSwFgE` |
 | `AFFINE_FEEDS_BLOCK_ID` | Feeds block; `FPh-Fksvis` |
+| `AFFINE_TOOLS_DOC_ID` | Optional page ID override; otherwise finds the unique active page titled exactly `Tools` in `AFFINE_COLLECTION_ID` |
+| `AFFINE_TOOLS_BLOCK_ID` | Optional database block ID override; otherwise finds the unique database block titled exactly `Tools` |
 | `AFFINE_PORTFOLIO_COLLECTION_ID` | Optional; collection holding Profile/Project/Experience/Skills/SocialLinks pages (`e9yeGpEb0hV3KCsdd-wWM`) |
 | `AFFINE_GIGS_COLLECTION_ID` | Optional; collection holding Gig pages (`4XdLJej6V8iFFZ6BuPAQk`) |
 | `AFFINE_META_ENTITY_ID` | `1`; source Meta fields have no integer entity ID |
@@ -55,6 +57,47 @@ The local source database uses trust-only authentication without a password.
 This is unsuitable for remote deployments. In production, have the DBA grant a
 dedicated read-only login with a password and require TLS with certificate
 verification in `AFFINE_DATABASE_URL`.
+
+## Tools database
+
+Create a page titled exactly **Tools**, explicitly add it to the collection whose
+ID is `AFFINE_COLLECTION_ID` (the same collection as Meta and Feeds), and create a
+database block titled exactly **Tools** inside it. For Chung's setup this is the
+**Production Data Set** collection: configure its ID, not its name. Collection
+names are not matched; automatic/filter membership is not sufficient. The page
+must not be trashed. No page `Kind` property or portfolio collection membership
+is needed for this path.
+
+If the page or block is renamed, or there are multiple matches, set
+`AFFINE_TOOLS_DOC_ID` / `AFFINE_TOOLS_BLOCK_ID` in the VPS `sync.env`. The page ID
+override still requires explicit membership in `AFFINE_COLLECTION_ID`; the block
+ID override selects that database regardless of its title. The legacy
+`Kind=Tools` path in a configured Portfolio/Gigs collection remains supported,
+and requires a database titled `Tools` (do not publish duplicate tool IDs from
+different pages).
+
+Column names are case-sensitive. Database columns are not page properties:
+
+| Column | AFFiNE type | Rule |
+| --- | --- | --- |
+| `Name` | Title column renamed to Name (shown as Text), or Text | Required nonempty string; max 128 characters |
+| `Id` | Number | Required positive integer, unique across all tools pages; max 2147483647 |
+| `Category` | Text (or Select with labels below) | Required category |
+| `DirectUrl` | Link (or Text) | Required nonempty URL string; max 512 characters; HTTPS Pages URLs are supported |
+| `Description` | Text | Required column; empty cell is allowed; max 1024 characters |
+
+Valid categories: `SearchCollect`, `ConvertTransformCompose`, `ObserveWatching`,
+`CalculatingAnalysing`, `WriteExecute`. Use those spellings. Optional columns:
+`RepositoryUrl`, `IssueUrl` (Link/Text); `DisplayOrder` (Number, defaults to 0);
+`IsActive` (Checkbox, defaults to `AFFINE_DEFAULT_IS_ACTIVE`, normally true).
+Creation timestamps come from the row or the page.
+
+Example rows: `1 / PARA Bridge / ObserveWatching / https://quocchungthan.github.io/para-bridge/`;
+`2 / Production Core Aids / ObserveWatching / https://quocchungthan.github.io/tools-w-productioncore-aids/`;
+`3 / Exploring Local / SearchCollect / https://quocchungthan.github.io/tools-s-exploring-local/`.
+Missing or invalid tools pages are reported and their last good rows are retained;
+other valid documents continue syncing. If there is no matching page and no ID
+override, tools sync is optional and the setup check reports that explicitly.
 
 ## Portfolio and Gigs pages
 
@@ -160,17 +203,18 @@ Reader contract:
 Rows use all PascalCase properties of their Farm.Data entity, including required
 integer `Id`, UTC timestamps, and the bookmark's `DisplayOrder` and `IsActive`.
 Missing fields, null arrays/strings, invalid timestamps, oversized strings,
-nonpositive entity IDs, and duplicate document/entity IDs fail the whole iteration
-before writes. Empty strings are permitted where the database permits them.
+nonpositive entity IDs, and duplicate document/entity IDs cause that document to
+be skipped and reported before writes. Snapshot-level faults still fail the
+iteration. Empty strings are permitted where the database permits them.
 
 Missing checkpoint means **1990-01-01T00:00:00Z**. Corrupt state fails explicitly
 rather than silently resetting it. Only documents with `updatedAtUtc` strictly
 greater than their own persisted timestamp, or with a different SHA-256 hash of
 the exported document content, are applied. New document IDs strictly newer than
 the baseline are applied independently of other documents' timestamps.
-All changed documents are saved in one
-transaction. Existing `CreatedAtUtc` values are retained; absent rows remain.
-The writer locks the two target tables during its transaction and advances
+Each data vertical is saved in its own transaction. Existing `CreatedAtUtc`
+values are retained; absent rows remain.
+The writers lock their target tables during their transactions and advance
 their identity sequences past explicit source IDs, preserving later
 database-generated inserts by other applications.
 After commit, a flushed staging file on the same filesystem atomically replaces
@@ -222,4 +266,11 @@ configuration.
 
 ## Setup check
 
-`AffineSync --check` is a read-only report (PASS/FAIL with a "->" fix per problem) covering the env keys, the Farm DB login, the AFFiNE read-only role, the workspace and the collection/page IDs. Run it in the container (`docker compose run --rm --no-deps affine-sync --check`) or via the `Deploy Note Sync` workflow with `check_only`. CI output shows counts only; add `--show-ids` in a private terminal to list candidate IDs and titles.
+`AffineSync --check` is a read-only report (PASS/FAIL with a "->" fix per problem) covering the env keys, the Farm DB login, the AFFiNE read-only role, the workspace and the collection/page IDs. Run it in the container (`docker compose run --rm --no-deps affine-sync --check`) or via the `Deploy Note Sync` workflow with `check_only`. Add `--show-ids` in a private terminal to list candidate IDs and titles.
+
+The check includes the number of tools exported and fails if any page would be
+skipped. It counts actual skipped pages, not the reader's summary line. CI reports
+the validation reasons with page IDs/titles redacted; `--show-ids` identifies the
+pages in a private terminal. A successful SSH/image load followed by this FAIL
+is a content-validation failure, not a missing `sync.env` or infrastructure failure.
+Do not disable the check to hide invalid content.

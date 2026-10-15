@@ -102,10 +102,28 @@ export function mapBookmarks(document, blockId, page, defaultIsActive) {
   });
 }
 
+export function findToolsPage(root, collectionId, configuredId) {
+  const collection = root.setting?.collections?.find(c => c.id === collectionId);
+  if (!collection) throw new Error('Configured Meta/Feeds collection was not found');
+  const pages = (root.meta?.pages ?? []).filter(page =>
+    !page.trash && collection.allowList?.includes(page.id));
+  if (configuredId) {
+    const page = pages.find(page => page.id === configuredId);
+    if (!page) throw new Error('Configured Tools page must exist and be an explicit member of AFFINE_COLLECTION_ID');
+    return page;
+  }
+  const matches = pages.filter(page => page.title === 'Tools');
+  if (matches.length > 1) throw new Error('More than one Tools page exists in AFFINE_COLLECTION_ID; set AFFINE_TOOLS_DOC_ID');
+  return matches[0];
+}
+
 export function mapTools(document, blockId, page, defaultIsActive = true) {
   const blocks = document.blocks;
-  const database = blockId ? blocks?.[blockId] : Object.values(blocks ?? {}).find(b => b?.['sys:flavour'] === 'affine:database');
-  if (database?.['sys:flavour'] !== 'affine:database') throw new Error(`Missing Tools database block ${blockId ?? ''}`);
+  const matches = Object.values(blocks ?? {}).filter(block =>
+    block?.['sys:flavour'] === 'affine:database' && block['prop:title'] === 'Tools');
+  if (!blockId && matches.length > 1) throw new Error('More than one database block titled "Tools"; set AFFINE_TOOLS_BLOCK_ID');
+  const database = blockId ? blocks?.[blockId] : matches[0];
+  if (database?.['sys:flavour'] !== 'affine:database') throw new Error(`Missing Tools database block ${blockId ?? 'titled "Tools"'}`);
   const columns = database['prop:columns'];
   if (!Array.isArray(columns)) throw new Error('Tools database columns are missing');
   const byName = new Map();
@@ -143,7 +161,8 @@ export function mapTools(document, blockId, page, defaultIsActive = true) {
     return {
       Id: id,
       Name: requiredText(rawName, 'Tools.Name'),
-      Description: requiredText(value('Description'), 'Tools.Description'),
+      Description: value('Description') == null || value('Description') === ''
+        ? '' : requiredText(value('Description'), 'Tools.Description'),
       Category: requiredText(value('Category'), 'Tools.Category'),
       DirectUrl: requiredText(value('DirectUrl'), 'Tools.DirectUrl'),
       RepositoryUrl: typeof repo === 'string' && repo.trim() ? repo.trim() : undefined,
@@ -158,4 +177,10 @@ export function mapTools(document, blockId, page, defaultIsActive = true) {
 
 export function contentHash(value) {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex');
+}
+
+export function skippedPageDiagnostic(page, showIds) {
+  if (showIds) return `Skipped ${page.kind} page "${page.title}" (${page.id}): ${page.reason}`;
+  const reason = page.reason.replaceAll(page.id, '[page]').replaceAll(page.title || '\0', '[title]');
+  return `Skipped ${page.kind}: ${reason}`;
 }
