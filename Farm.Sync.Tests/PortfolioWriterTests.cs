@@ -62,6 +62,44 @@ public sealed class PortfolioWriterTests
     }
 
     [Fact]
+    public async Task FreeGigMarkdownRoundTripsWithoutLegacyFieldsAndReplacesOldSteps()
+    {
+        var (connection, options) = await OpenAsync();
+        await using var _ = connection;
+        var gig = new GigRow
+        {
+            SourceDocId = "free", Title = "Free", Slug = "free", Category = "Data", Summary = "s",
+            Problem = "Old", Steps = [new() { StepNumber = 1, Title = "Old step" }]
+        };
+        await using (var db = new PortfolioDbContext(options))
+            await PortfolioWriter.WriteAsync(db, [Doc("p1", Profile()), Doc("free", gig: gig)], Token);
+        var body = "Intro\n\n## Arbitrary heading\n\n- List\n\n[Link](https://example.com)\n\n```cs\nvar x = 1;\n```\n" +
+            new string('x', 12000);
+        var free = gig with { BodyMarkdown = body, Problem = null, Steps = [] };
+        var snapshot = new Snapshot
+        {
+            CapturedAtUtc = DateTimeOffset.Parse("2026-10-01T00:00:00Z"),
+            Documents = [Doc("free", gig: free) with { UpdatedAtUtc = DateTimeOffset.Parse("2026-10-01T00:00:00Z") }]
+        };
+        snapshot.Validate();
+        for (var i = 0; i < 2; i++)
+        {
+            await using var db = new PortfolioDbContext(options);
+            await PortfolioWriter.WriteAsync(db, snapshot.Documents, Token);
+        }
+        await using var read = new PortfolioDbContext(options);
+        var persisted = await read.GigProblems.SingleAsync();
+        Assert.Equal(body, persisted.BodyMarkdown);
+        Assert.Null(persisted.Problem);
+        Assert.Null(persisted.Outcome);
+        Assert.Empty(await read.GigSteps.ToListAsync());
+        Assert.Throws<InvalidDataException>(() => (snapshot with
+        {
+            Documents = [snapshot.Documents[0] with { Gigs = [free with { Category = "" }] }]
+        }).Validate());
+    }
+
+    [Fact]
     public async Task RemovedStepsAndSkillsAreReplacedButEntitiesAreKept()
     {
         var (connection, options) = await OpenAsync();
