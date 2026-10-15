@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import * as Y from 'yjs';
 import { decodeDocument, findToolsPage, mapBookmarks, mapMetadata, mapTools, contentHash, skippedPageDiagnostic } from './decode.mjs';
+import { bodyNodes, loadYDoc, mapGig, propertyReader } from './portfolio.mjs';
 
 test('merges snapshot and pending CRDT updates', () => {
   const doc = new Y.Doc();
@@ -209,4 +210,81 @@ test('skipped-page reports expose reasons without leaking page titles or IDs in 
   assert.match(redacted, /Experience.StartDate/);
   assert.ok(!redacted.includes(page.id) && !redacted.includes(page.title));
   assert.match(skippedPageDiagnostic(page, true), /private-id/);
+});
+
+function gigProperties(values = {}) {
+  const fields = { Category: 'Data', Summary: 'Free body', ...values };
+  return propertyReader(
+    { gig: Object.fromEntries(Object.entries(fields).map(([key, value]) => [`custom:${key}`, value])) },
+    Object.fromEntries(Object.keys(fields).map(name => [name, { id: name, name }])),
+    'gig', 'Gig');
+}
+
+const paragraph = (text, type = 'text', children = []) =>
+  ({ flavour: 'affine:paragraph', text, type, children });
+
+test('Gig accepts intro prose, arbitrary/repeated headings and mixed Steps without losing any body', () => {
+  const nodes = [
+    paragraph('Intro before any heading'),
+    paragraph('Custom section', 'h2'), paragraph('Free text'),
+    paragraph('Problem', 'h2'), paragraph('First problem'),
+    paragraph('Problem', 'h2'), paragraph('Second problem'),
+    paragraph('Steps', 'h2'), paragraph('A paragraph, not a list'),
+    { flavour: 'affine:list', type: 'numbered', text: 'Do work', children: [paragraph('Nested detail')] },
+    paragraph('Steps', 'h2'), paragraph('Another non-list entry'),
+  ];
+  const row = mapGig(gigProperties(), 'gig', 'Gig', nodes);
+  assert.match(row.BodyMarkdown, /^Intro before any heading/);
+  assert.match(row.BodyMarkdown, /## Custom section/);
+  assert.match(row.BodyMarkdown, /Another non-list entry/);
+  assert.equal(row.Problem, 'First problem\n\nSecond problem');
+  assert.deepEqual(row.Steps, [{ StepNumber: 1, Title: 'Do work', Description: 'Nested detail' }]);
+  assert.equal(row.Outcome, null);
+});
+
+test('Gig free body and oversized legacy sections always keep full Markdown, while properties remain required', () => {
+  const big = 'x'.repeat(10000);
+  const row = mapGig(gigProperties(), 'gig', 'Gig', [
+    paragraph('Problem', 'h2'), paragraph(big),
+    paragraph('Steps', 'h2'), { flavour: 'affine:list', type: 'bulleted', text: big, children: [] },
+  ]);
+  assert.ok(row.BodyMarkdown.includes(big));
+  assert.equal(row.Problem, null);
+  assert.deepEqual(row.Steps, []);
+  const free = mapGig(gigProperties(), 'gig', 'Gig', [paragraph('Just prose')]);
+  assert.equal(free.BodyMarkdown, 'Just prose');
+  assert.equal(free.Problem, null);
+  assert.deepEqual(free.Steps, []);
+  assert.throws(() => mapGig(gigProperties({ Category: '' }), 'gig', 'Gig', []), /Missing Gig.Category/);
+  assert.throws(() => mapGig(gigProperties({ Summary: '' }), 'gig', 'Gig', []), /Missing Gig.Summary/);
+});
+
+test('Gig CRDT conversion preserves headings, links, nested lists, checked items and raw code fences', () => {
+  const doc = new Y.Doc();
+  const blocks = doc.getMap('blocks');
+  const add = (id, flavour, text, children = [], props = {}) => {
+    const block = new Y.Map();
+    blocks.set(id, block);
+    block.set('sys:flavour', flavour);
+    block.set('sys:children', Y.Array.from(children));
+    if (text != null) block.set('prop:text', new Y.Text(text));
+    for (const [key, value] of Object.entries(props)) block.set(key, value);
+    return block;
+  };
+  add('page', 'affine:page', null, ['note']);
+  add('note', 'affine:note', null, ['intro', 'heading', 'link', 'list', 'todo', 'code']);
+  add('intro', 'affine:paragraph', 'Intro');
+  add('heading', 'affine:paragraph', 'Anything', [], { 'prop:type': 'h2' });
+  const link = add('link', 'affine:paragraph', 'Site');
+  link.get('prop:text').format(0, 4, { link: 'https://example.com' });
+  add('list', 'affine:list', 'Item', ['nested'], { 'prop:type': 'numbered' });
+  add('nested', 'affine:paragraph', 'Nested');
+  add('todo', 'affine:list', 'Done', [], { 'prop:type': 'todo', 'prop:checked': true });
+  add('code', 'affine:code', 'const fence = "```";', [], { 'prop:language': 'js' });
+  const loaded = loadYDoc([{ blob: Y.encodeStateAsUpdate(doc) }]);
+  const row = mapGig(gigProperties(), 'gig', 'Gig', bodyNodes(loaded));
+  assert.equal(row.BodyMarkdown,
+    'Intro\n\n## Anything\n\n[Site](https://example.com)\n\n1. Item\n  Nested\n- [x] Done\n\n````js\nconst fence = "```";\n````');
+  loaded.destroy();
+  doc.destroy();
 });

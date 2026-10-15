@@ -152,6 +152,7 @@ public class PortfolioDbContext(DbContextOptions<PortfolioDbContext> options) : 
             entity.Property(p => p.Slug).HasMaxLength(220).IsRequired();
             entity.Property(p => p.Category).HasMaxLength(80).IsRequired();
             entity.Property(p => p.Summary).HasMaxLength(500).IsRequired();
+            entity.Property(p => p.BodyMarkdown).HasColumnType("text");
             entity.Property(p => p.Problem).HasMaxLength(8000);
             entity.Property(p => p.Outcome).HasMaxLength(4000);
             entity.Property(p => p.SolvedOn).HasColumnType("date");
