@@ -45,6 +45,7 @@ public class PortfolioController(PortfolioDbContext db, IClientTracingService tr
             Slug = g.Slug,
             Category = g.Category,
             Summary = g.Summary,
+            BodyMarkdown = g.BodyMarkdown,
             Problem = g.Problem,
             Outcome = g.Outcome,
             SolvedOn = g.SolvedOn,

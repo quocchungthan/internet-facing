@@ -67,7 +67,7 @@ holds the prose people actually edit. Pages without a `Kind` property are ignore
 | `Profile` | KaiPortfolio | DisplayName, Headline, Location, ContactEmail, ... | Bio |
 | `Project` | KaiPortfolio | Title, Slug, Summary, DemoUrl, SourceUrl, Role, Skills, ... | Description |
 | `Experience` | KaiPortfolio | Company, EmploymentType, WorkMode, StartDate, EndDate, IsCurrent | Description |
-| `Gig` | Gigs | Title, Slug, Category, Summary, SolvedOn, Skills | `## Problem`, `## Outcome`, `## Steps` (numbered list; nested paragraphs = step description) |
+| `Gig` | Gigs | Title, Slug, Category, Summary, SolvedOn, Skills | Full free Markdown in BodyMarkdown; optional best-effort Problem/Outcome/Steps projections |
 | `Skills`, `SocialLinks` | KaiPortfolio | none | a database block (rows) |
 | Meta | StaingDataSet | DeveloperName, Title, Description, RepositoryUrl, SpecifiedIssueUrl | not used |
 | Feeds | StaingDataSet | none | a database block (rows) |

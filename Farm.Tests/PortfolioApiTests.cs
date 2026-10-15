@@ -79,7 +79,8 @@ public sealed class PortfolioApiFixture : WebApplicationFactory<Program>
             new GigProblem
             {
                 Id = 15, Title = "Tied gig", Slug = "tied-gig", Category = "Test",
-                Summary = "Tied summary", DisplayOrder = 1
+                Summary = "Tied summary", DisplayOrder = 1,
+                BodyMarkdown = "Intro\n\n## Arbitrary heading\n\n- Work\n\n```cs\nvar x = 1;\n```"
             });
         db.GigSteps.AddRange(
             new GigStep { Id = 2, ProblemId = 10, StepNumber = 2, Title = "Second step" },
@@ -272,11 +273,22 @@ public class PortfolioApiTests(PortfolioApiFixture fixture) : IClassFixture<Port
         Assert.Equal("Featured problem", gig.GetProperty("problem").GetString());
         Assert.Equal("Featured outcome", gig.GetProperty("outcome").GetString());
         Assert.Equal("2026-01-01", gig.GetProperty("solvedOn").GetString());
-        Assert.False(gig.TryGetProperty("bodyMarkdown", out _));
+        Assert.Equal(JsonValueKind.Null, gig.GetProperty("bodyMarkdown").ValueKind);
         Assert.Equal("First step", gig.GetProperty("steps")[0].GetProperty("title").GetString());
         Assert.Equal("Skill 1", gig.GetProperty("skills")[0].GetProperty("name").GetString());
         Assert.Equal(HttpStatusCode.NotFound,
             (await client.GetAsync("/api/portfolio/gigs/9999")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Gig_FreeMarkdownIsReturnedWithEmptyLegacyFields()
+    {
+        using var client = fixture.NewClient();
+        var row = await client.GetFromJsonAsync<JsonElement>("/api/portfolio/gigs/15");
+        Assert.Contains("## Arbitrary heading", row.GetProperty("bodyMarkdown").GetString());
+        Assert.Contains("```cs", row.GetProperty("bodyMarkdown").GetString());
+        Assert.Equal(JsonValueKind.Null, row.GetProperty("problem").ValueKind);
+        Assert.Equal(JsonValueKind.Null, row.GetProperty("outcome").ValueKind);
     }
 
     [Fact]

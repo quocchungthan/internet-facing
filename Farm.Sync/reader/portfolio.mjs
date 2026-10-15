@@ -22,6 +22,7 @@ function inline(text, titleOf) {
     if (a.reference?.pageId) value = titleOf(a.reference.pageId) ?? value.trim();
     if (a.code) value = `\`${value}\``;
     if (a.bold) value = `**${value}**`;
+    if (a.italic) value = `*${value}*`;
     if (a.link) value = `[${value}](${a.link})`;
     return value;
   }).join('');
@@ -32,11 +33,14 @@ function node(blocks, blockId, titleOf) {
   if (!block) return null;
   const flavour = block.get('sys:flavour');
   if (!['affine:paragraph', 'affine:list', 'affine:code'].includes(flavour)) return null;
-  const text = inline(block.get('prop:text'), titleOf);
+  const text = flavour === 'affine:code'
+    ? block.get('prop:text')?.toString() ?? ''
+    : inline(block.get('prop:text'), titleOf);
   return {
     flavour,
     type: block.get('prop:type') ?? 'text',
     language: block.get('prop:language'),
+    checked: block.get('prop:checked') === true,
     text,
     children: (block.get('sys:children')?.toArray() ?? []).map(id => node(blocks, id, titleOf)).filter(Boolean),
   };
@@ -67,9 +71,13 @@ function render(nodes, indent = '') {
     const isList = n.flavour === 'affine:list';
     numbered = isList && n.type === 'numbered' ? numbered + 1 : 0;
     let text;
-    if (n.flavour === 'affine:code') text = `\`\`\`${n.language ?? ''}\n${n.text}\n\`\`\``;
+    if (n.flavour === 'affine:code') {
+      const runs = n.text.match(/`+/g) ?? [];
+      const fence = '`'.repeat(Math.max(3, ...runs.map(run => run.length + 1)));
+      text = `${fence}${n.language ?? ''}\n${n.text}\n${fence}`;
+    }
     else if (isList) {
-      const marker = n.type === 'numbered' ? `${numbered}. ` : n.type === 'todo' ? '- [ ] ' : '- ';
+      const marker = n.type === 'numbered' ? `${numbered}. ` : n.type === 'todo' ? `- [${n.checked ? 'x' : ' '}] ` : '- ';
       text = marker + n.text;
     } else if (/^h[1-6]$/.test(n.type)) text = `${'#'.repeat(Number(n.type[1]))} ${n.text}`;
     else if (n.type === 'quote') text = `> ${n.text}`;
@@ -203,33 +211,32 @@ export function mapExperience(p, pageId, title, body) {
   return row;
 }
 
-// Gig body: "## Problem", "## Outcome" and a "## Steps" numbered list
-// (item text = step title, nested paragraphs = step description).
+// The complete body is authoritative; legacy sections are optional projections.
 export function mapGig(p, pageId, title, nodes) {
   const sections = new Map();
   let current = null;
   for (const n of nodes) {
     if (n.flavour === 'affine:paragraph' && /^h[1-6]$/.test(n.type)) {
       current = n.text.trim().toLowerCase();
-      if (sections.has(current)) throw new Error(`Gig ${pageId}: duplicate section "${n.text}"`);
-      sections.set(current, []);
+      if (!sections.has(current)) sections.set(current, []);
     } else if (current) sections.get(current).push(n);
-    else if (n.text.trim()) throw new Error(`Gig ${pageId}: text before the first heading; use "## Problem"`);
   }
-  for (const name of sections.keys())
-    if (!['problem', 'outcome', 'steps'].includes(name)) throw new Error(`Gig ${pageId}: unknown section "${name}"`);
-  const steps = (sections.get('steps') ?? []).map((n, index) => {
-    if (n.flavour !== 'affine:list') throw new Error(`Gig ${pageId}: the Steps section may only contain a list`);
-    return { StepNumber: index + 1, Title: nonEmpty(n.text.trim(), `Gig ${pageId} step ${index + 1} title`), Description: markdown(n.children) || null };
-  });
+  const legacyText = (value, limit) => value && value.length <= limit ? value : null;
+  const steps = (sections.get('steps') ?? [])
+    .filter(n => n.flavour === 'affine:list' && n.text.trim() && n.text.trim().length <= 200)
+    .map((n, index) => ({
+      StepNumber: index + 1, Title: n.text.trim(),
+      Description: legacyText(markdown(n.children), 4000),
+    }));
   return {
     SourceDocId: pageId,
     Title: nonEmpty(title?.trim(), `Gig title (page ${pageId})`),
     Slug: p.text('Slug') ?? slugify(title),
     Category: p.text('Category', { required: true }),
     Summary: p.text('Summary', { required: true }),
-    Problem: markdown(sections.get('problem') ?? []) || null,
-    Outcome: markdown(sections.get('outcome') ?? []) || null,
+    BodyMarkdown: markdown(nodes),
+    Problem: legacyText(markdown(sections.get('problem') ?? []), 8000),
+    Outcome: legacyText(markdown(sections.get('outcome') ?? []), 4000),
     SolvedOn: p.date('SolvedOn'),
     DisplayOrder: p.int('DisplayOrder'),
     Skills: p.list('Skills'),

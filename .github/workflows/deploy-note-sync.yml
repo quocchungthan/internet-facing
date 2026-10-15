@@ -134,6 +134,7 @@ jobs:
             docker compose -f compose.yml -f compose.sync.yml run --rm --no-deps affine-sync --check
             exit 0
           fi
-          docker compose -f compose.yml -f compose.sync.yml up -d affine-sync
+          docker compose -f compose.yml -f compose.sync.yml up -d --wait --wait-timeout 180 affine-sync
+          docker compose -f compose.yml -f compose.sync.yml exec -T affine-sync dotnet AffineSync.dll --healthcheck
           docker compose -f compose.yml -f compose.sync.yml ps affine-sync
           REMOTE
