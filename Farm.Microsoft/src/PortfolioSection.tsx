@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react'
+import Markdown from 'react-markdown'
 
 interface Project { id: number; title: string; slug: string; summary: string; description?: string | null; demoUrl?: string | null; sourceUrl?: string | null }
 interface Skill { id: number; name: string; category: string }
 interface Experience { id: number; company: string; jobTitle: string; description?: string | null; startDate: string; endDate?: string | null; isCurrent: boolean; displayOrder: number }
+interface Gig { id: number; title: string; summary: string; category: string; bodyMarkdown?: string | null; problem?: string | null; outcome?: string | null }
 
 interface PortfolioData {
   projects: Project[]
   skills: Skill[]
   experiences: Experience[]
+  gigs: Gig[]
 }
 
 async function getJson<T>(path: string): Promise<T> {
@@ -39,11 +42,13 @@ export function PortfolioSection() {
       getJson<Project[]>('/api/portfolio/projects'),
       getJson<Skill[]>('/api/portfolio/skills'),
       getJson<Experience[]>('/api/portfolio/experiences'),
+      getJson<Gig[]>('/api/portfolio/gigs'),
     ])
-      .then(([projects, skills, experiences]) => {
+      .then(([projects, skills, experiences, gigs]) => {
         if (cancelled) return
         setData({
           projects,
+          gigs,
           skills,
           experiences: [...experiences].sort((a, b) => a.displayOrder - b.displayOrder),
         })
@@ -59,7 +64,7 @@ export function PortfolioSection() {
   if (error) return <p className="ms-portfolio-note">Portfolio is unavailable right now ({error}).</p>
   if (!data) return <p className="ms-portfolio-note">Loading portfolio…</p>
 
-  const { projects, skills, experiences } = data
+  const { projects, skills, experiences, gigs } = data
   const skillGroups = Object.entries(
     skills.reduce<Record<string, Skill[]>>((groups, skill) => {
       ;(groups[skill.category] ??= []).push(skill)
@@ -95,6 +100,23 @@ export function PortfolioSection() {
                 {project.sourceUrl && <ExternalLink href={project.sourceUrl}>Source</ExternalLink>}
                 {project.demoUrl && <ExternalLink href={project.demoUrl}>Demo</ExternalLink>}
               </p>
+            </article>
+          ))}
+        </section>
+      )}
+
+      {gigs.length > 0 && (
+        <section className="ms-portfolio-section" aria-label="Gigs">
+          <h3>Gigs</h3>
+          {gigs.map((gig) => (
+            <article key={gig.id} className="ms-portfolio-item">
+              <h4>{gig.title}</h4>
+              <p className="ms-portfolio-muted">{gig.category}</p>
+              <p>{gig.summary}</p>
+              <Markdown skipHtml>{gig.bodyMarkdown ?? [
+                gig.problem ? `## Problem\n\n${gig.problem}` : '',
+                gig.outcome ? `## Outcome\n\n${gig.outcome}` : '',
+              ].filter(Boolean).join('\n\n')}</Markdown>
             </article>
           ))}
         </section>

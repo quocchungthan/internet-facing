@@ -110,12 +110,27 @@ prose people edit**:
 | `Profile` | DisplayName, Headline, Location, ContactEmail, ... | Bio |
 | `Project` | Title, Slug, Summary, DemoUrl, SourceUrl, Role, Skills (comma list), ... | Description |
 | `Experience` | Company, JobTitle, EmploymentType, WorkMode, StartDate, ... | Description |
-| `Gig` | Title, Slug, Category, Summary, SolvedOn, Skills | `## Problem`, `## Outcome`, `## Steps` (numbered list; nested paragraphs are step descriptions) |
+| `Gig` | Title, Slug, Category, Summary, SolvedOn, Skills | Free Markdown: headings, paragraphs, lists, links and code; no required structure |
 | `Skills` / `SocialLinks` | none | a database block (rows = skills / links) |
 
 Rows are upserted by AFFiNE page id (`SourceDocId`); an existing row with no
 `SourceDocId` is adopted by `Slug`. Join rows and gig steps mirror the page; entity
 rows are never deleted.
+
+Gig bodies are stored in full in `GigProblems.BodyMarkdown` (PostgreSQL `text`,
+without a length limit). Prose before a heading, arbitrary/repeated headings,
+and paragraphs under `Steps` never invalidate a Gig. `Category` and `Summary`
+remain required Text properties. If `Problem`, `Outcome` or `Steps` headings
+happen to exist, legacy fields are populated best-effort: list items under Steps
+become steps, and projections exceeding their legacy column limits are omitted
+without truncating the full body. A later free-form edit clears obsolete sections
+and steps. The worker applies the additive body-column migration on startup.
+
+Farm exposes the full body in `GET /api/portfolio/gigs` and
+`GET /api/portfolio/gigs/{id}` as `bodyMarkdown`. The Microsoft portfolio UI
+renders this Markdown as the authoritative content, falling back to legacy
+Problem/Outcome only for older records without a body. Raw HTML is disabled and
+unsafe link protocols are filtered by the Markdown renderer.
 
 ```bash
 node reader/seed-structure.mjs           # dry run; --apply creates the sample pages (stop affine_server first)
@@ -142,7 +157,8 @@ reached by container name over `farm-network`.
 1. On the VPS, in `AFFINE_DEPLOY_DIR`, create `sync.env` from [`deploy/sync.env.example`](deploy/sync.env.example).
 2. Provision the read-only AFFiNE role once with `reader/provision-source-role.sql` (and give it a password).
 3. Run the **Deploy Note Sync** workflow (manual). It builds the image from `Farm.Sync/Dockerfile`, loads it on
-   the VPS and runs `docker compose -f compose.yml -f compose.sync.yml up -d affine-sync`. The existing
+   the VPS, starts `affine-sync`, waits up to 180 seconds for container health, and
+   verifies the worker healthcheck (a successful sync pass). The existing
    **Deploy Note** workflow is untouched.
 
 Run only one worker per checkpoint and database; it locks a sibling `.lock` file to reject a second worker.

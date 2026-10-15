@@ -8,6 +8,7 @@ public class GigProblem
     public string Slug { get; set; } = string.Empty;
     public string Category { get; set; } = string.Empty;
     public string Summary { get; set; } = string.Empty;
+    public string? BodyMarkdown { get; set; }
     public string? Problem { get; set; }
     public string? Outcome { get; set; }
     public DateOnly? SolvedOn { get; set; }
