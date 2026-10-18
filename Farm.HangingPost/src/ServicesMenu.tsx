@@ -10,6 +10,7 @@ const services: Service[] = [
   { label: 'Mail', description: 'mail.eldervibe.dev', url: 'https://mail.eldervibe.dev' },
   { label: 'Note', description: 'note.eldervibe.dev', url: 'https://note.eldervibe.dev' },
   { label: 'Storage', description: 'storage.eldervibe.dev', url: 'https://storage.eldervibe.dev' },
+  { label: '30s', description: 'Side business for when I am in my 30s and no longer employed', url: 'https://30s.eldervibe.dev' },
 ]
 
 export function ServicesMenu() {
