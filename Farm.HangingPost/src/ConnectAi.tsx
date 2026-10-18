@@ -84,7 +84,7 @@ function formatBytes(bytes: number): string {
   return `${value.toFixed(2)} ${units[unit]}`
 }
 
-function UsageHistory() {
+export function UsageHistory() {
   const [days, setDays] = useState(30)
   const [usage, setUsage] = useState<UsageDay[]>([])
   const [loading, setLoading] = useState(true)
@@ -154,10 +154,12 @@ function UsageHistory() {
           </select>
         </label>
       </div>
-      <div className="usage-totals" aria-label="Traffic totals">
-        <p><span className="usage-dot usage-read-dot" aria-hidden="true" />Read <strong>{formatBytes(totals.readBytes)}</strong></p>
-        <p><span className="usage-dot usage-write-dot" aria-hidden="true" />Write <strong>{formatBytes(totals.writeBytes)}</strong></p>
-      </div>
+      {!loading && !error && (
+        <div className="usage-totals" aria-label="Traffic totals">
+          <p><span className="usage-dot usage-read-dot" aria-hidden="true" />Read <strong>{formatBytes(totals.readBytes)}</strong></p>
+          <p><span className="usage-dot usage-write-dot" aria-hidden="true" />Write <strong>{formatBytes(totals.writeBytes)}</strong></p>
+        </div>
+      )}
       {loading ? (
         <p className="connect-hint" role="status">Loading bandwidth history…</p>
       ) : error ? (

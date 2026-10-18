@@ -1,6 +1,6 @@
 import { Component, useEffect, useState, type ErrorInfo, type ReactNode } from 'react'
 import { MicrosoftTab } from '@farm/microsoft'
-import { BrickTracker } from '@farm/brick-tracker'
+import { Dashboard } from './Dashboard'
 import { WinchesterView } from './WinchesterView'
 import { AccountMenu } from './AccountMenu'
 import { ServicesMenu } from './ServicesMenu'
@@ -149,7 +149,7 @@ export function App() {
       <section className="tab-content" aria-live="polite">
         <ErrorBoundary>
           {pathname === '/' && <MicrosoftTab />}
-          {pathname === '/tracker' && <BrickTracker />}
+          {pathname === '/tracker' && <Dashboard session={session} loading={status === 'loading'} />}
           {pathname === '/winchester' && <WinchesterView />}
           {pathname === '/connect' && <ConnectAi session={session} loading={status === 'loading'} />}
         </ErrorBoundary>
