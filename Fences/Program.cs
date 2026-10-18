@@ -30,6 +30,10 @@ builder.Services.AddDbContext<IdentityDbContext>(options =>
     options.UseSqlite($"Data Source={identityDatabasePath}");
     options.UseOpenIddict();
 });
+// A separate database avoids changing the existing OpenIddict EnsureCreated schema.
+builder.Services.AddDbContext<AudienceDbContext>(options =>
+    options.UseSqlite($"Data Source={identityDatabasePath}.audience"));
+builder.Services.AddScoped<AudienceStore>();
 
 builder.Services.AddOpenIddict()
     .AddCore(options => options.UseEntityFrameworkCore().UseDbContext<IdentityDbContext>())
@@ -191,7 +195,12 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 });
 builder.Services.AddCors(options => options.AddPolicy("IdentityCors", policy =>
 {
-    var allowedOrigins = builder.Configuration.GetSection("IdentityApp:AllowedCorsOrigins").Get<string[]>() ?? [];
+    var registeredOrigins = builder.Configuration.GetSection("IdentityApp:OidcClients").GetChildren()
+        .SelectMany(client => client.GetSection("RedirectUris").Get<string[]>() ?? [])
+        .Where(uri => Uri.TryCreate(uri, UriKind.Absolute, out var parsed) && parsed.Scheme is "http" or "https")
+        .Select(uri => new Uri(uri).GetLeftPart(UriPartial.Authority));
+    var allowedOrigins = (builder.Configuration.GetSection("IdentityApp:AllowedCorsOrigins").Get<string[]>() ?? [])
+        .Concat(registeredOrigins).Distinct(StringComparer.Ordinal).ToArray();
     policy.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod().AllowCredentials();
 }));
 
@@ -199,6 +208,7 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     scope.ServiceProvider.GetRequiredService<IdentityDbContext>().Database.EnsureCreated();
+    scope.ServiceProvider.GetRequiredService<AudienceDbContext>().Database.EnsureCreated();
     await SeedOidcClientsAsync(scope.ServiceProvider, identityOptions.OidcClients);
 }
 if (!app.Environment.IsDevelopment())
@@ -323,4 +333,3 @@ static void ReplaceClaim(ClaimsIdentity identity, string type, string value)
 
     identity.AddClaim(new Claim(type, value));
 }
-

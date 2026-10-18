@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.Text.Json;
+using Fences.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -10,7 +11,7 @@ using OpenIddict.Validation.AspNetCore;
 
 namespace Fences.Controllers;
 
-public sealed class OidcController(IOpenIddictApplicationManager applications) : Controller
+public sealed class OidcController(IOpenIddictApplicationManager applications, AudienceStore audience) : Controller
 {
     [HttpGet("/connect/authorize")]
     [HttpPost("/connect/authorize")]
@@ -85,6 +86,8 @@ public sealed class OidcController(IOpenIddictApplicationManager applications) :
             _ => [OpenIddictConstants.Destinations.AccessToken]
         });
 
+        if (!string.IsNullOrWhiteSpace(request.ClientId))
+            await audience.RecordAsync(request.ClientId, subject, githubLogin ?? githubId, HttpContext.RequestAborted);
         return SignIn(principal, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
     }
 
