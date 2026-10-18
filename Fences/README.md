@@ -21,6 +21,30 @@ Fences is the central GitHub identity and workspace launcher for the Shuneo serv
 
 ## Configuration
 
+### Dashboard audience analytics
+
+`GET /api/audience?clientId=<registered-app>&days=7|30|90` returns actual,
+app-scoped observed users, daily first-observed growth, returning users and
+first/last observation days. It requires the existing Fences SSO cookie and
+an owner identity allowed by `IdentityApp:AudienceOwnerSubjects` (an array
+of stable `github:<numeric-id>` subjects, defaulting to the requested owner).
+It returns 401 when signed out and 403 for other identities, with no-store
+responses. No email addresses, tokens or prompt content are returned.
+
+Fences records at most one observation per user/client/UTC day when issuing
+an authenticated OIDC authorization response. These observations are not
+proof of completed downstream login, exact login counts, page activity or
+online presence. First seen means first observed after this feature starts;
+older identity history is not invented or backfilled. Users with existing
+application cookies appear after their next authorization through Fences.
+
+The dedicated SQLite file is `<IdentityDatabasePath>.audience`, alongside
+the identity database in its persistent directory; include it and any
+SQLite journal files in normal consistent backups. Keeping this separate
+avoids applying EnsureCreated changes to existing OpenIddict tables.
+Credentialed CORS accepts configured `AllowedCorsOrigins` plus HTTP(S)
+origins from the explicitly registered OIDC redirect URI configuration.
+
 Set OAuth secrets with environment variables rather than committing them:
 
 - `Authentication__GitHub__ClientId`
