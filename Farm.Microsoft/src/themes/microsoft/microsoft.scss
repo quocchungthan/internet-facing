@@ -33,6 +33,22 @@ $ms-font-mono: 'Cascadia Code', 'Segoe UI Mono', Consolas, 'Courier New', monosp
   :is(a, button, summary, pre):focus-visible { outline: 2px solid var(--ms-focus); outline-offset: 2px; }
 }
 
+.ms-gig-list { display: grid; gap: 1rem; }
+
+.ms-markdown {
+  color: var(--ms-text);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+
+  :is(h1, h2, h3, h4) { font-size: 1rem; font-weight: 600; margin: 1rem 0 0.35rem; }
+  :is(p, ul, ol) { margin: 0 0 0.75rem; }
+  :is(ul, ol) { padding-left: 1.25rem; }
+  pre { background: #1b1a19; border-radius: 6px; color: #f3f2f1; overflow-x: auto; padding: 0.75rem 1rem; }
+  code { font-family: ui-monospace, 'Cascadia Code', Consolas, monospace; font-size: 0.875em; }
+  :not(pre) > code { background: var(--ms-surface-2); border-radius: 4px; padding: 0.1em 0.35em; }
+}
+
 .ms-header {
   margin-bottom: 1.25rem;
 

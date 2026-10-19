@@ -186,3 +186,9 @@
 .wn-transmission { align-content: start; background: var(--surface); border: 1px dashed var(--brand); display: grid; gap: 8px; min-width: 0; padding: 16px 18px; header { align-items: center; display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; code { color: var(--brand); } } .wn-signal { color: var(--muted-text); font-family: ui-monospace, 'Courier New', monospace; font-size: 0.8125rem; } summary { cursor: pointer; font-style: italic; min-height: 36px; padding: 6px 0; } pre { background: #090605; border: 1px solid var(--border); color: #d8c9a6; font-family: ui-monospace, 'Courier New', monospace; font-size: 0.8125rem; line-height: 1.55; margin: 6px 0 0; max-height: 260px; overflow: auto; overflow-wrap: anywhere; padding: 14px; white-space: pre-wrap; } .json-key { color: #e3c677; } .json-string { color: #c7d6a3; } .json-number, .json-boolean, .json-null { color: #e08a5f; } .json-link { color: inherit; text-decoration: underline; } small { color: var(--muted-text); } }
 
 .wn-ledger { overflow-x: auto; }
+
+// Contracts: gigs written up as typed carbon copies
+.wn-contracts { display: grid; gap: 20px; }
+.wn-contract { background: var(--surface); border-left: 3px solid var(--brand); display: grid; gap: 8px; padding: 16px 20px; h3 { font-size: 1.125rem; } }
+.wn-contract-tag { color: var(--brand); font-size: 0.75rem; letter-spacing: 0.12em; text-transform: uppercase; }
+.wn-markdown { line-height: 1.65; overflow-wrap: anywhere; :is(h1, h2, h3, h4) { color: var(--brand); font-size: 1rem; font-style: italic; margin: 14px 0 4px; } :is(p, ul, ol) { margin: 0 0 10px; } :is(ul, ol) { padding-left: 1.25rem; } pre { background: #090605; border: 1px solid var(--border); color: #d8c9a6; overflow-x: auto; padding: 12px; } code { font-family: ui-monospace, 'Courier New', monospace; font-size: 0.875em; } }
