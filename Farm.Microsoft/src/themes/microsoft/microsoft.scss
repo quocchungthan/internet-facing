@@ -33,6 +33,8 @@ $ms-font-mono: 'Cascadia Code', 'Segoe UI Mono', Consolas, 'Courier New', monosp
   :is(a, button, summary, pre):focus-visible { outline: 2px solid var(--ms-focus); outline-offset: 2px; }
 }
 
+.ms-view-container > .ms-panel { margin-bottom: 1.5rem; }
+
 .ms-header {
   margin-bottom: 1.25rem;
 

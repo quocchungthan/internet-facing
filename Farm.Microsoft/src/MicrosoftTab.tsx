@@ -4,7 +4,6 @@ import { JsonView } from './JsonView'
 import { formatPeriod, levelOf, plural, useSiteContent, type ApiProbe, type DayCell, type DisplayProject, type ToolStatus } from './siteContent'
 
 const SECTIONS = [
-  { id: 'api', label: 'API console' },
   { id: 'overview', label: 'Overview' },
   { id: 'experience', label: 'Experience' },
   { id: 'projects', label: 'Projects' },
@@ -157,6 +156,10 @@ export const MicrosoftTab = ({ analytics }: { analytics?: ReactNode }) => {
 
   return (
     <div className="ms-view-container" aria-busy={site.loading}>
+      <Panel id="api" title="API console" hint="This portfolio is served by a live API. Send a request and inspect the response, rate limits and usage metrics.">
+        <div className="ms-api-grid">{site.probes.map((probe) => <ApiBlock key={probe.endpoint} probe={probe} />)}</div>
+      </Panel>
+
       <header className="ms-header">
         <div className="ms-title-group">
           <div className="ms-icon-tile" aria-hidden="true">⊞</div>
@@ -171,10 +174,6 @@ export const MicrosoftTab = ({ analytics }: { analytics?: ReactNode }) => {
         <SectionNav items={sections} />
 
         <div className="ms-content">
-          <Panel id="api" title="API console" hint="This portfolio is served by a live API. Send a request and inspect the response, rate limits and usage metrics.">
-            <div className="ms-api-grid">{site.probes.map((probe) => <ApiBlock key={probe.endpoint} probe={probe} />)}</div>
-          </Panel>
-
           <Panel id="overview" title="Overview" hint="Where things stand today.">
             <div className="ms-kpis">
               <article className="ms-kpi"><span>Day streak</span><strong>{activity.streak}</strong><small>{activity.todayDone ? 'Looked for work today' : 'Nothing logged today yet'}</small></article>
