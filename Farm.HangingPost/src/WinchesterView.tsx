@@ -1,12 +1,14 @@
 import type { ReactNode } from 'react'
 import { LinkedText } from '@farm/microsoft'
+import Markdown from 'react-markdown'
 import { JsonView } from './JsonView'
-import { formatPeriod, levelOf, plural, useSiteContent, type ApiProbe, type CaseFile, type DayCell, type DisplayProject } from './siteContent'
+import { formatPeriod, gigMarkdown, levelOf, plural, useSiteContent, type ApiProbe, type CaseFile, type DayCell, type DisplayProject } from './siteContent'
 import './themes/winchester/winchester.scss'
 
 const CHAPTERS = [
   { id: 'journal', title: 'Journal entries', note: 'Experience' },
   { id: 'files', title: 'Case files', note: 'Projects' },
+  { id: 'contracts', title: 'Contracts', note: 'Gigs' },
   { id: 'lore', title: 'Lore', note: 'Skills' },
   { id: 'armory', title: 'The armory', note: 'Local tools' },
   { id: 'informants', title: 'Informants', note: 'Where work comes from' },
@@ -14,7 +16,7 @@ const CHAPTERS = [
   { id: 'board', title: 'The board', note: 'Open cases' },
 ]
 
-const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII']
+const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX']
 
 function Seal() {
   return (
@@ -173,7 +175,21 @@ export const WinchesterView = ({ analytics }: { analytics?: ReactNode }) => {
         </div>
       </Chapter>
 
-      <Chapter index={2} id="lore" title="Lore">
+      <Chapter index={2} id="contracts" title="Contracts">
+        {!site.loading && site.gigs.length === 0 && <p className="wn-note">No contracts on file.</p>}
+        <div className="wn-contracts">
+          {site.gigs.map((gig) => (
+            <article key={gig.id} className="wn-contract">
+              <h3>{gig.title}</h3>
+              <p className="wn-contract-tag">{gig.category}</p>
+              <p>{gig.summary}</p>
+              <div className="wn-markdown"><Markdown skipHtml>{gigMarkdown(gig)}</Markdown></div>
+            </article>
+          ))}
+        </div>
+      </Chapter>
+
+      <Chapter index={3} id="lore" title="Lore">
         <dl className="wn-lore">
           {site.skillGroups.map(([category, items]) => (
             <div key={category}>
@@ -185,7 +201,7 @@ export const WinchesterView = ({ analytics }: { analytics?: ReactNode }) => {
         {!site.loading && site.skillGroups.length === 0 && <p className="wn-note">The lore is still being written.</p>}
       </Chapter>
 
-      <Chapter index={3} id="armory" title="The armory">
+      <Chapter index={4} id="armory" title="The armory">
         {site.toolCount > 0 && (
           <div className="wn-toolbar">
             <button type="button" className="wn-btn" onClick={site.checkAllTools}>Inspect all</button>
@@ -217,7 +233,7 @@ export const WinchesterView = ({ analytics }: { analytics?: ReactNode }) => {
         ))}
       </Chapter>
 
-      <Chapter index={4} id="informants" title="Informants">
+      <Chapter index={5} id="informants" title="Informants">
         {!site.loading && site.habits.length === 0 && <p className="wn-note">No informants on file.</p>}
         <ul className="wn-informants">
           {site.habits.map(({ platform, days, visits }) => (
@@ -230,15 +246,15 @@ export const WinchesterView = ({ analytics }: { analytics?: ReactNode }) => {
         </ul>
       </Chapter>
 
-      <Chapter index={5} id="radio" title="Radio transmissions">
+      <Chapter index={6} id="radio" title="Radio transmissions">
         <div className="wn-radio">{site.probes.map((probe) => <Transmission key={probe.endpoint} probe={probe} />)}</div>
       </Chapter>
 
-      <Chapter index={6} id="board" title="The board">
+      <Chapter index={7} id="board" title="The board">
         <div className="winchester-board">{site.cases.map((item) => <BoardCase key={item.id} item={item} />)}</div>
       </Chapter>
 
-      {analytics && <Chapter index={7} id="ledger" title="The ledger"><div className="wn-ledger">{analytics}</div></Chapter>}
+      {analytics && <Chapter index={8} id="ledger" title="The ledger"><div className="wn-ledger">{analytics}</div></Chapter>}
     </div>
   )
 }

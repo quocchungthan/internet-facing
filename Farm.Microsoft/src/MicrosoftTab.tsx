@@ -1,15 +1,17 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import Markdown from 'react-markdown'
 import './themes/microsoft/microsoft.scss'
 import { JsonView } from './JsonView'
 import { LinkedText } from './LinkedText'
 import { PlatformIcon } from './PlatformIcon'
-import { formatPeriod, levelOf, plural, useSiteContent, type ApiProbe, type DayCell, type DisplayProject, type ToolStatus } from './siteContent'
+import { formatPeriod, gigMarkdown, levelOf, plural, useSiteContent, type ApiProbe, type DayCell, type DisplayProject, type ToolStatus } from './siteContent'
 
 const SECTIONS = [
   { id: 'api', label: 'API console' },
   { id: 'overview', label: 'Overview' },
   { id: 'experience', label: 'Experience' },
   { id: 'projects', label: 'Projects' },
+  { id: 'gigs', label: 'Gigs' },
   { id: 'skills', label: 'Skills' },
   { id: 'tools', label: 'Local tools' },
   { id: 'sources', label: 'Work sources' },
@@ -221,6 +223,20 @@ export const MicrosoftTab = ({ analytics }: { analytics?: ReactNode }) => {
                   </div>
                 )}
               </>
+            )}
+          </Panel>
+
+          <Panel id="gigs" title="Gigs" hint="Engagements written up in full.">
+            {site.loading ? <p className="ms-note">Loading portfolio…</p> : site.gigs.length === 0 ? <p className="ms-note">No gigs listed yet.</p> : (
+              <div className="ms-gig-list">
+                {site.gigs.map((gig) => (
+                  <article key={gig.id} className="ms-card ms-gig">
+                    <div className="ms-card-top"><h4>{gig.title}</h4><span className="ms-chip">{gig.category}</span></div>
+                    <p>{gig.summary}</p>
+                    <div className="ms-markdown"><Markdown skipHtml>{gigMarkdown(gig)}</Markdown></div>
+                  </article>
+                ))}
+              </div>
             )}
           </Panel>
 
