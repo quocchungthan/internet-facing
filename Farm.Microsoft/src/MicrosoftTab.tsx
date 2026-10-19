@@ -4,14 +4,14 @@ import { JsonView } from './JsonView'
 import { formatPeriod, levelOf, plural, useSiteContent, type ApiProbe, type DayCell, type DisplayProject, type ToolStatus } from './siteContent'
 
 const SECTIONS = [
+  { id: 'api', label: 'API console' },
   { id: 'overview', label: 'Overview' },
   { id: 'experience', label: 'Experience' },
   { id: 'projects', label: 'Projects' },
   { id: 'skills', label: 'Skills' },
   { id: 'tools', label: 'Local tools' },
   { id: 'sources', label: 'Work sources' },
-  { id: 'api', label: 'API console' },
-  { id: 'cases', label: 'Case files' },
+  { id: 'cases', label: 'Work items' },
 ]
 
 const TOOL_STATUS_LABEL: Record<ToolStatus | 'unknown', string> = {
@@ -171,6 +171,10 @@ export const MicrosoftTab = ({ analytics }: { analytics?: ReactNode }) => {
         <SectionNav items={sections} />
 
         <div className="ms-content">
+          <Panel id="api" title="API console" hint="This portfolio is served by a live API. Send a request and inspect the response, rate limits and usage metrics.">
+            <div className="ms-api-grid">{site.probes.map((probe) => <ApiBlock key={probe.endpoint} probe={probe} />)}</div>
+          </Panel>
+
           <Panel id="overview" title="Overview" hint="Where things stand today.">
             <div className="ms-kpis">
               <article className="ms-kpi"><span>Day streak</span><strong>{activity.streak}</strong><small>{activity.todayDone ? 'Looked for work today' : 'Nothing logged today yet'}</small></article>
@@ -262,7 +266,7 @@ export const MicrosoftTab = ({ analytics }: { analytics?: ReactNode }) => {
             )}
           </Panel>
 
-          <Panel id="sources" title="Where do I usually find work" hint="The places I look for gigs and cases. Opening one logs today's visit.">
+          <Panel id="sources" title="Where do I usually find work" hint="The places I look for gigs and roles. Opening one logs today's visit.">
             {!site.loading && site.habits.length === 0 && <p className="ms-note">No sources configured.</p>}
             <ul className="ms-list">
               {site.habits.map(({ platform, days, visits }) => (
@@ -276,14 +280,10 @@ export const MicrosoftTab = ({ analytics }: { analytics?: ReactNode }) => {
             </ul>
           </Panel>
 
-          <Panel id="api" title="API console" hint="Live responses from the Farm backend.">
-            <div className="ms-api-grid">{site.probes.map((probe) => <ApiBlock key={probe.endpoint} probe={probe} />)}</div>
-          </Panel>
-
-          <Panel id="cases" title="Case files" hint="Open work items from the family business.">
+          <Panel id="cases" title="Work items" hint="Open and recent engineering items.">
             <div className="ms-table-wrap">
               <table className="ms-table">
-                <thead><tr><th scope="col">ID</th><th scope="col">Title</th><th scope="col">State</th><th scope="col">Owner</th></tr></thead>
+                <thead><tr><th scope="col">ID</th><th scope="col">Title</th><th scope="col">Status</th><th scope="col">Owner</th></tr></thead>
                 <tbody>
                   {site.cases.map((item) => (
                     <tr key={item.id}>

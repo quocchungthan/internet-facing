@@ -19,26 +19,26 @@ export const CASES: CaseFile[] = [
   {
     id: 104,
     state: 'solved',
-    status: 'Solved · Salt & Burn',
-    title: 'The Poltergeist in the Server Room',
-    summary: 'Anomalous network spikes traced to an ungrounded iron pipe and a legacy cron job. Salted the rack, burned the ghost script.',
-    meta: 'Lebanon, Kansas · Lead: Dean',
+    status: 'Resolved',
+    title: 'Network spikes in the server room',
+    summary: 'Intermittent network spikes traced to a grounding fault and a legacy scheduled job. Rack re-grounded and the job retired.',
+    meta: 'Kansas office · Owner: Dean',
   },
   {
     id: 105,
     state: 'open',
-    status: 'Open · Investigation',
-    title: 'The Shape-shifter in CI/CD',
-    summary: 'Build artifacts changing checksums between runners. Testing silver bullets and verifying git SHA commits.',
-    meta: 'Bunker Terminal 4 · Lead: Sam',
+    status: 'In progress',
+    title: 'Inconsistent build checksums in CI/CD',
+    summary: 'Build artifacts produce different checksums between runners. Comparing toolchain versions and verifying commit SHAs.',
+    meta: 'Build agents · Owner: Sam',
   },
   {
     id: 106,
     state: 'pending',
-    status: 'Pending · Surveillance',
-    title: 'Crossroads Contract at Port 4554',
-    summary: 'PostgreSQL instance deployed on custom port 4554 with seed data locked in EF Core. No demon deals found, purely clean vibe coding.',
-    meta: 'Internet-facing Farm · Lead: Elder Vibe Coder',
+    status: 'Backlog',
+    title: 'PostgreSQL on custom port 4554',
+    summary: 'Database deployed on a custom port with seed data managed by EF Core. No issues found; monitoring only.',
+    meta: 'Internet-facing Farm · Owner: Elder Vibe Coder',
   },
 ]
 
@@ -246,7 +246,7 @@ export function useSiteContent() {
 
   const clicks = useMemo(() => [...(loaded?.clicks ?? []), ...clickOverrides], [loaded, clickOverrides])
 
-  // Opening a source counts as today's brick for it.
+  // Opening a source logs today's visit for it.
   const registerVisit = useCallback((platform: PlatformBookmark) => {
     setClickOverrides((prev) => [...prev, { platform: platform.platform, day: dayKey(new Date()), count: 1 }])
     fetch(`/api/feeds/${encodeURIComponent(platform.platform)}/click`, { method: 'POST', keepalive: true }).catch(() => {})
