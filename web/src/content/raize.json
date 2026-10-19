@@ -1,0 +1,140 @@
+{
+  "id": "raize",
+  "name": "Toyota Raize",
+  "subtitle": "1.0 Turbo · Z · 2WD",
+  "year": 2019,
+  "market": "Japan · launch specification",
+  "engine": "1KR-VET · 1.0 L turbo inline-three",
+  "transmission": "D-CVT · belt + split-gear drive",
+  "drive": "Front-wheel drive",
+  "character": "Small footprint. Clever engineering.",
+  "color": "#5b9d9b",
+  "geometry": "compact-suv",
+  "dimensions": { "length": 3.995, "width": 1.695, "wheelbase": 2.525 },
+  "facts": [
+    { "label": "Length", "value": "3,995 mm", "sourceId": "toyota-launch" },
+    { "label": "Width", "value": "1,695 mm", "sourceId": "toyota-launch" },
+    { "label": "Luggage", "value": "369 L · deck low", "sourceId": "toyota-launch" },
+    { "label": "Front / rear", "value": "Strut / torsion beam", "sourceId": "toyota-launch" }
+  ],
+  "book": "/books/raize.md",
+  "sources": [
+    { "id": "toyota-launch", "title": "Toyota launches the new Raize in Japan · 5 Nov 2019", "url": "https://global.toyota/en/newsroom/toyota/29251184.html", "scope": "Primary source: Japanese launch powertrain, dimensions, suspension and equipment. Not a service schedule." },
+    { "id": "toyota-manuals", "title": "Toyota Japan · owner manual library", "url": "https://toyota.jp/ownersmanual/", "scope": "Locate the manual matching build date and chassis. Exact fluids, intervals, lift points and torque settings must be verified there." },
+    { "id": "tire-safety", "title": "NHTSA · Tires", "url": "https://www.nhtsa.gov/vehicle-safety/tires", "scope": "General cold-pressure, tread, age and damage guidance; use the vehicle placard rather than tire-sidewall maximum pressure." }
+  ],
+  "photos": [
+    { "id": "raize-engine", "src": "/media/raize-engine.jpg", "title": "The real 1KR-VET engine bay", "author": "オーバードライブ83 / Wikimedia Commons", "license": "CC BY-SA 4.0", "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/", "sourceUrl": "https://commons.wikimedia.org/wiki/File:2021_Toyota_Raize_1.0_Turbo_S_GR_Sport_A250RA_1KR-VET_engine_(20210521).jpg", "note": "2021 Indonesian GR Sport reference, not the 2019 Japanese Z. Shared engine family; trim and component packaging can differ. Resized, uncropped." },
+    { "id": "raize-exterior", "src": "/media/raize-exterior.jpg", "title": "Raize exterior reference", "author": "Andra Febrian / Wikimedia Commons", "license": "CC BY-SA 4.0", "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/", "sourceUrl": "https://commons.wikimedia.org/wiki/File:2021_Toyota_Raize_1.0T_GR_Sport_(Indonesia)_front_view.jpg", "note": "2021 Indonesian GR Sport, shown for family resemblance only. Not an exact trim match. Resized, uncropped." }
+  ],
+  "parts": [
+    {
+      "id": "engine", "label": "Engine", "system": "powertrain", "position": [-1.05, 0.75, 0],
+      "summary": "Three cylinders. A turbo. A surprisingly capable little heart.",
+      "description": "The 1KR-VET is a transverse 1.0-liter turbocharged inline-three. Combustion moves pistons, connecting rods turn the crankshaft, and the transmission passes torque to the front wheels. The schematic shows three cylinders in a row; it is not a casting drawing or a guide to dismantling.",
+      "checks": ["With the engine off and cool, look for fresh fluid staining below the engine.", "Record new noises, warning lamps and when they occur; a description is more useful than guessing a failed part.", "Use the build-date-matched owner manual for oil grade, quantity and service intervals."],
+      "symptoms": ["Persistent warning lamp", "Unusual vibration or knocking", "Loss of power"],
+      "caution": "If the oil-pressure warning appears or the engine overheats, stop safely and switch off. Do not continue driving to diagnose it.",
+      "sourceIds": ["toyota-launch", "toyota-manuals"], "relatedIds": ["lubrication", "intake", "cooling", "transmission"], "photoIds": ["raize-engine"]
+    },
+    {
+      "id": "lubrication", "label": "Oil & lubrication", "system": "powertrain", "position": [-1.02, 0.55, 0.15],
+      "summary": "A thin film separates moving metal and carries heat away.",
+      "description": "Oil circulates from the sump through the pump, filter and galleries to bearings and other loaded surfaces. Turbocharger bearings also depend on the correct oil supply. Oil quantity, viscosity and approval are separate requirements: a generic 'turbo oil' label is not a specification.",
+      "checks": ["Follow the manual's level-check procedure on level ground; keep clear of hot parts.", "Look for an upward or downward level trend between checks.", "Log oil type, date and odometer reading after professional servicing."],
+      "symptoms": ["Oil-pressure warning", "New oil spots", "Unexpected oil consumption"],
+      "caution": "Do not overfill or run an engine with a pressure warning. Never reach under an unsupported car.",
+      "sourceIds": ["toyota-manuals"], "relatedIds": ["engine", "intake"], "photoIds": ["raize-engine"]
+    },
+    {
+      "id": "intake", "label": "Intake & turbo", "system": "powertrain", "position": [-1.35, 0.88, -0.35],
+      "summary": "Exhaust energy helps the engine breathe.",
+      "description": "A turbine in the exhaust stream drives a compressor in the inlet path. Compressed intake air is cooled before combustion. The air filter keeps abrasive dirt out; intake hoses must remain sealed. A whistle alone is not enough to diagnose a turbocharger.",
+      "checks": ["Inspect accessible intake hoses for loose connections with the engine off.", "Have the air filter checked against the applicable service schedule.", "Note whether loss of boost happens cold, hot or under load."],
+      "symptoms": ["Hissing under load", "Reduced acceleration", "Unexpected exhaust smoke"],
+      "caution": "Turbo and exhaust housings stay hot after shutdown. Do not test boost by disconnecting hoses or touching a running engine.",
+      "sourceIds": ["toyota-launch", "toyota-manuals"], "relatedIds": ["engine", "exhaust", "lubrication"], "photoIds": ["raize-engine"]
+    },
+    {
+      "id": "cooling", "label": "Cooling system", "system": "powertrain", "position": [-1.66, 0.82, 0],
+      "summary": "The radiator releases heat that the engine cannot keep.",
+      "description": "Coolant carries heat from the engine to the radiator; airflow and an electric fan move it into the surroundings. A thermostat regulates flow as the engine warms. The reservoir is a level-check location, not permission to mix unknown coolant types.",
+      "checks": ["Inspect the reservoir only when cold, using its level marks and the manual.", "Look for wet hose joints or dried coolant residue without opening the system.", "Keep the front cooling-air path free of loose debris."],
+      "symptoms": ["High temperature warning", "Sweet smell or visible leakage", "Repeatedly falling coolant level"],
+      "caution": "Never open a hot pressure cap. An electric fan can start unexpectedly. Stop safely if the temperature warning appears.",
+      "sourceIds": ["toyota-manuals"], "relatedIds": ["engine", "intake"], "photoIds": ["raize-engine"]
+    },
+    {
+      "id": "transmission", "label": "D-CVT", "system": "powertrain", "position": [-0.95, 0.72, 0.5],
+      "summary": "Belt drive at low speed. Belt and gears at higher speed.",
+      "description": "Toyota's launch description explains that D-CVT adds split gears to a belt CVT. At higher speeds it uses both belt and gear paths to improve efficiency. This is not the hybrid power-split e-CVT used in some other Toyotas, and fluid requirements must not be borrowed from those cars.",
+      "checks": ["Record hesitation, shudder or unusual noises and their operating conditions.", "Check the actual manual before approving any fluid or flush.", "Have any leaks identified instead of topping up with a universal fluid."],
+      "symptoms": ["Delayed engagement", "Shudder", "Transmission warning"],
+      "caution": "Fluid-level checking can require specified temperature and workshop procedures. Do not remove plugs to experiment.",
+      "sourceIds": ["toyota-launch", "toyota-manuals"], "relatedIds": ["engine", "wheels"], "photoIds": ["raize-engine"]
+    },
+    {
+      "id": "brakes", "label": "Braking system", "system": "chassis", "position": [-1.26, 0.52, 0.82],
+      "summary": "Turn the car's motion into heat, predictably.",
+      "description": "Hydraulic pressure transmits pedal force to friction brakes at the wheels. ABS modulates pressure when a wheel approaches lockup; it cannot replace tire grip. The rendered brake disc is a principle illustration, not a verified depiction of every brake fitted to this trim.",
+      "checks": ["Before moving, check for an abnormal pedal or brake warning.", "Ask a qualified technician to measure friction material and inspect fluid condition.", "Report pulling, vibration and new sounds rather than waiting for a fixed interval."],
+      "symptoms": ["Soft or sinking pedal", "Grinding", "Brake warning lamp"],
+      "caution": "A soft pedal, visible fluid leak or impaired braking means do not drive. Arrange professional recovery.",
+      "sourceIds": ["toyota-manuals"], "relatedIds": ["wheels", "suspension"], "photoIds": []
+    },
+    {
+      "id": "wheels", "label": "Wheels & tires", "system": "chassis", "position": [1.26, 0.48, 0.86],
+      "summary": "Four small contact patches do all the work.",
+      "description": "Tires carry load, transmit braking and steering forces, and absorb small road irregularities. The launch Z has 17-inch wheels. Pressure comes from the correct vehicle placard and load condition, not the maximum stamped on a tire sidewall.",
+      "checks": ["Check cold pressures with a gauge and the vehicle placard.", "Inspect tread, sidewalls, embedded objects and uneven wear.", "Include the spare or repair kit in your checks; learn which one your vehicle carries."],
+      "symptoms": ["Pressure loss", "Bulges or cuts", "Uneven wear or vibration"],
+      "caution": "Do not drive on a bulging or structurally damaged tire. Never work beneath a car supported only by its emergency jack.",
+      "sourceIds": ["tire-safety", "toyota-launch"], "relatedIds": ["brakes", "suspension"], "photoIds": ["raize-exterior"]
+    },
+    {
+      "id": "suspension", "label": "Suspension", "system": "chassis", "position": [1.26, 0.9, -0.72],
+      "summary": "Keep the tire on the road, not just the ride comfortable.",
+      "description": "The launch Raize uses MacPherson struts at the front and a torsion beam at the rear. Springs support the body; dampers control oscillation. Bushings allow controlled movement and isolate noise. Alignment changes can be a symptom of wear or impact.",
+      "checks": ["Look for uneven ride height from outside the parked vehicle.", "Report new clunks, persistent bouncing or a steering pull.", "Have joints, boots, dampers and alignment inspected after a substantial impact."],
+      "symptoms": ["Repeated bouncing", "Clunks", "Uneven tire wear"],
+      "caution": "Springs store dangerous energy. Do not loosen strut mounts or attempt spring compression from this guide.",
+      "sourceIds": ["toyota-launch", "toyota-manuals"], "relatedIds": ["wheels", "brakes"], "photoIds": []
+    },
+    {
+      "id": "electrical", "label": "Battery & electrics", "system": "electrical", "position": [-1.03, 0.84, -0.61],
+      "summary": "Starting energy, charging and a network of sensors.",
+      "description": "The low-voltage battery supports starting and electrical loads, while the charging system replenishes energy when the engine runs. Fuses protect circuits. Repeated battery discharge can have several causes and is not proof that the battery alone has failed.",
+      "checks": ["Look for obvious corrosion or a loose battery hold-down without touching terminals.", "Use the exact manual's jump-start procedure and specified connection points.", "Have the battery and charging system tested together if starting becomes slow."],
+      "symptoms": ["Slow cranking", "Charging warning", "Repeated flat battery"],
+      "caution": "Keep sparks and metal tools away from battery terminals. Do not disconnect a battery with the engine running.",
+      "sourceIds": ["toyota-manuals"], "relatedIds": ["engine", "body"], "photoIds": ["raize-engine"]
+    },
+    {
+      "id": "fuel", "label": "Fuel system", "system": "powertrain", "position": [0.95, 0.44, 0],
+      "summary": "Store, meter and deliver fuel without leaks.",
+      "description": "The tank, pump, lines and injectors deliver fuel to the engine. Fuel choice is market-specific; use the correct manual and filler label instead of assumptions based on another Raize market. The tank position in the schematic is approximate.",
+      "checks": ["Check the filler cap closes properly.", "Report fuel smells immediately.", "Record the fuel used and the conditions if a running problem follows refueling."],
+      "symptoms": ["Fuel smell", "Visible leakage", "Hard starting after refueling"],
+      "caution": "If fuel is leaking, switch off, avoid ignition sources and seek professional help. Do not disconnect fuel lines.",
+      "sourceIds": ["toyota-manuals"], "relatedIds": ["engine", "electrical"], "photoIds": []
+    },
+    {
+      "id": "exhaust", "label": "Exhaust", "system": "powertrain", "position": [0.4, 0.35, -0.3],
+      "summary": "Move hot gases away and control noise and emissions.",
+      "description": "The exhaust path includes the turbocharger turbine, emissions-control equipment and silencing. Leaks affect noise and can let dangerous gases enter the cabin. An emissions fault needs diagnosis; removing emissions components is not maintenance.",
+      "checks": ["Listen for a new exhaust leak without running the engine indoors.", "Have damaged hangers or unusual rattles inspected.", "Investigate persistent exhaust smells in the cabin urgently."],
+      "symptoms": ["New loudness", "Rattles", "Exhaust smell inside"],
+      "caution": "Never idle in an enclosed space. Exhaust gases can contain fatal carbon monoxide; exhaust surfaces can burn.",
+      "sourceIds": ["toyota-manuals"], "relatedIds": ["intake", "engine"], "photoIds": []
+    },
+    {
+      "id": "body", "label": "Body & access", "system": "body", "position": [0, 1.42, 0.55],
+      "summary": "The structure around you is part of the safety system.",
+      "description": "The Raize's high-rigidity body and DNGA platform support crash performance, suspension mounting and everyday usability. Use the access control to open the schematic hood and doors, then compare with the real photograph. Real latch, hinge and lift-point positions are not modeled.",
+      "checks": ["Check lamps, wipers, washers and mirrors before driving.", "Keep drain paths and door seals clear of debris.", "Use the manual's designated lift and support locations for any workshop work."],
+      "symptoms": ["Water ingress", "Latch not engaging", "Damaged lights or glass"],
+      "caution": "Confirm the hood is securely latched before driving. Do not infer real lift points from the 3D illustration.",
+      "sourceIds": ["toyota-launch", "toyota-manuals"], "relatedIds": ["electrical", "suspension"], "photoIds": ["raize-exterior"]
+    }
+  ]
+}
