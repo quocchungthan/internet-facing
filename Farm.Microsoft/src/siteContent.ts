@@ -9,6 +9,15 @@ export interface ProfileProject { profileId: number; projectId: number; role?: s
 export interface DisplayProject extends Project { association?: ProfileProject }
 export interface Skill { id: number; name: string; category: string }
 export interface Experience { id: number; company: string; jobTitle: string; description?: string | null; startDate: string; endDate?: string | null; isCurrent: boolean; displayOrder: number }
+export interface Gig { id: number; title: string; summary: string; category: string; bodyMarkdown?: string | null; problem?: string | null; outcome?: string | null }
+
+/** Full Gig Markdown, or a body rebuilt from the legacy problem/outcome fields. */
+export function gigMarkdown(gig: Gig): string {
+  return gig.bodyMarkdown ?? [
+    gig.problem ? `## Problem\n\n${gig.problem}` : '',
+    gig.outcome ? `## Outcome\n\n${gig.outcome}` : '',
+  ].filter(Boolean).join('\n\n')
+}
 export interface PlatformBookmark { id: number; platform: string; url: string; platformId: string; description: string; color: string; displayOrder: number }
 export interface LocalhostTool { id: number; name: string; description: string; category: string; directUrl: string; repositoryUrl: string; issueUrl?: string | null; displayOrder: number }
 export type ToolStatus = 'checking' | 'online' | 'offline'
@@ -184,6 +193,7 @@ interface Loaded {
   projects: DisplayProject[]
   skills: Skill[]
   experiences: Experience[]
+  gigs: Gig[]
   platforms: PlatformBookmark[]
   clicks: ClickRow[]
   tools: LocalhostTool[]
@@ -191,11 +201,12 @@ interface Loaded {
 }
 
 async function loadAll(): Promise<Loaded> {
-  const [projects, links, skills, experiences, platforms, clicks, tools] = await Promise.all([
+  const [projects, links, skills, experiences, gigs, platforms, clicks, tools] = await Promise.all([
     getJson<Project[]>('/api/portfolio/projects').catch(() => null),
     loadList<ProfileProject>('/api/portfolio/profile-projects'),
     loadList<Skill>('/api/portfolio/skills'),
     loadList<Experience>('/api/portfolio/experiences'),
+    loadList<Gig>('/api/portfolio/gigs'),
     loadList<PlatformBookmark>('/api/feeds'),
     loadList<ClickRow>('/api/feeds/clicks'),
     loadList<LocalhostTool>('/api/tools'),
@@ -219,6 +230,7 @@ async function loadAll(): Promise<Loaded> {
     projects: display,
     skills,
     experiences: [...experiences].sort((a, b) => a.displayOrder - b.displayOrder),
+    gigs,
     platforms,
     clicks,
     tools,
@@ -307,6 +319,7 @@ export function useSiteContent() {
     portfolioFailed: loaded?.portfolioFailed ?? false,
     projects: loaded?.projects ?? [],
     experiences: loaded?.experiences ?? [],
+    gigs: loaded?.gigs ?? [],
     skillGroups,
     habits,
     activity,
