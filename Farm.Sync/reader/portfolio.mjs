@@ -124,8 +124,10 @@ export function propertyReader(properties, definitions, pageId, kind) {
   const bool = name => {
     const value = read(name);
     if (value == null) return false;
-    if (typeof value !== 'boolean') throw new Error(`Invalid ${where(name)}: expected checkbox`);
-    return value;
+    if (typeof value === 'boolean') return value;
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    throw new Error(`Invalid ${where(name)}: expected checkbox`);
   };
   const int = name => {
     const value = read(name);

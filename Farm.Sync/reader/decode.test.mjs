@@ -212,6 +212,20 @@ test('skipped-page reports expose reasons without leaking page titles or IDs in 
   assert.match(skippedPageDiagnostic(page, true), /private-id/);
 });
 
+test('checkbox properties accept AFFiNE text values and native booleans', () => {
+  const read = value => propertyReader(
+    { page: { 'custom:Checkbox': value } },
+    { checkbox: { id: 'Checkbox', name: 'Checkbox', isDeleted: false } },
+    'page', 'Project');
+
+  assert.equal(read('true').bool('Checkbox'), true);
+  assert.equal(read('false').bool('Checkbox'), false);
+  assert.equal(read(true).bool('Checkbox'), true);
+  assert.equal(read(false).bool('Checkbox'), false);
+  assert.equal(read(undefined).bool('Checkbox'), false);
+  assert.throws(() => read('yes').bool('Checkbox'), /expected checkbox/);
+});
+
 function gigProperties(values = {}) {
   const fields = { Category: 'Data', Summary: 'Free body', ...values };
   return propertyReader(
