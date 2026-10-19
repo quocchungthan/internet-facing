@@ -1,6 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import './themes/microsoft/microsoft.scss'
 import { JsonView } from './JsonView'
+import { LinkedText } from './LinkedText'
+import { PlatformIcon } from './PlatformIcon'
 import { formatPeriod, levelOf, plural, useSiteContent, type ApiProbe, type DayCell, type DisplayProject, type ToolStatus } from './siteContent'
 
 const SECTIONS = [
@@ -97,8 +99,8 @@ function ProjectCard({ project, pinned }: { project: DisplayProject; pinned?: bo
           {detail && <span>{detail}</span>}
         </p>
       )}
-      <p>{project.summary}</p>
-      {project.description && <p className="ms-card-text">{project.description}</p>}
+      <p className="ms-project-text"><LinkedText text={project.summary} /></p>
+      {project.description && <p className="ms-card-text ms-project-text"><LinkedText text={project.description} /></p>}
       {(project.sourceUrl || project.demoUrl) && (
         <footer className="ms-card-actions">
           {project.demoUrl && <a className="ms-btn ms-btn-primary" href={project.demoUrl} target="_blank" rel="noopener noreferrer">Open demo</a>}
@@ -171,11 +173,11 @@ export const MicrosoftTab = ({ analytics }: { analytics?: ReactNode }) => {
         <SectionNav items={sections} />
 
         <div className="ms-content">
-          <Panel id="api" title="API console" hint="This portfolio is served by a live API. Send a request and inspect the response, rate limits and usage metrics.">
+          <Panel id="api" title="API console">
             <div className="ms-api-grid">{site.probes.map((probe) => <ApiBlock key={probe.endpoint} probe={probe} />)}</div>
           </Panel>
 
-          <Panel id="overview" title="Overview" hint="Where things stand today.">
+          <Panel id="overview" title="Overview">
             <div className="ms-kpis">
               <article className="ms-kpi"><span>Day streak</span><strong>{activity.streak}</strong><small>{activity.todayDone ? 'Looked for work today' : 'Nothing logged today yet'}</small></article>
               <article className="ms-kpi"><span>Active days</span><strong>{activity.activeDays}</strong><small>Last 14 weeks</small></article>
@@ -185,7 +187,7 @@ export const MicrosoftTab = ({ analytics }: { analytics?: ReactNode }) => {
             {site.portfolioFailed && <p className="ms-note" role="alert">Portfolio is unavailable right now.</p>}
           </Panel>
 
-          <Panel id="experience" title="Experience" hint="Roles as ordered in the profile.">
+          <Panel id="experience" title="Experience">
             {site.loading ? <p className="ms-note">Loading portfolio…</p> : site.experiences.length === 0 ? <p className="ms-note">No experience listed yet.</p> : (
               <div className="ms-table-wrap">
                 <table className="ms-table">
@@ -205,7 +207,7 @@ export const MicrosoftTab = ({ analytics }: { analytics?: ReactNode }) => {
             )}
           </Panel>
 
-          <Panel id="projects" title="Projects" hint="Featured work is pinned first.">
+          <Panel id="projects" title="Projects">
             {site.loading ? <p className="ms-note">Loading portfolio…</p> : site.projects.length === 0 ? <p className="ms-note">No projects listed yet.</p> : (
               <>
                 {featured.length > 0 && (
@@ -234,7 +236,7 @@ export const MicrosoftTab = ({ analytics }: { analytics?: ReactNode }) => {
             {!site.loading && site.skillGroups.length === 0 && <p className="ms-note">No skills listed yet.</p>}
           </Panel>
 
-          <Panel id="tools" title="Local tools" hint="Services running on this machine.">
+          <Panel id="tools" title="Local tools">
             <div className="ms-toolbar">
               <button type="button" className="ms-btn" onClick={site.checkAllTools} disabled={site.toolCount === 0}>Check all</button>
             </div>
@@ -242,7 +244,7 @@ export const MicrosoftTab = ({ analytics }: { analytics?: ReactNode }) => {
             {site.toolCount > 0 && (
               <div className="ms-table-wrap">
                 <table className="ms-table">
-                  <thead><tr><th scope="col">Tool</th><th scope="col">Category</th><th scope="col">Status</th><th scope="col"><span className="ms-sr">Actions</span></th></tr></thead>
+                  <thead><tr><th scope="col">Tool</th><th scope="col">Category</th><th scope="col" className="ms-status-column">Status</th><th scope="col"><span className="ms-sr">Actions</span></th></tr></thead>
                   <tbody>
                     {site.toolGroups.flatMap((group) => group.items.map((tool) => {
                       const status = site.toolStatuses[tool.id]
@@ -250,7 +252,7 @@ export const MicrosoftTab = ({ analytics }: { analytics?: ReactNode }) => {
                         <tr key={tool.id}>
                           <th scope="row">{tool.name}<small>{tool.description}</small></th>
                           <td>{group.label}</td>
-                          <td><span className={`ms-status-badge tool-${status ?? 'unknown'}`}>{TOOL_STATUS_LABEL[status ?? 'unknown']}</span></td>
+                          <td className="ms-status-column"><span className={`ms-status-badge tool-${status ?? 'unknown'}`}>{TOOL_STATUS_LABEL[status ?? 'unknown']}</span></td>
                           <td className="ms-row-actions">
                             <a className="ms-btn ms-btn-primary" href={tool.directUrl} target="_blank" rel="noreferrer noopener">Launch</a>
                             <button type="button" className="ms-btn" onClick={() => site.checkTool(tool)} disabled={status === 'checking'} aria-label={`Check whether ${tool.name} is running`}>Check</button>
@@ -266,12 +268,12 @@ export const MicrosoftTab = ({ analytics }: { analytics?: ReactNode }) => {
             )}
           </Panel>
 
-          <Panel id="sources" title="Where do I usually find work" hint="The places I look for gigs and roles. Opening one logs today's visit.">
+          <Panel id="sources" title="Work sources" hint="Opening a source logs today's visit.">
             {!site.loading && site.habits.length === 0 && <p className="ms-note">No sources configured.</p>}
             <ul className="ms-list">
               {site.habits.map(({ platform, days, visits }) => (
                 <li key={platform.id} className="ms-list-row">
-                  <span className="ms-avatar" aria-hidden="true">{platform.platform.slice(0, 1).toUpperCase()}</span>
+                  <span className="ms-avatar" aria-hidden="true"><PlatformIcon platform={platform.platform} /></span>
                   <div className="ms-list-main"><strong>{platform.platform}</strong><span>{platform.description}</span></div>
                   <HeatStrip days={days.slice(-28)} label={`${platform.platform}: ${plural(visits, 'visit')} in the last 14 weeks`} />
                   <a className="ms-btn" href={platform.url} target="_blank" rel="noreferrer noopener" onClick={() => site.registerVisit(platform)} aria-label={`Open ${platform.platform}`}>Open</a>
@@ -280,16 +282,16 @@ export const MicrosoftTab = ({ analytics }: { analytics?: ReactNode }) => {
             </ul>
           </Panel>
 
-          <Panel id="cases" title="Work items" hint="Open and recent engineering items.">
+          <Panel id="cases" title="Work items">
             <div className="ms-table-wrap">
               <table className="ms-table">
-                <thead><tr><th scope="col">ID</th><th scope="col">Title</th><th scope="col">Status</th><th scope="col">Owner</th></tr></thead>
+                <thead><tr><th scope="col">ID</th><th scope="col">Title</th><th scope="col" className="ms-status-column">Status</th><th scope="col">Owner</th></tr></thead>
                 <tbody>
                   {site.cases.map((item) => (
                     <tr key={item.id}>
                       <td className="ms-nowrap">#{item.id}</td>
                       <th scope="row">{item.title}<small>{item.summary}</small></th>
-                      <td><span className={`ms-status-badge case-${item.state}`}>{item.status}</span></td>
+                      <td className="ms-status-column"><span className={`ms-status-badge case-${item.state}`}>{item.status}</span></td>
                       <td>{item.meta}</td>
                     </tr>
                   ))}

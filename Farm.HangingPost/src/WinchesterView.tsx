@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { LinkedText } from '@farm/microsoft'
 import { JsonView } from './JsonView'
 import { formatPeriod, levelOf, plural, useSiteContent, type ApiProbe, type CaseFile, type DayCell, type DisplayProject } from './siteContent'
 import './themes/winchester/winchester.scss'
@@ -61,8 +62,8 @@ function CaseFolder({ project }: { project: DisplayProject }) {
           {detail && <div><dt>Assigned</dt><dd>{detail}</dd></div>}
         </dl>
       )}
-      <p>{project.summary}</p>
-      {project.description && <p className="wn-notes">{project.description}</p>}
+      <p className="wn-project-text"><LinkedText text={project.summary} /></p>
+      {project.description && <p className="wn-notes wn-project-text"><LinkedText text={project.description} /></p>}
       {(project.sourceUrl || project.demoUrl) && (
         <footer>
           Evidence:
@@ -120,8 +121,8 @@ export const WinchesterView = ({ analytics }: { analytics?: ReactNode }) => {
         <Seal />
         <div>
           <span className="journal-badge">Hunter&apos;s Journal &middot; Men of Letters Archive</span>
-          <h1>Saving people, hunting things</h1>
-          <p>The family business: open case files, lore and leads. Kept by Elder Vibe Coder. If you are seeking for a software developer to talk to, it&apos;s me here.</p>
+          <h1>Helping people, hunting things</h1>
+          <p>Kept by Elder Vibe Coder.</p>
         </div>
       </header>
 
@@ -185,10 +186,11 @@ export const WinchesterView = ({ analytics }: { analytics?: ReactNode }) => {
       </Chapter>
 
       <Chapter index={3} id="armory" title="The armory">
-        <div className="wn-toolbar">
-          <p className="wn-note">Weapons kept on this machine.</p>
-          {site.toolCount > 0 && <button type="button" className="wn-btn" onClick={site.checkAllTools}>Inspect all</button>}
-        </div>
+        {site.toolCount > 0 && (
+          <div className="wn-toolbar">
+            <button type="button" className="wn-btn" onClick={site.checkAllTools}>Inspect all</button>
+          </div>
+        )}
         {!site.loading && site.toolCount === 0 && <p className="wn-note">The armory is empty.</p>}
         {site.toolGroups.map((group) => (
           <div key={group.key} className="wn-shelf">
@@ -216,7 +218,6 @@ export const WinchesterView = ({ analytics }: { analytics?: ReactNode }) => {
       </Chapter>
 
       <Chapter index={4} id="informants" title="Informants">
-        <p className="wn-note">Where the jobs come from. Each mark is a day I called on them.</p>
         {!site.loading && site.habits.length === 0 && <p className="wn-note">No informants on file.</p>}
         <ul className="wn-informants">
           {site.habits.map(({ platform, days, visits }) => (

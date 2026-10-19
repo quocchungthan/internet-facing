@@ -120,6 +120,7 @@
 }
 
 .wn-notes { color: var(--muted-text); line-height: 1.65; margin-top: 6px; white-space: pre-line; }
+.wn-project-text { overflow-wrap: anywhere; a { color: var(--link); text-decoration: underline; } }
 
 // Case files
 .winchester-board { display: grid; gap: 22px 18px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr)); }
@@ -168,7 +169,7 @@
 .wn-lore { display: grid; gap: 14px; div { align-items: baseline; border-bottom: 1px dotted var(--border); display: grid; gap: 4px 24px; padding-bottom: 12px; @media (min-width: 720px) { grid-template-columns: 11rem minmax(0, 1fr); } } dt { color: var(--brand); font-style: italic; } dd { line-height: 1.7; } }
 
 // Armory: a ledger of weapons with a checkbox for whether each one is loaded
-.wn-toolbar { align-items: center; display: flex; gap: 12px; justify-content: space-between; }
+.wn-toolbar { align-items: center; display: flex; gap: 12px; justify-content: flex-end; }
 .wn-btn, .wn-links button, .wn-transmission button { background: transparent; border: 1px solid var(--brand); border-radius: var(--radius); color: var(--brand); cursor: pointer; font: inherit; font-size: 0.8125rem; letter-spacing: 0.08em; min-height: 36px; padding: 0 14px; text-transform: uppercase; &:hover:not(:disabled) { background: color-mix(in srgb, var(--brand) 14%, transparent); } &:disabled { cursor: progress; opacity: 0.6; } }
 .wn-shelf { display: grid; gap: 6px; h3 { color: var(--brand); font-size: 1rem; font-style: italic; small { color: var(--muted-text); font-size: 0.8125rem; margin-left: 8px; } } ul { list-style: none; padding: 0; } li { align-items: center; border-bottom: 1px dotted var(--border); display: grid; gap: 8px 14px; grid-template-columns: auto minmax(0, 1fr) auto; padding: 10px 0; @media (max-width: 640px) { grid-template-columns: auto minmax(0, 1fr); .wn-links { grid-column: 1 / -1; } } } li > div { display: grid; strong { font-weight: 600; } span { color: var(--muted-text); font-size: 0.875rem; } } }
 .wn-box { align-items: center; border: 1.5px solid var(--brand); display: inline-flex; font-weight: 700; height: 22px; justify-content: center; width: 22px; }
