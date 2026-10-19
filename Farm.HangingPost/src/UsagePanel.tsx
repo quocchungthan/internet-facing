@@ -1,5 +1,4 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { BrickTracker } from '@farm/brick-tracker'
 import { UsageHistory } from './ConnectAi'
 import { bytes, count, dateLabel, duration, money, summarize, type AudienceData, type DashboardData } from './dashboard'
 import { signInUrl, type Session } from './session'
@@ -169,7 +168,7 @@ function Analytics({ session }: { session: Session }) {
       {state.error && <div role="alert"><p>{state.error}</p><button type="button" onClick={() => {
         setState({ data: null, error: null, loading: true })
         setAttempt(value => value + 1)
-      }}>Retry analytics</button> <a href={signInUrl('/tracker')}>Sign in again</a></div>}
+                }}>Retry analytics</button> <a href={signInUrl('/')}>Sign in again</a></div>}
       {state.data && <Insights data={state.data} />}
       <section aria-labelledby="live-bandwidth-title" className="analytics-live">
         <div className="analytics-heading"><div><h2 id="live-bandwidth-title">Live MCP bandwidth</h2><p>Measured traffic for your connected memory service only; not all AI usage.</p></div><span className="analytics-badge">Live source</span></div>
@@ -179,15 +178,11 @@ function Analytics({ session }: { session: Session }) {
   )
 }
 
-export function Dashboard({ session, loading }: { session: Session; loading: boolean }) {
+export function UsagePanel({ session, loading }: { session: Session; loading: boolean }) {
+  if (loading || !session.isAuthenticated) return null
   return (
-    <>
-      <BrickTracker />
-      {!loading && session.isAuthenticated && (
-        <div className="analytics-dashboard">
-          <Analytics key={session.subject} session={session} />
-        </div>
-      )}
-    </>
+    <div className="analytics-dashboard">
+      <Analytics key={session.subject} session={session} />
+    </div>
   )
 }

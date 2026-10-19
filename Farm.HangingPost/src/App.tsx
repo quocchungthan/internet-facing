@@ -1,6 +1,7 @@
 import { Component, useEffect, useState, type ErrorInfo, type ReactNode } from 'react'
 import { MicrosoftTab } from '@farm/microsoft'
-import { Dashboard } from './Dashboard'
+import { BrickTracker } from '@farm/brick-tracker'
+import { UsagePanel } from './UsagePanel'
 import { WinchesterView } from './WinchesterView'
 import { AccountMenu } from './AccountMenu'
 import { ServicesMenu } from './ServicesMenu'
@@ -67,17 +68,30 @@ const themes: ThemeOption[] = [
   { label: 'Winchester', theme: 'winchester' },
 ]
 
+// Same content in three projects, each with its own layout.
+function PortfolioView({ theme, analytics }: { theme: ThemeOption['theme']; analytics?: ReactNode }) {
+  if (theme === 'brick') return <BrickTracker analytics={analytics} />
+  if (theme === 'winchester') return <WinchesterView analytics={analytics} />
+  return <MicrosoftTab analytics={analytics} />
+}
+
 function getPathname(): string {
+  return window.location.pathname.toLowerCase() === '/connect' ? '/connect' : '/'
+}
+
+// Old tab URLs now just open the portfolio in the matching style.
+function themeFromPath(): ThemeOption['theme'] | null {
   const path = window.location.pathname.toLowerCase()
-  if (path === '/connect') return '/connect'
-  if (path === '/winchester') return '/winchester'
-  if (path === '/tracker' || path === '/brick' || path === '/bricks') return '/tracker'
-  return '/'
+  if (path === '/winchester') return 'winchester'
+  if (path === '/tracker' || path === '/brick' || path === '/bricks') return 'brick'
+  return null
 }
 
 const LAST_THEME_KEY = 'farm.lastTheme'
 
 function loadLastTheme(): ThemeOption['theme'] {
+  const fromPath = themeFromPath()
+  if (fromPath) return fromPath
   try {
     const saved = window.localStorage.getItem(LAST_THEME_KEY)
     return themes.find((option) => option.theme === saved)?.theme ?? 'microsoft'
@@ -141,9 +155,7 @@ export function App() {
 
       <section className="tab-content" aria-live="polite">
         <ErrorBoundary>
-          {pathname === '/' && <MicrosoftTab theme={theme} />}
-          {pathname === '/tracker' && <Dashboard session={session} loading={status === 'loading'} />}
-          {pathname === '/winchester' && <WinchesterView />}
+          {pathname === '/' && <PortfolioView theme={theme} analytics={status !== 'loading' && session.isAuthenticated ? <UsagePanel session={session} loading={false} /> : undefined} />}
           {pathname === '/connect' && <ConnectAi session={session} loading={status === 'loading'} />}
         </ErrorBoundary>
       </section>

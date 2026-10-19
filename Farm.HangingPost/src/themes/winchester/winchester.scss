@@ -43,22 +43,21 @@
 
 @keyframes winchester-flicker {
   0%,
-  100% {
-    box-shadow: 0 6px 12px -8px rgb(201 161 74 / 70%);
-  }
-  45% {
-    box-shadow: 0 6px 16px -7px rgb(201 161 74 / 95%);
-  }
-  70% {
-    box-shadow: 0 5px 10px -8px rgb(201 161 74 / 55%);
-  }
+  100% { box-shadow: 0 6px 12px -8px rgb(201 161 74 / 70%); }
+  45% { box-shadow: 0 6px 16px -7px rgb(201 161 74 / 95%); }
+  70% { box-shadow: 0 5px 10px -8px rgb(201 161 74 / 55%); }
 }
 
-// Winchester page content
+// The journal: one reading column, chapters in order, a contents page up front.
 .winchester {
   display: grid;
-  gap: clamp(20px, 3vw, 36px);
+  gap: clamp(24px, 4vw, 44px);
+  margin: 0 auto;
+  max-width: 62rem;
   text-align: left;
+
+  h2, h3, p, dl, dd, ol, ul { margin: 0; }
+  :is(a, button, summary, pre):focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
 }
 
 .winchester-header {
@@ -68,72 +67,63 @@
   gap: clamp(16px, 3vw, 32px);
   padding-bottom: clamp(16px, 2vw, 28px);
 
-  .winchester-seal {
-    color: var(--brand);
-    flex: 0 0 auto;
-    height: clamp(72px, 10vw, 120px);
-    width: clamp(72px, 10vw, 120px);
-  }
-
-  .journal-badge {
-    border: 1px solid var(--brand);
-    color: var(--brand);
-    display: inline-block;
-    font-size: 0.75rem;
-    font-weight: 700;
-    letter-spacing: 0.14em;
-    padding: 3px 10px;
-    text-transform: uppercase;
-  }
-
-  h1 {
-    font-size: clamp(1.75rem, 1.2rem + 2.5vw, 2.75rem);
-    letter-spacing: 0.01em;
-    line-height: 1.15;
-    margin: 12px 0 6px;
-  }
-
-  p {
-    color: var(--muted-text);
-    font-size: 1.0625rem;
-    font-style: italic;
-    margin: 0;
-    max-width: 52ch;
-  }
+  .winchester-seal { color: var(--brand); flex: 0 0 auto; height: clamp(72px, 10vw, 120px); width: clamp(72px, 10vw, 120px); }
+  .journal-badge { border: 1px solid var(--brand); color: var(--brand); display: inline-block; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.14em; padding: 3px 10px; text-transform: uppercase; }
+  h1 { font-size: clamp(1.75rem, 1.2rem + 2.5vw, 2.75rem); letter-spacing: 0.01em; line-height: 1.15; margin: 12px 0 6px; }
+  p { color: var(--muted-text); font-size: 1.0625rem; font-style: italic; line-height: 1.55; max-width: 56ch; }
 }
 
-.winchester-board {
+.wn-note { color: var(--muted-text); font-style: italic; }
+
+// Contents page
+.wn-contents {
+  background: linear-gradient(180deg, var(--surface-2), var(--surface));
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--brand);
+  padding: 20px 24px;
+
+  h2 { color: var(--brand); font-size: 0.8125rem; letter-spacing: 0.18em; margin-bottom: 10px; text-transform: uppercase; }
+  ol { columns: 2 18rem; column-gap: 32px; list-style: none; padding: 0; }
+  li { break-inside: avoid; }
+  a { align-items: baseline; border-bottom: 1px dotted var(--border); color: var(--text); display: flex; gap: 8px; min-height: 40px; padding: 8px 0; text-decoration: none; &:hover { color: var(--link-hover); } }
+  a span { color: var(--brand); min-width: 2rem; }
+  a em { color: var(--muted-text); font-size: 0.8125rem; margin-left: auto; }
+  .wn-log { border-top: 1px dashed var(--border); color: var(--muted-text); font-style: italic; margin-top: 14px; padding-top: 12px; }
+}
+
+// Chapters
+.wn-chapter {
   display: grid;
   gap: 18px;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
+  scroll-margin-top: 1rem;
+
+  > header { align-items: baseline; border-bottom: 1px solid var(--brand); display: flex; gap: 14px; padding-bottom: 8px; }
+  .wn-numeral { color: var(--brand); font-size: 1.1rem; letter-spacing: 0.1em; min-width: 2.2rem; }
+  h2 { font-size: clamp(1.25rem, 1rem + 1vw, 1.65rem); letter-spacing: 0.06em; text-transform: uppercase; }
+  h2::first-letter { color: var(--brand); font-size: 1.3em; }
 }
 
-:root[data-theme='winchester'] .ms-project-grid--winchester {
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
+// Journal entries: dates in the margin, an ink line down the page
+.wn-entries {
+  border-left: 1px solid var(--border);
+  display: grid;
+  gap: 26px;
+  list-style: none;
+  margin-left: 6px;
+  padding: 0 0 0 22px;
+
+  li { display: grid; gap: 4px 24px; position: relative; @media (min-width: 720px) { grid-template-columns: 11rem minmax(0, 1fr); } }
+  li::before { background: var(--brand); border-radius: 50%; content: ''; height: 9px; left: -27px; position: absolute; top: 0.55em; width: 9px; }
+  .wn-date { color: var(--brand); font-style: italic; letter-spacing: 0.02em; }
+  h3 { font-size: 1.15rem; }
+  .wn-where { color: var(--link); font-style: italic; margin-top: 2px; }
 }
 
-:root[data-theme='winchester'] .ms-experience-grid--winchester {
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
-}
+.wn-notes { color: var(--muted-text); line-height: 1.65; margin-top: 6px; white-space: pre-line; }
 
-:root[data-theme='winchester'] .ms-experience-card.case-file {
-  min-height: 100%;
-}
+// Case files
+.winchester-board { display: grid; gap: 22px 18px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr)); }
 
-:root[data-theme='winchester'] .ms-portfolio-section {
-  border-top: 1px dashed var(--border);
-  padding-block: 1.5rem;
-}
-
-:root[data-theme='winchester'] .ms-portfolio-section > h3 {
-  color: var(--brand);
-  font-family: var(--font-display);
-  font-size: 1.25rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-// Case files: paper-dark cards with a brass pin and a stamped status
 .case-file {
   background: linear-gradient(180deg, var(--surface-2), var(--surface));
   border: 1px solid var(--border);
@@ -146,58 +136,17 @@
   position: relative;
   transition: border-color 0.2s ease, transform 0.2s ease;
 
-  &::before {
-    background: radial-gradient(circle at 35% 35%, #ecd08a, var(--brand) 55%, #6b5320);
-    border-radius: 50%;
-    box-shadow: 0 2px 3px rgb(0 0 0 / 60%);
-    content: '';
-    height: 10px;
-    position: absolute;
-    right: 14px;
-    top: -6px;
-    width: 10px;
-  }
+  &::before { background: radial-gradient(circle at 35% 35%, #ecd08a, var(--brand) 55%, #6b5320); border-radius: 50%; box-shadow: 0 2px 3px rgb(0 0 0 / 60%); content: ''; height: 10px; position: absolute; right: 14px; top: -6px; width: 10px; }
+  &:hover { border-color: color-mix(in srgb, var(--brand) 50%, var(--border)); transform: translateY(-2px); }
+  &[data-featured='true'] { border-color: color-mix(in srgb, var(--brand) 55%, var(--border)); box-shadow: 0 0 0 1px color-mix(in srgb, var(--brand) 25%, transparent), 0 12px 28px -18px rgb(201 161 74 / 55%); }
+  h3 { font-size: 1.2rem; line-height: 1.3; }
+  p { color: var(--muted-text); line-height: 1.6; }
+  footer { align-items: center; border-top: 1px dashed var(--border); color: var(--muted-text); display: flex; flex-wrap: wrap; font-size: 0.8125rem; gap: 6px 14px; letter-spacing: 0.02em; margin-top: auto; padding-top: 10px; a { color: var(--link); font-weight: 600; } }
 
-  &:hover {
-    border-color: color-mix(in srgb, var(--brand) 50%, var(--border));
-    transform: translateY(-2px);
-  }
-
-  h2 {
-    font-size: 1.25rem;
-    line-height: 1.3;
-    margin: 0;
-  }
-
-  h4 {
-    font-size: 1.2rem;
-    line-height: 1.3;
-    margin: 0;
-  }
-
-  p {
-    color: var(--muted-text);
-    flex: 1;
-    line-height: 1.6;
-    margin: 0;
-  }
-
-  footer {
-    border-top: 1px dashed var(--border);
-    color: var(--muted-text);
-    font-size: 0.8125rem;
-    letter-spacing: 0.02em;
-    padding-top: 10px;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    transition: none;
-
-    &:hover {
-      transform: none;
-    }
-  }
+  @media (prefers-reduced-motion: reduce) { transition: none; &:hover { transform: none; } }
 }
+
+.wn-docket { border-block: 1px dashed var(--border); display: grid; font-size: 0.8125rem; gap: 4px; padding: 8px 0; div { display: flex; gap: 10px; } dt { color: var(--brand); letter-spacing: 0.1em; min-width: 5rem; text-transform: uppercase; } dd { color: var(--text); } }
 
 .case-status {
   align-self: flex-start;
@@ -210,46 +159,29 @@
   text-transform: uppercase;
   transform: rotate(-2deg);
 
-  &[data-state='solved'] {
-    color: var(--brand);
-  }
-
-  &[data-state='open'] {
-    color: var(--danger);
-  }
-
-  &[data-state='pending'] {
-    color: var(--muted-text);
-  }
-
-  &[data-state='featured'] {
-    color: var(--brand);
-  }
+  &[data-state='solved'], &[data-state='featured'] { color: var(--brand); }
+  &[data-state='open'] { color: var(--danger); }
+  &[data-state='pending'] { color: var(--muted-text); }
 }
 
-:root[data-theme='winchester'] .ms-project-card.case-file {
-  min-height: 100%;
-}
+// Lore: an index, not a set of chips
+.wn-lore { display: grid; gap: 14px; div { align-items: baseline; border-bottom: 1px dotted var(--border); display: grid; gap: 4px 24px; padding-bottom: 12px; @media (min-width: 720px) { grid-template-columns: 11rem minmax(0, 1fr); } } dt { color: var(--brand); font-style: italic; } dd { line-height: 1.7; } }
 
-:root[data-theme='winchester'] .ms-project-card .ms-portfolio-period,
-:root[data-theme='winchester'] .ms-project-card .ms-portfolio-meta {
-  color: var(--brand);
-  font-size: 0.8125rem;
-  letter-spacing: 0.04em;
-}
+// Armory: a ledger of weapons with a checkbox for whether each one is loaded
+.wn-toolbar { align-items: center; display: flex; gap: 12px; justify-content: space-between; }
+.wn-btn, .wn-links button, .wn-transmission button { background: transparent; border: 1px solid var(--brand); border-radius: var(--radius); color: var(--brand); cursor: pointer; font: inherit; font-size: 0.8125rem; letter-spacing: 0.08em; min-height: 36px; padding: 0 14px; text-transform: uppercase; &:hover:not(:disabled) { background: color-mix(in srgb, var(--brand) 14%, transparent); } &:disabled { cursor: progress; opacity: 0.6; } }
+.wn-shelf { display: grid; gap: 6px; h3 { color: var(--brand); font-size: 1rem; font-style: italic; small { color: var(--muted-text); font-size: 0.8125rem; margin-left: 8px; } } ul { list-style: none; padding: 0; } li { align-items: center; border-bottom: 1px dotted var(--border); display: grid; gap: 8px 14px; grid-template-columns: auto minmax(0, 1fr) auto; padding: 10px 0; @media (max-width: 640px) { grid-template-columns: auto minmax(0, 1fr); .wn-links { grid-column: 1 / -1; } } } li > div { display: grid; strong { font-weight: 600; } span { color: var(--muted-text); font-size: 0.875rem; } } }
+.wn-box { align-items: center; border: 1.5px solid var(--brand); display: inline-flex; font-weight: 700; height: 22px; justify-content: center; width: 22px; }
+.wn-shelf li[data-status='online'] .wn-box { color: var(--brand); }
+.wn-shelf li[data-status='offline'] .wn-box { border-color: var(--danger); color: var(--danger); }
+.wn-links { align-items: center; display: flex; flex-wrap: wrap; gap: 6px 14px; a { color: var(--link); font-weight: 600; min-height: 32px; padding-block: 6px; } button { border-color: var(--border); color: var(--muted-text); min-height: 32px; padding: 0 10px; } }
 
-:root[data-theme='winchester'] .ms-project-card .ms-portfolio-featured {
-  background: transparent;
-}
+// Informants: a name, a tally of visits and a way to call on them
+.wn-informants { display: grid; list-style: none; padding: 0; li { align-items: center; border-bottom: 1px dotted var(--border); display: grid; gap: 8px 20px; grid-template-columns: minmax(0, 1fr) auto auto; padding: 12px 0; @media (max-width: 640px) { grid-template-columns: minmax(0, 1fr) auto; .wn-tally { grid-column: 1 / -1; grid-row: 2; } } } li div { display: grid; strong { font-weight: 600; } span { color: var(--muted-text); font-size: 0.875rem; } } li > a { color: var(--link); font-weight: 600; min-height: 32px; padding-block: 6px; } }
+.wn-tally { display: grid; gap: 3px; grid-auto-flow: column; grid-template-rows: repeat(2, 7px); i { background: var(--border); border-radius: 50%; display: block; height: 7px; width: 7px; } i[data-level='1'] { background: color-mix(in srgb, var(--brand) 45%, var(--border)); } i[data-level='2'] { background: color-mix(in srgb, var(--brand) 70%, var(--border)); } i[data-level='3'], i[data-level='4'] { background: var(--brand); } }
 
-:root[data-theme='winchester'] .ms-skill-group {
-  background: linear-gradient(180deg, var(--surface-2), var(--surface));
-  border: 1px dashed var(--border);
-  border-radius: var(--radius);
-}
+// Radio transmissions: typed telegrams
+.wn-radio { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr)); }
+.wn-transmission { background: var(--surface); border: 1px dashed var(--brand); display: grid; gap: 8px; min-width: 0; padding: 16px 18px; header { align-items: center; display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; code { color: var(--brand); } } .wn-signal { color: var(--muted-text); font-family: ui-monospace, 'Courier New', monospace; font-size: 0.8125rem; } summary { cursor: pointer; font-style: italic; min-height: 36px; padding: 6px 0; } pre { background: #090605; border: 1px solid var(--border); color: #d8c9a6; font-family: ui-monospace, 'Courier New', monospace; font-size: 0.8125rem; line-height: 1.55; margin: 6px 0 0; max-height: 260px; overflow: auto; overflow-wrap: anywhere; padding: 14px; white-space: pre-wrap; } .json-key { color: #e3c677; } .json-string { color: #c7d6a3; } .json-number, .json-boolean, .json-null { color: #e08a5f; } .json-link { color: inherit; text-decoration: underline; } small { color: var(--muted-text); } }
 
-:root[data-theme='winchester'] .ms-skill-group li {
-  border-bottom: 1px dashed var(--border);
-  color: var(--muted-text);
-  padding: 0.25rem 0;
-}
+.wn-ledger { overflow-x: auto; }
