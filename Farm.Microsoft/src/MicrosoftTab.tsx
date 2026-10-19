@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import './themes/microsoft/microsoft.scss'
 import { JsonView } from './JsonView'
-import { PortfolioSection } from './PortfolioSection'
+import { PortfolioSection, type PortfolioTheme } from './PortfolioSection'
 
 interface ApiTracingMetrics {
   totalRequests: number | null
@@ -72,7 +72,7 @@ const stripHiddenKeys = (value: unknown): unknown => {
   return value
 }
 
-export const MicrosoftTab = () => {
+export const MicrosoftTab = ({ theme = 'microsoft' }: { theme?: PortfolioTheme }) => {
   const [metadataBlock, setMetadataBlock] = useState<ApiBlockState>(initialBlockState)
   const [feedsBlock, setFeedsBlock] = useState<ApiBlockState>(initialBlockState)
   const clientId = getOrCreateClientId()
@@ -284,7 +284,7 @@ export const MicrosoftTab = () => {
         )}
       </div>
 
-      <PortfolioSection />
+      <PortfolioSection theme={theme} />
     </div>
   )
 }

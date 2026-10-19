@@ -96,13 +96,134 @@ $ms-font-mono: 'Cascadia Code', 'Segoe UI Mono', Consolas, 'Courier New', monosp
   }
 }
 
-.ms-portfolio-item {
-  margin-bottom: 1.25rem;
+.ms-experience-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+}
+
+.ms-experience-card {
+  background: $ms-surface;
+  border: 1px solid $ms-border;
+  border-radius: 8px;
+  min-width: 0;
+  padding: 1.25rem;
+
+  h4,
+  p {
+    margin: 0;
+  }
 
   h4 {
     font-size: 1rem;
     font-weight: 600;
+  }
+
+  p {
+    margin-top: 0.6rem;
+  }
+}
+
+.ms-project-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+}
+
+.ms-project-card,
+.ms-skill-group {
+  background: $ms-surface;
+  border: 1px solid $ms-border;
+  border-radius: 8px;
+  min-width: 0;
+  padding: 1.25rem;
+}
+
+.ms-project-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+
+  &:hover {
+    border-color: rgba($ms-primary, 0.55);
+    box-shadow: 0 8px 24px rgba(32, 31, 30, 0.08);
+    transform: translateY(-2px);
+  }
+
+  h4,
+  p {
     margin: 0;
+  }
+
+  h4 {
+    font-size: 1.125rem;
+  }
+
+  &.is-featured {
+    border-top: 3px solid $ms-primary;
+  }
+}
+
+.ms-portfolio-featured {
+  align-self: flex-start;
+  background: $ms-primary-light;
+  border-radius: 999px;
+  color: $ms-primary-dark;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.25rem 0.65rem;
+  text-transform: uppercase;
+}
+
+.ms-portfolio-period {
+  color: $ms-primary-dark;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.ms-portfolio-meta {
+  color: $ms-text-secondary;
+  font-size: 0.875rem;
+}
+
+.ms-skill-groups {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+}
+
+.ms-skill-group {
+  h4 {
+    margin: 0 0 0.75rem;
+  }
+
+  ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  li {
+    background: $ms-primary-light;
+    border-radius: 999px;
+    color: $ms-primary-dark;
+    font-size: 0.8125rem;
+    padding: 0.3rem 0.65rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ms-project-card {
+    transition: none;
+
+    &:hover {
+      transform: none;
+    }
   }
 }
 
@@ -123,6 +244,8 @@ $ms-font-mono: 'Cascadia Code', 'Segoe UI Mono', Consolas, 'Courier New', monosp
   display: flex;
   flex-wrap: wrap;
   gap: 0.25rem 1rem;
+  margin-top: auto;
+  padding-top: 0.5rem;
 }
 
 .ms-header {
@@ -415,6 +538,23 @@ $ms-font-mono: 'Cascadia Code', 'Segoe UI Mono', Consolas, 'Courier New', monosp
   .ms-get-block {
     background: #1e1e1e;
     border-color: #333333;
+  }
+
+  .ms-project-card,
+  .ms-skill-group,
+  .ms-experience-card {
+    background: #1e1e1e;
+    border-color: #333333;
+  }
+
+  .ms-portfolio-featured,
+  .ms-skill-group li {
+    background: rgba(76, 194, 255, 0.15);
+    color: #9cdcfe;
+  }
+
+  .ms-portfolio-period {
+    color: #9cdcfe;
   }
 
   .ms-api-bar,

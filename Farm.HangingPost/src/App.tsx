@@ -56,16 +56,15 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   }
 }
 
-interface TabDefinition {
+interface ThemeOption {
   label: string
-  path: string
   theme: 'microsoft' | 'brick' | 'winchester'
 }
 
-const tabs: TabDefinition[] = [
-  { label: 'Elder Vibe Coder', path: '/', theme: 'microsoft' },
-  { label: 'Dashboard', path: '/tracker', theme: 'brick' },
-  { label: 'Cases', path: '/winchester', theme: 'winchester' },
+const themes: ThemeOption[] = [
+  { label: 'Microsoft', theme: 'microsoft' },
+  { label: 'Brick', theme: 'brick' },
+  { label: 'Winchester', theme: 'winchester' },
 ]
 
 function getPathname(): string {
@@ -78,16 +77,16 @@ function getPathname(): string {
 
 const LAST_THEME_KEY = 'farm.lastTheme'
 
-function loadLastTheme(): TabDefinition['theme'] {
+function loadLastTheme(): ThemeOption['theme'] {
   try {
     const saved = window.localStorage.getItem(LAST_THEME_KEY)
-    return tabs.find((tab) => tab.theme === saved)?.theme ?? 'microsoft'
+    return themes.find((option) => option.theme === saved)?.theme ?? 'microsoft'
   } catch {
     return 'microsoft'
   }
 }
 
-function saveLastTheme(theme: TabDefinition['theme']) {
+function saveLastTheme(theme: ThemeOption['theme']) {
   try {
     window.localStorage.setItem(LAST_THEME_KEY, theme)
   } catch {
@@ -97,16 +96,13 @@ function saveLastTheme(theme: TabDefinition['theme']) {
 
 export function App() {
   const [pathname, setPathname] = useState(getPathname)
+  const [theme, setTheme] = useState(loadLastTheme)
   const { status, session } = useSession()
-  const tabTheme = tabs.find((tab) => tab.path === pathname)?.theme
-  // Pages that are not tabs (like /connect) keep the theme of the last tab the user opened.
-  const theme = tabTheme ?? loadLastTheme()
 
-  // The theme is applied to <html> so the whole page, nav and tab content restyle together.
   useEffect(() => {
     document.documentElement.dataset.theme = theme
-    if (tabTheme) saveLastTheme(tabTheme)
-  }, [theme, tabTheme])
+    saveLastTheme(theme)
+  }, [theme])
 
   useEffect(() => {
     const handlePopState = () => setPathname(getPathname())
@@ -124,31 +120,28 @@ export function App() {
   return (
     <main className="app-shell">
       <header className="app-header">
-        <nav className="tab-list" aria-label="Primary navigation">
-          {tabs.map((tab) => {
-            const isActive = pathname === tab.path
+        <div className="tab-list theme-switcher" role="group" aria-label="Portfolio display style">
+          {themes.map((option) => {
+            const isActive = theme === option.theme
             return (
-              <a
-                key={tab.path}
-                href={tab.path}
-                aria-current={isActive ? 'page' : undefined}
+              <button
+                key={option.theme}
+                type="button"
+                aria-pressed={isActive}
                 className={`tab${isActive ? ' tabActive' : ''}`}
-                onClick={(event) => {
-                  event.preventDefault()
-                  navigate(tab.path)
-                }}
+                onClick={() => setTheme(option.theme)}
               >
-                {tab.label}
-              </a>
+                {option.label}
+              </button>
             )
           })}
-        </nav>
+        </div>
         <AccountMenu session={session} loading={status === 'loading'} pathname={pathname} onNavigate={navigate} />
       </header>
 
       <section className="tab-content" aria-live="polite">
         <ErrorBoundary>
-          {pathname === '/' && <MicrosoftTab />}
+          {pathname === '/' && <MicrosoftTab theme={theme} />}
           {pathname === '/tracker' && <Dashboard session={session} loading={status === 'loading'} />}
           {pathname === '/winchester' && <WinchesterView />}
           {pathname === '/connect' && <ConnectAi session={session} loading={status === 'loading'} />}

@@ -18,6 +18,50 @@
   --page-pattern: none;
 }
 
+:root[data-theme='brick'] .ms-project-grid--brick {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+}
+
+:root[data-theme='brick'] .ms-experience-grid--brick {
+  grid-template-columns: 1fr;
+}
+
+:root[data-theme='brick'] .ms-experience-card {
+  background: var(--surface);
+  border: 0;
+  border-left: 5px solid var(--brand);
+  border-radius: 8px;
+  box-shadow: 4px 4px 0 var(--surface-2);
+}
+
+:root[data-theme='brick'] .ms-project-card {
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 5px 5px 0 var(--surface-2);
+}
+
+:root[data-theme='brick'] .ms-project-card.is-featured {
+  background: color-mix(in srgb, var(--brand) 9%, var(--surface));
+  border-color: var(--brand);
+}
+
+:root[data-theme='brick'] .ms-portfolio-featured,
+:root[data-theme='brick'] .ms-skill-group li {
+  background: var(--brand);
+  color: var(--brand-contrast);
+}
+
+:root[data-theme='brick'] .ms-portfolio-section {
+  border-top: 2px dashed var(--border);
+}
+
+:root[data-theme='brick'] .ms-skill-group {
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 4px 4px 0 var(--surface-2);
+}
+
 @media (prefers-color-scheme: dark) {
   :root[data-theme='brick'] {
     --background: #12150e;

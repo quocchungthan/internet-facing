@@ -53,7 +53,13 @@ public sealed class PortfolioApiFixture : WebApplicationFactory<Program>
             });
             db.SocialLinks.Add(new PortfolioSocialLink
                 { Id = id, ProfileId = 1, Label = $"Test {id}", Url = "https://example.invalid" });
-            db.ProfileProjects.Add(new ProfileProject { ProfileId = 1, ProjectId = id });
+            db.ProfileProjects.Add(new ProfileProject
+            {
+                ProfileId = 1, ProjectId = id,
+                StartDate = id == 1 ? new DateOnly(2026, 3, 5) : null,
+                IsFeatured = id == 1,
+                DisplayOrder = id
+            });
             db.ProfileSkills.Add(new ProfileSkill { ProfileId = 1, SkillId = id });
             db.ProjectSkills.Add(new ProjectSkill { ProjectId = 1, SkillId = id });
         }
@@ -191,6 +197,17 @@ public class PortfolioApiTests(PortfolioApiFixture fixture) : IClassFixture<Port
         Assert.Equal(JsonValueKind.Null, row.GetProperty("endDate").ValueKind);
         Assert.Equal((int)EmploymentType.Contract, row.GetProperty("employmentType").GetInt32());
         Assert.Equal((int)WorkMode.Remote, row.GetProperty("workMode").GetInt32());
+    }
+
+    [Fact]
+    public async Task ProfileProject_PreservesDatesFeaturedFlagAndDisplayOrder()
+    {
+        using var client = fixture.NewClient();
+        var row = await client.GetFromJsonAsync<JsonElement>("/api/portfolio/profile-projects/1/1");
+        Assert.Equal("2026-03-05", row.GetProperty("startDate").GetString());
+        Assert.Equal(JsonValueKind.Null, row.GetProperty("endDate").ValueKind);
+        Assert.True(row.GetProperty("isFeatured").GetBoolean());
+        Assert.Equal(1, row.GetProperty("displayOrder").GetInt32());
     }
 
     [Fact]
