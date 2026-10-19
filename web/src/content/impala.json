@@ -1,0 +1,140 @@
+{
+  "id": "impala",
+  "name": "Chevrolet Impala",
+  "subtitle": "Sport Sedan · 283 V8 · Powerglide",
+  "year": 1967,
+  "market": "United States · illustrative factory configuration",
+  "engine": "283 cu in · small-block V8 · carbureted",
+  "transmission": "Powerglide · two-speed automatic",
+  "drive": "Rear-wheel drive",
+  "character": "Long lines. Mechanical soul.",
+  "color": "#383e48",
+  "geometry": "classic-sedan",
+  "dimensions": { "length": 5.415, "width": 2.03, "wheelbase": 3.023 },
+  "facts": [
+    { "label": "Model year", "value": "1967", "sourceId": "gm-kit" },
+    { "label": "Wheelbase", "value": "119 in", "sourceId": "gm-kit" },
+    { "label": "Engine family", "value": "Small-block V8", "sourceId": "gm-kit" },
+    { "label": "Layout", "value": "Front engine / RWD", "sourceId": "gm-kit" }
+  ],
+  "book": "/books/impala.md",
+  "sources": [
+    { "id": "gm-kit", "title": "GM Heritage · 1967 Chevrolet vehicle information kit", "url": "https://www.gm.com/content/dam/company/no_search/heritage-archive-docs/vehicle-information-kits/chevrolet/1967-Chevrolet.pdf", "scope": "Primary historical specification reference for the full-size Chevrolet range. A range document, not proof of the equipment in a surviving car." },
+    { "id": "gm-archive", "title": "GM Heritage · vehicle information archive", "url": "https://www.gm.com/heritage/archive/vehicle-information-kits", "scope": "Find original model-year reference material. Match engine, transmission and brake options to the actual vehicle; consult a qualified classic specialist and correct shop manual for service work." },
+    { "id": "tire-safety", "title": "NHTSA · Tires", "url": "https://www.nhtsa.gov/vehicle-safety/tires", "scope": "General tire safety. Modern replacement sizing and pressures need specialist confirmation on a modified classic." }
+  ],
+  "photos": [
+    { "id": "impala-exterior", "src": "/media/impala-exterior.jpg", "title": "1967 Impala four-door hardtop", "author": "Sicnag / Wikimedia Commons", "license": "CC BY 2.0", "licenseUrl": "https://creativecommons.org/licenses/by/2.0/", "sourceUrl": "https://commons.wikimedia.org/wiki/File:1967_Chevrolet_Impala_4_door_Hardtop.jpg", "note": "Real surviving car. Its engine, transmission and modifications are not established by this photograph. Resized, uncropped." },
+    { "id": "smallblock-reference", "src": "/media/smallblock-reference.jpg", "title": "Chevrolet small-block architecture reference", "author": "TruckMatt / Wikimedia Commons", "license": "CC0 1.0", "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/", "sourceUrl": "https://commons.wikimedia.org/wiki/File:Chevrolet_327_Cubic_Inch_Small-Block_V8_Engine_Marinized_By_Chris-Craft,_Incorporated_Of_Algonac,_Michigan;_Mounted_On_An_Engine_Hoist.jpg", "note": "A marinized 327, NOT the selected Impala's 283. Used only to compare the small-block engine family; cooling, manifolds and accessories differ. Resized, uncropped." }
+  ],
+  "parts": [
+    {
+      "id": "engine", "label": "Small-block V8", "system": "powertrain", "position": [-1.4, 0.73, 0],
+      "summary": "Eight cylinders, two banks, one unmistakable era.",
+      "description": "This learning configuration uses a longitudinal 283 cubic-inch Chevrolet small-block V8, not the 327 or 427 sometimes associated with the Impala. A central camshaft operates overhead valves through lifters, pushrods and rocker arms. Surviving cars often have replacement engines: verify casting numbers and installed equipment before ordering parts.",
+      "checks": ["Identify the installed engine and document modifications before applying factory specifications.", "With the engine off and cold, look for oil, coolant or fuel leakage.", "Have persistent knocks, smoke or poor running diagnosed by a classic-car specialist."],
+      "symptoms": ["Knocking", "Persistent smoke", "Uneven running"],
+      "caution": "Do not run a classic engine in an enclosed garage. Stop for oil-pressure loss, overheating or fuel leakage.",
+      "sourceIds": ["gm-kit", "gm-archive"], "relatedIds": ["intake", "lubrication", "cooling", "electrical"], "photoIds": ["smallblock-reference"]
+    },
+    {
+      "id": "lubrication", "label": "Oil & lubrication", "system": "powertrain", "position": [-1.35, 0.55, 0],
+      "summary": "Old design does not mean any oil will do.",
+      "description": "A wet sump stores oil that is pumped through the filter and engine passages. Camshaft, bearing and rebuild choices affect lubricant requirements. Flat-tappet discussions online are not a substitute for the installed engine builder's specification. No additive recipe or universal viscosity is prescribed here.",
+      "checks": ["Check level using the procedure appropriate to the installed dipstick and sump.", "Keep a record of oil consumption and leaks.", "Confirm oil and filter requirements with the engine builder or correct service literature."],
+      "symptoms": ["Oil-pressure change", "New leaks", "Rising consumption"],
+      "caution": "Stop for loss of oil pressure. Never crawl under a vehicle supported only by a jack.",
+      "sourceIds": ["gm-archive"], "relatedIds": ["engine"], "photoIds": ["smallblock-reference"]
+    },
+    {
+      "id": "intake", "label": "Carburetor & intake", "system": "powertrain", "position": [-1.4, 0.94, 0],
+      "summary": "Airflow meters fuel through a mechanical carburetor.",
+      "description": "The selected 283 configuration is carbureted. An air cleaner sits above the carburetor; passages and jets meter fuel into the intake airflow. Choke behavior affects cold starting. The exact carburetor and linkage in a restored car must be identified; the circular air-cleaner drawing is conceptual.",
+      "checks": ["Check for fuel smell or wetness without starting the engine.", "Have air-cleaner condition and choke operation inspected.", "Record cold versus hot starting behavior before changing adjustments."],
+      "symptoms": ["Hard cold starting", "Stalling", "Fuel smell"],
+      "caution": "Fuel leakage is a fire risk. Never pour fuel into the intake or look into a carburetor while cranking.",
+      "sourceIds": ["gm-kit", "gm-archive"], "relatedIds": ["engine", "fuel", "electrical"], "photoIds": ["smallblock-reference"]
+    },
+    {
+      "id": "cooling", "label": "Radiator & cooling", "system": "powertrain", "position": [-2.12, 0.87, 0],
+      "summary": "A long engine bay still needs healthy airflow.",
+      "description": "Coolant circulates through the engine, thermostat and radiator. Belt-driven accessories and fan arrangements vary after decades of repairs. Old hoses can look sound outside while degrading internally. A replacement radiator or engine may change the correct fill procedure.",
+      "checks": ["When cold, inspect accessible hoses and visible radiator seams.", "Document the installed fan, shroud and any electric-fan conversion.", "Have recurrent temperature changes checked rather than fitting a random thermostat."],
+      "symptoms": ["Temperature climbing", "Coolant leakage", "Hose deterioration"],
+      "caution": "Never remove a hot pressure cap. Keep hands away from fans and belts; retrofitted electric fans may start unexpectedly.",
+      "sourceIds": ["gm-archive"], "relatedIds": ["engine", "electrical"], "photoIds": []
+    },
+    {
+      "id": "transmission", "label": "Powerglide & driveline", "system": "powertrain", "position": [-0.55, 0.58, 0],
+      "summary": "Two forward ratios, then a shaft to the rear axle.",
+      "description": "The selected Powerglide is a two-speed automatic. A torque converter couples the engine to the gearbox; a propeller shaft carries torque to the rear differential. This is a chosen factory-era combination, not a claim that every 1967 Impala used Powerglide. Rebuilds can change service requirements.",
+      "checks": ["Document transmission identity and rebuild records.", "Report delayed engagement, slipping or new driveline vibration.", "Confirm fluid and checking procedure with the rebuilder and matching service manual."],
+      "symptoms": ["Slipping", "Delayed engagement", "Driveline vibration"],
+      "caution": "Do not inspect a rotating shaft from underneath. Keep the vehicle secure and leave raised running tests to professionals.",
+      "sourceIds": ["gm-kit", "gm-archive"], "relatedIds": ["engine", "wheels"], "photoIds": []
+    },
+    {
+      "id": "brakes", "label": "Braking system", "system": "chassis", "position": [-1.51, 0.51, 0.98],
+      "summary": "Know what is fitted before trusting what is original.",
+      "description": "1967 full-size Chevrolets had equipment variations, and many surviving cars now have disc conversions. Identify master cylinder, assist, lines and wheel brakes as one system. The disc in the schematic illustrates hydraulic friction braking and does not certify factory brake fitment.",
+      "checks": ["Have a classic specialist establish brake configuration and roadworthiness.", "Inspect for leaks and perished hoses professionally, especially after storage.", "Check abnormal pedal feel before moving the car."],
+      "symptoms": ["Soft or sinking pedal", "Pulling", "Fluid leakage"],
+      "caution": "Do not drive with impaired brakes. Old friction material may contain asbestos; do not blow brake dust out with compressed air.",
+      "sourceIds": ["gm-kit", "gm-archive"], "relatedIds": ["wheels", "suspension"], "photoIds": []
+    },
+    {
+      "id": "wheels", "label": "Wheels & tires", "system": "chassis", "position": [1.51, 0.48, 1],
+      "summary": "Good tread cannot tell you the age of a tire.",
+      "description": "A classic may cover few miles while its tires age. Wheel width, offset, tire construction and brake conversions affect clearance and load suitability. Historical sizes are not a direct instruction to fit a modern replacement of a guessed equivalent.",
+      "checks": ["Read tire date codes and inspect cracking, bulges and uneven wear.", "Have replacement sizing, load rating and pressures confirmed for the actual wheels and vehicle.", "Check cold pressure and include the spare."],
+      "symptoms": ["Sidewall cracking", "Air loss", "Vibration after storage"],
+      "caution": "Aged or damaged tires need specialist assessment even with deep tread. Never infer a safe pressure from this model.",
+      "sourceIds": ["tire-safety", "gm-archive"], "relatedIds": ["brakes", "suspension"], "photoIds": ["impala-exterior"]
+    },
+    {
+      "id": "suspension", "label": "Suspension & steering", "system": "chassis", "position": [1.51, 0.87, -0.9],
+      "summary": "A big body depends on small joints and bushings.",
+      "description": "The front suspension locates each front wheel independently; the rear axle is a live assembly. Springs carry load, dampers control movement, and steering linkage must have controlled play. Rebuilt or modified cars need their actual components checked rather than assumptions from appearance.",
+      "checks": ["Have steering linkage, ball joints and bushings inspected.", "Report wandering, clunks or uneven ride height.", "Check alignment after worn parts are replaced, not as a substitute for replacing them."],
+      "symptoms": ["Wandering", "Clunks", "Uneven tire wear"],
+      "caution": "Coil springs store potentially lethal energy. This is not a spring-removal or steering-repair guide.",
+      "sourceIds": ["gm-kit", "gm-archive"], "relatedIds": ["wheels", "brakes"], "photoIds": []
+    },
+    {
+      "id": "electrical", "label": "Ignition & electrics", "system": "electrical", "position": [-1.75, 0.85, -0.7],
+      "summary": "The spark must arrive at the right time.",
+      "description": "A distributor-based ignition sends high voltage to the spark plugs. Many classics have electronic-ignition conversions, so identify what is installed before using points-era instructions. Battery, charging, grounds and wiring condition all influence reliability.",
+      "checks": ["Record whether ignition is original or converted.", "Have brittle wiring, grounds and charging performance checked.", "Inspect visible battery security without bridging terminals."],
+      "symptoms": ["Misfire", "Slow cranking", "Intermittent electrical loss"],
+      "caution": "Ignition voltage can injure. Keep away from rotating belts and do not disconnect leads on a running engine.",
+      "sourceIds": ["gm-kit", "gm-archive"], "relatedIds": ["engine", "fuel"], "photoIds": ["smallblock-reference"]
+    },
+    {
+      "id": "fuel", "label": "Tank & fuel delivery", "system": "powertrain", "position": [1.85, 0.45, 0],
+      "summary": "Old rubber and modern fuel deserve attention.",
+      "description": "The fuel path runs from a rear-mounted tank toward the engine's fuel-delivery hardware and carburetor. Tank contamination, aged hoses and undocumented pump conversions can all cause trouble. Do not assume a fuel hose is compatible simply because it fits.",
+      "checks": ["Have hose age, routing and fuel compatibility assessed.", "Check for smells or wetness before starting after storage.", "Ask a specialist to evaluate stale fuel and tank condition."],
+      "symptoms": ["Fuel smell", "Stalling under load", "Visible wetness"],
+      "caution": "Do not start a car with a fuel leak. Avoid sparks and flames; fuel-system repair belongs in a suitably equipped workshop.",
+      "sourceIds": ["gm-archive"], "relatedIds": ["intake", "engine"], "photoIds": []
+    },
+    {
+      "id": "exhaust", "label": "Exhaust system", "system": "powertrain", "position": [0.6, 0.34, -0.4],
+      "summary": "A beautiful sound should still stay outside the cabin.",
+      "description": "Exhaust manifolds collect gases from both V8 cylinder banks, with pipes and silencers carrying them toward the rear. Single- and dual-exhaust installations exist; the schematic is not an option decoder. Leaks and poor routing can expose passengers to carbon monoxide.",
+      "checks": ["Have leaks, hangers and floor clearances inspected.", "Investigate exhaust smell inside immediately.", "Listen for new rattles without running the car indoors."],
+      "symptoms": ["Cabin exhaust smell", "New ticking", "Loose or rattling pipes"],
+      "caution": "Carbon monoxide can be fatal. Never idle in an enclosed garage and do not touch hot exhaust parts.",
+      "sourceIds": ["gm-archive"], "relatedIds": ["engine", "body"], "photoIds": []
+    },
+    {
+      "id": "body", "label": "Body, frame & access", "system": "body", "position": [0, 1.35, 0.7],
+      "summary": "Chrome catches the eye. Structure earns the attention.",
+      "description": "This is a four-door Sport Sedan learning silhouette with body-on-frame construction. Rust condition, body mounts, previous repairs and latch security matter more than cosmetic finish. Open the schematic panels to explore, but never use its geometry as a real jacking or repair reference.",
+      "checks": ["Have frame, body mounts and corrosion assessed by a classic specialist.", "Check lighting, wipers, mirrors and seat-belt condition.", "Confirm hood and door latches engage securely."],
+      "symptoms": ["Structural corrosion", "Water ingress", "Poor latch engagement"],
+      "caution": "A glossy restoration is not a safety certificate. Never infer load-bearing or lifting locations from the illustration.",
+      "sourceIds": ["gm-kit", "gm-archive"], "relatedIds": ["suspension", "electrical"], "photoIds": ["impala-exterior"]
+    }
+  ]
+}
