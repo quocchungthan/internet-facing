@@ -10,7 +10,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@farm/brick-tracker": "file:../Farm.BrickTracker",
     "@farm/microsoft": "file:../Farm.Microsoft",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"

@@ -1,6 +1,5 @@
 import { Component, useEffect, useState, type ErrorInfo, type ReactNode } from 'react'
 import { MicrosoftTab } from '@farm/microsoft'
-import { BrickTracker } from '@farm/brick-tracker'
 import { UsagePanel } from './UsagePanel'
 import { WinchesterView } from './WinchesterView'
 import { AccountMenu } from './AccountMenu'
@@ -9,7 +8,6 @@ import { ConnectAi } from './ConnectAi'
 import { useSession } from './session'
 import './App.css'
 import './themes/microsoft/microsoft.scss'
-import './themes/brick/brick.scss'
 import './themes/winchester/winchester.scss'
 
 interface ErrorBoundaryProps {
@@ -59,18 +57,16 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 
 interface ThemeOption {
   label: string
-  theme: 'microsoft' | 'brick' | 'winchester'
+  theme: 'microsoft' | 'winchester'
 }
 
 const themes: ThemeOption[] = [
   { label: 'Microsoft', theme: 'microsoft' },
-  { label: 'Brick', theme: 'brick' },
   { label: 'Winchester', theme: 'winchester' },
 ]
 
-// Same content in three projects, each with its own layout.
+// Same content in two projects, each with its own layout.
 function PortfolioView({ theme, analytics }: { theme: ThemeOption['theme']; analytics?: ReactNode }) {
-  if (theme === 'brick') return <BrickTracker analytics={analytics} />
   if (theme === 'winchester') return <WinchesterView analytics={analytics} />
   return <MicrosoftTab analytics={analytics} />
 }
@@ -83,7 +79,6 @@ function getPathname(): string {
 function themeFromPath(): ThemeOption['theme'] | null {
   const path = window.location.pathname.toLowerCase()
   if (path === '/winchester') return 'winchester'
-  if (path === '/tracker' || path === '/brick' || path === '/bricks') return 'brick'
   return null
 }
 

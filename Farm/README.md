@@ -9,9 +9,9 @@ building, downloading, consuming, and managing the shared database schema.
 
 ## Usage and savings dashboard
 
-The Dashboard tab (`/tracker`, including the `/brick` and `/bricks` aliases)
-preserves the existing activity tracker, navigation and top-bar sign-in.
-An additional analytics block below the tracker shows signed-in users
+The portfolio page (`/`; the legacy `/tracker`, `/brick` and `/bricks` paths
+still load it) keeps the activity tracker, navigation and top-bar sign-in.
+An analytics block below the portfolio shows signed-in users
 cost/fees, estimated savings, input/output tokens, elapsed time per task,
 payload bytes and a per-task breakdown. The entire analytics block is
 absent while signed out or loading the session; no extra sign-in panel

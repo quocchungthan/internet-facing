@@ -3,7 +3,6 @@ WORKDIR /src
 
 # Copy package definitions for React projects
 COPY Farm.Microsoft/package.json Farm.Microsoft/
-COPY Farm.BrickTracker/package.json Farm.BrickTracker/
 COPY Farm.HangingPost/package.json Farm.HangingPost/package-lock.json Farm.HangingPost/
 
 # Build Farm.Microsoft first so its artifacts and types are available
@@ -11,12 +10,7 @@ WORKDIR /src/Farm.Microsoft
 COPY Farm.Microsoft/ ./
 RUN npm install && npm run build
 
-# Build Farm.BrickTracker so its artifacts and types are available
-WORKDIR /src/Farm.BrickTracker
-COPY Farm.BrickTracker/ ./
-RUN npm install && npm run build
-
-# Build Farm.HangingPost shell with injected Farm.Microsoft and Farm.BrickTracker tabs
+# Build Farm.HangingPost shell with injected Farm.Microsoft skin
 WORKDIR /src/Farm.HangingPost
 COPY Farm.HangingPost/ ./
 RUN npm install

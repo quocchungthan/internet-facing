@@ -10,7 +10,6 @@ on:
       - Farm.Auth/**
       - Farm.Mind/**
       - Farm.Microsoft/**
-      - Farm.BrickTracker/**
       - Farm.HangingPost/**
       - .github/workflows/build-deploy-farm.yml
       - .github/workflows/reusable-deploy-service.yml
@@ -49,12 +48,6 @@ jobs:
 
       - name: Build Microsoft frontend
         working-directory: Farm.Microsoft
-        run: |
-          npm install
-          npm run build
-
-      - name: Build BrickTracker frontend
-        working-directory: Farm.BrickTracker
         run: |
           npm install
           npm run build
