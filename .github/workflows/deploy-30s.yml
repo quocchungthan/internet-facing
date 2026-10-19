@@ -1,0 +1,111 @@
+name: Deploy 30s
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-30s-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build sub/30s and deploy static frontend
+    runs-on: ubuntu-latest
+    environment: hostkey-server
+    steps:
+      - name: Check out application branch
+        uses: actions/checkout@v4
+        with:
+          ref: sub/30s
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install, check content and build
+        working-directory: web
+        run: npm ci --no-audit --no-fund && npm test && npm run build
+
+      - name: Browser checks
+        working-directory: web
+        run: npx playwright install --with-deps chromium && npm run test:browser
+
+      - name: Verify production Caddy routes
+        working-directory: web
+        run: bash scripts/test-caddy.sh
+
+      - name: Preserve built frontend
+        uses: actions/upload-artifact@v4
+        with:
+          name: 30s-static-frontend
+          path: web/dist
+          retention-days: 14
+
+      - name: Configure SSH
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$VPS_HOST"
+          test -n "$VPS_USER"
+          test -n "$VPS_SSH_KEY"
+          test -n "$VPS_KNOWN_HOSTS"
+          mkdir -p "$HOME/.ssh"
+          chmod 700 "$HOME/.ssh"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+          eval "$(ssh-agent -s)"
+          ssh-add - <<< "$VPS_SSH_KEY"
+          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
+
+      - name: Transfer and atomically deploy static release
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT || '22' }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          set -euo pipefail
+          remote="$VPS_USER@$VPS_HOST"
+          options=(-p "$VPS_PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes)
+          staging="$(ssh "${options[@]}" "$remote" 'mktemp -d /tmp/30s-XXXXXXXXXX')"
+          [[ "$staging" =~ ^/tmp/30s-[A-Za-z0-9.]+$ ]]
+          cleanup() {
+            ssh "${options[@]}" "$remote" \
+              "rm -f '$staging/frontend.tar.gz' '$staging/site.caddy' '$staging/deploy.sh'; rm -rf -- '$staging/dist'; rmdir '$staging'" \
+              || echo "::warning::Could not remove staging directory $staging"
+          }
+          trap cleanup EXIT
+          tar -C web -czf - dist | ssh "${options[@]}" "$remote" "cat > '$staging/frontend.tar.gz'"
+          ssh "${options[@]}" "$remote" "tar -xzf '$staging/frontend.tar.gz' -C '$staging'"
+          ssh "${options[@]}" "$remote" "cat > '$staging/site.caddy'" < deployment/caddy/sites/30s.eldervibe.dev.caddy
+          ssh "${options[@]}" "$remote" "cat > '$staging/deploy.sh'" < deployment/deploy-30s-static.sh
+          revision="$(git rev-parse HEAD)"
+          ssh "${options[@]}" "$remote" \
+            "bash '$staging/deploy.sh' '$staging' '$revision-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT'"
+
+      - name: Verify public HTTPS and root-only routing
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 8 --retry-all-errors --retry-delay 5 \
+            https://30s.eldervibe.dev/ -o /tmp/30s-index.html
+          grep -q '30s' /tmp/30s-index.html
+          curl --fail --silent --show-error https://30s.eldervibe.dev/books/raize.md -o /dev/null
+          status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' https://30s.eldervibe.dev/not-an-app-route)"
+          test "$status" = 404
+          {
+            echo '### 30s deployed'
+            echo '- Application source: `sub/30s`'
+            echo "- Revision: \`$(git rev-parse HEAD)\`"
+            echo '- Static frontend: https://30s.eldervibe.dev/'
+            echo '- Root-only application; car and part are URL query state.'
+          } >> "$GITHUB_STEP_SUMMARY"
