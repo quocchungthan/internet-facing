@@ -1,13 +1,27 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowUpRight, Search, X } from 'lucide-react';
-import type { Part, System, Vehicle } from '../domain/catalog';
-import { IconButton } from './IconButton';
+import type { Part, System, Vehicle } from '../../../domain/catalog';
+import { IconButton } from '../../../components/IconButton';
+import { createVehicleItems, specificationFor, type ItemTree } from '../domain/items';
 
 const systems: { id: System | 'all'; label: string }[] = [
   { id: 'all', label: 'All' }, { id: 'powertrain', label: 'Powertrain' },
   { id: 'chassis', label: 'Chassis' }, { id: 'electrical', label: 'Electrical' }, { id: 'body', label: 'Body' },
 ];
-export function PartIndex({ vehicle, onSelect, onClose }: { vehicle: Vehicle; onSelect: (p: Part) => void; onClose: () => void }) {
+function Hierarchy({ tree, parentId, onSelect }: { tree: ItemTree; parentId?: string; onSelect: (id: string) => void }) {
+  return <ul className="item-children">{tree.items.filter(item => item.parentId === parentId).map(item =>
+    <li key={item.id}>
+      <button className="item-choice" onClick={() => onSelect(item.id)}>
+        {specificationFor(tree, item).label}
+        {item.id.includes('-front-') || item.id.includes('-rear-') ? <small>{item.id.split('-').slice(1).join(' ')}</small> : null}
+      </button>
+      <Hierarchy tree={tree} parentId={item.id} onSelect={onSelect} />
+    </li>)}</ul>;
+}
+
+export function PartIndex({ vehicle, onSelect, onSelectItem, onClose }: {
+  vehicle: Vehicle; onSelect: (p: Part) => void; onSelectItem: (id: string) => void; onClose: () => void;
+}) {
   const [query, setQuery] = useState('');
   const [system, setSystem] = useState<System | 'all'>('all');
   const input = useRef<HTMLInputElement>(null);
@@ -19,6 +33,10 @@ export function PartIndex({ vehicle, onSelect, onClose }: { vehicle: Vehicle; on
     <label className="search-field"><Search size={17} /><input ref={input} value={query} onChange={e => setQuery(e.target.value)} placeholder="Search systems, parts, symptoms…" aria-label="Search components" /></label>
     <div className="system-filter">{systems.map(s => <button key={s.id} aria-pressed={s.id === system} onClick={() => setSystem(s.id)}>{s.label}</button>)}</div>
     <div className="index-results" aria-live="polite">
+      {!query && system === 'all' && <details className="item-hierarchy">
+        <summary>Car / assembly / part hierarchy</summary>
+        <Hierarchy tree={createVehicleItems(vehicle)} onSelect={onSelectItem} />
+      </details>}
       {matches.map((p, i) => <button className="part-row" key={p.id} onClick={() => onSelect(p)}>
         <span className="part-number">{String(i + 1).padStart(2, '0')}</span>
         <span><strong>{p.label}</strong><small>{p.system}</small></span><ArrowUpRight size={17} />
