@@ -325,3 +325,17 @@ svg { flex-shrink: 0; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
+
+.content-workshop { height: 100dvh; overflow: auto; padding: 28px clamp(16px, 4vw, 56px); }
+.content-workshop > header, .content-vehicle, .content-features { max-width: 1100px; margin: 0 auto 24px; }
+.content-workshop h1 { font-family: 'Space Grotesk', sans-serif; font-weight: 500; }
+.content-workshop p { line-height: 1.7; }
+.content-workshop label { display: flex; flex-direction: column; gap: 8px; }
+.content-workshop select { color: var(--ink); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; min-height: 44px; padding: 10px; width: 100%; }
+.content-features { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 350px), 1fr)); gap: 24px; }
+.content-features > section { min-width: 0; }
+.content-features .primary-button { margin: 12px 0; }
+.content-workshop .repair-guide, .content-workshop .detail-panel { position: static; width: 100%; max-height: none; margin-top: 16px; }
+.content-workshop .detail-scroll { overflow: visible; }
+.content-workshop .detail-summary { display: block; }
+.content-workshop .repair-heading { position: static; }

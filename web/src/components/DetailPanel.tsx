@@ -6,8 +6,8 @@ import { IconButton } from './IconButton';
 import { ReferencePhoto } from './ReferencePhoto';
 
 type Props = {
-  vehicle: Vehicle; part: Part; onSelect: (p?: Part) => void; tour: boolean;
-  onTourStep: (delta: number) => void; onEndTour: () => void;
+  vehicle: Vehicle; part: Part; onSelect: (p?: Part) => void; tour?: boolean;
+  onTourStep?: (delta: number) => void; onEndTour?: () => void;
   openBook: boolean; onBookOpened: () => void;
 };
 export function DetailPanel({ vehicle, part, onSelect, tour, onTourStep, onEndTour, openBook, onBookOpened }: Props) {
@@ -49,7 +49,7 @@ export function DetailPanel({ vehicle, part, onSelect, tour, onTourStep, onEndTo
   ];
   return <aside className="detail-panel glass" aria-label={`${part.label} details`}>
     <div className="detail-top"><span className="eyebrow">{part.system} / {String(index + 1).padStart(2, '0')}</span>
-      <IconButton label="Close part details" onClick={() => { onEndTour(); onSelect(); }}><X /></IconButton></div>
+      <IconButton label="Close part details" onClick={() => { onEndTour?.(); onSelect(); }}><X /></IconButton></div>
     <h2 tabIndex={-1} ref={heading}>{part.label}</h2>
     <p className="detail-summary">{part.summary}</p>
     <div className="detail-tabs" role="group" aria-label="Part information">
@@ -104,10 +104,10 @@ export function DetailPanel({ vehicle, part, onSelect, tour, onTourStep, onEndTo
       </>}
     </div>
     {tour && <div className="tour-footer">
-      <IconButton label="Previous tour part" disabled={index === 0} onClick={() => onTourStep(-1)}><ArrowLeft /></IconButton>
+      <IconButton label="Previous tour part" disabled={index === 0} onClick={() => onTourStep?.(-1)}><ArrowLeft /></IconButton>
       <span>GUIDED WALKTHROUGH <strong>{index + 1} / {vehicle.parts.length}</strong></span>
       {index === vehicle.parts.length - 1 ? <button className="finish-tour" onClick={onEndTour}>Finish</button>
-        : <IconButton label="Next tour part" onClick={() => onTourStep(1)}><ArrowRight /></IconButton>}
+        : <IconButton label="Next tour part" onClick={() => onTourStep?.(1)}><ArrowRight /></IconButton>}
     </div>}
   </aside>;
 }
