@@ -51,6 +51,18 @@ such as domain/application/presentation/rendering are not that matrix's axes.
 Do not manufacture a file or abstraction for every intersection. Preserve
 current catalog IDs, share links, books and source claims.
 
+### Independent feature composition
+
+Build-time `VITE_FEATURE_EXPLORATION`, `VITE_FEATURE_REPAIR` and
+`VITE_FEATURE_LEARNING` default to `true` and accept only exact `true`/`false`.
+`App` selects the exploration shell or the HTML-only `ContentWorkshop`.
+Repair's optional location adapter and learning's standalone part selector
+remove their runtime dependency on exploration. Disabled feature components
+are not mounted/loaded; flags are not authorization or output-asset removal.
+See the README for build configuration and the architecture matrix for ownership.
+`npm run test:features` exercises all eight real builds sequentially, including
+an all-disabled state, and is wired into the feature-quality workflow.
+
 ## First issue-to-resolution slice
 
 The wiper-streak story implements safe preparation, inspection, cleaning, wet-glass
@@ -180,12 +192,15 @@ the Windows references.
 
 ## Local verification
 
-The review source passes `npm run lint`, `npm test` (19 tests),
+The feature-flag review source passes `npm run lint`, `npm test` (34 tests),
 `npm run build`, and `npm run test:browser` (20 scenarios against the production
-preview, without updating snapshots). This includes real mesh picking,
+preview, without updating snapshots), plus `npm run test:features` (all eight
+production-build feature combinations). This includes real mesh picking,
 engine/subtree isolation, occurrence selection, bounds-relative camera controls,
 history/restoration, field-book compatibility, four visual comparisons and
 portrait/landscape checks. The same browser runner supports the Docker dev URL.
 Latest review screenshots and traces are retained outside the repo under
-`C:\Users\727124\src\prompts\30s-pr-review-results`; earlier feature evidence
-remains under `C:\Users\727124\src\prompts\30s-final-demand`.
+`C:\Users\727124\src\prompts\30s-feature-default-regressions` and
+`C:\Users\727124\src\prompts\30s-feature-combinations-final`; earlier feature
+evidence remains under `C:\Users\727124\src\prompts\30s-pr-review-results`
+and `C:\Users\727124\src\prompts\30s-final-demand`.

@@ -4,6 +4,7 @@ const externalServer = process.env.PLAYWRIGHT_BASE_URL;
 
 export default defineConfig({
   testDir: './tests',
+  testIgnore: 'featureFlags.spec.ts',
   timeout: 60000,
   expect: { timeout: 15000, toHaveScreenshot: { maxDiffPixelRatio: 0.001, animations: 'disabled' } },
   retries: process.env.CI ? 1 : 0,
