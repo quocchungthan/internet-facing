@@ -36,6 +36,7 @@ jobs:
       - run: npm run build
       - run: npx playwright install chromium
       - run: npm run test:browser -- --reporter=html,line
+      - run: npm run test:features -- --reporter=line
       - name: Upload browser evidence
         if: always()
         uses: actions/upload-artifact@v4

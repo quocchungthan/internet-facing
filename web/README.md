@@ -7,6 +7,49 @@ The first two learning configurations are the 2019 Japanese Toyota Raize Z
 1.0 turbo 2WD D-CVT and a 1967 US Chevrolet Impala Sport Sedan with a 283 V8 and
 Powerglide. Real-world vehicle identity must be verified separately.
 
+## Independent features (build-time)
+
+The static app supports three independent environment flags:
+
+| Flag | Default | Responsibility |
+| --- | --- | --- |
+| `VITE_FEATURE_EXPLORATION` | `true` | Interactive 3D, component hierarchy, focus/isolation and camera controls |
+| `VITE_FEATURE_REPAIR` | `true` | Wiper symptom/check/remedy/verification guidance |
+| `VITE_FEATURE_LEARNING` | `true` | Part explanations, learning tour, reference panels and field books |
+
+Set flags in the build environment, for example in Git Bash:
+
+```bash
+cd web
+VITE_FEATURE_EXPLORATION=false VITE_FEATURE_REPAIR=true VITE_FEATURE_LEARNING=true npm run build
+npm run preview
+```
+
+Only exact `true`/`false` values are accepted; omitted flags default to `true`.
+Invalid values fail configuration instead of silently enabling a feature.
+Rebuild after changing flags; setting variables on the static server or preview
+does not change already-built JavaScript. Environment files are local and must
+not be committed. Never put secrets in `VITE_*`: values are public client config.
+
+With exploration disabled, repair and learning use a scrollable HTML workshop
+with vehicle selection. Repair keeps its complete observation flow without any
+3D-location controls; learning has an independent part selector and field books.
+Disabling repair or learning removes their entry points and lazy component
+mounts while leaving exploration usable. All eight combinations are supported;
+all-disabled shows an explicit configuration message rather than a blank page.
+
+These flags control feature execution, not authorization or asset secrecy.
+Build output may still include disabled-feature chunks, books and images; they
+are not protected resources. Disabled feature components are not loaded by the
+UI. The Vite manual vendor grouping was removed so shared React code does not
+pull the Three.js renderer into builds running without exploration.
+
+Run `npm run test:features -- --output=<external artifact directory>` to build
+and exercise every combination sequentially against its own temporary preview.
+The suite verifies remaining feature workflows, disabled component requests,
+small-screen layouts and the all-disabled state. Previews stop after each case.
+This suite is separate from the default all-enabled browser/visual regressions.
+
 ## Local development
 
 ### Docker development (feature worktree)
@@ -142,7 +185,8 @@ route configuration with TLS disabled only in the isolated test configuration.
 ## Feature quality
 
 `.github/workflows/verify-30s.yml` runs lint (including cognitive complexity <=15),
-unit tests, type-check/build and browser tests on every `feat/30s-*` push, and on
+unit tests, type-check/build, browser tests and independent-feature build checks
+on every `feat/30s-*` push, and on
 web changes in PRs targeting `sub/30s`. It does not publish or deploy.
 Browser evidence and failure traces are uploaded even when checks fail.
 This workflow takes effect on matching published feature branches.
