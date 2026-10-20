@@ -1,6 +1,6 @@
 # 30s — the everyday machine, explained
 
-A static, root-only React + Three.js car-maintenance learning workshop.
+A static, root-only React + Three.js car troubleshooting and maintenance workshop.
 The name refers to being in your **thirties**, not thirty seconds.
 The full-viewport scene is always the primary surface. Panels scroll internally.
 The first two learning configurations are the 2019 Japanese Toyota Raize Z
@@ -9,12 +9,84 @@ Powerglide. Real-world vehicle identity must be verified separately.
 
 ## Local development
 
+### Docker development (feature worktree)
+
+From this worktree's `web` directory:
+
+```bash
+docker compose -f compose.dev.yml up --build -d --wait
+docker compose -f compose.dev.yml logs -f web
+```
+
+Open http://localhost:5183/. Source is bind-mounted with polling for
+Windows/Docker Desktop live reload. Dependencies live in a Docker volume and
+`npm ci` synchronizes them with the lockfile on each container start.
+This is a development server only, bound to localhost; production remains static.
+
+```bash
+docker compose -f compose.dev.yml exec web npm test
+docker compose -f compose.dev.yml exec web npm run build
+docker compose -f compose.dev.yml down
+```
+
+To exercise the running Docker server with the existing browser suite, install
+the native browser-test dependencies using the native-development steps below,
+then run:
+
+```bash
+PLAYWRIGHT_BASE_URL=http://127.0.0.1:5183 npm run test:browser
+```
+
+The dedicated Compose project does not start or modify the monorepo's other apps.
+See [FEATURE-PLAN.md](FEATURE-PLAN.md) for the architecture, implementation
+increments and quality budgets.
+
+## Start with an issue
+
+Choose **Wipers leave streaks? Start a guided check** on the home view, or
+**Troubleshoot wiper streaks** in the tool rail. The first repair-guidance slice
+connects safe preparation, observations, cleaning, replacement-fitment guidance
+and parked verification. Persistent or uncertain problems stop at a service
+handoff rather than an invented diagnosis. Previous/restart controls let you
+correct observations; the trail is in-memory, not a saved service record.
+
+Each step isolates its relevant wiper assembly, blade carrier or rubber edge.
+**Show windshield location on car** restores context. Silver arms, amber carriers
+and dark contact strips are separate selectable Item occurrences in the body
+hierarchy, with shared drawing specifications. Shapes and attachments are generic,
+not verified vehicle-specific service geometry.
+
+The AAA source linked inside the guide supports general wiper care. This is
+**not a documented Raize or Impala recurring defect**. No blade sizes, adapter
+release sequence or model-specific repair specifications are asserted; use the
+correct vehicle manual and blade supplier instructions or professional fitting.
+There is not yet a catalog of verified model-specific faults or repair procedures.
+
+## Explore a component
+
+Select a part label or open **Component index**, then expand
+**Car / assembly / part hierarchy**. Systems, assemblies and individual wheel/
+brake/strut occurrences have distinct identities. **Focus selection** fits the
+camera to the subject; **Isolate selection** removes unrelated parts while
+keeping descendants. An engine exposes its block, head, cover, intake and
+lubrication children. Click geometry or a child button to drill down.
+
+Orbit, zoom, reset, view modes and PNG capture use the same controls for the car
+and isolated components. **Show whole car** restores the full vehicle.
+Closing a part panel also returns to the whole car.
+Share `/?car=raize&part=engine&isolate=1` or
+`/?car=raize&part=wheels&item=wheel-front-left&isolate=1`.
+Browser Back restores the selected occurrence and isolation state.
+
+### Native development
+
 Use Node 22 LTS (Node 20.19+ also works with the current Vite release).
 
 ```bash
 cd web
 npm ci
 npm run dev
+npm run lint
 npm test
 npm run build
 npx playwright install chromium
@@ -23,9 +95,10 @@ bash scripts/test-caddy.sh
 ```
 
 `dist/` is the only deployable application output. There is no Node server,
-API, database or runtime Docker container. Caddy serves files directly.
+API, database or production runtime Docker container. Caddy serves files directly.
 `/?car=raize&part=engine` is a shareable state, not a nested route.
-The car and part participate in browser history; view settings are local UI state.
+The car, selected item and isolation participate in browser history; other view
+settings are local UI state.
 The optional Caddy integration check uses Docker and a temporary local listener
 on port 4180; it stops its container when finished. It exercises the production
 route configuration with TLS disabled only in the isolated test configuration.
@@ -36,8 +109,13 @@ route configuration with TLS disabled only in the isolated test configuration.
 | --- | --- |
 | `src/domain` | Runtime-validated vehicle/part contracts, referential integrity and URL selection |
 | `src/content` | Canonical JSON vehicle catalog, facts, source scopes, photo credits and part relationships |
-| `src/hooks` | Workshop navigation and interaction state; reduced-motion preference |
-| `src/scene` | Procedural car geometry, Three.js rendering, orbit controls and PNG capture |
+| `src/hooks` | Shared reduced-motion preference |
+| `src/features/exploration/domain` | Item/specification hierarchy, integrity, positions and shareable subject state; no React/Three.js |
+| `src/features/exploration/application` | Workshop navigation, selection, isolation and tour state |
+| `src/features/exploration/presentation` | Component hierarchy and selected-subject controls |
+| `src/features/exploration/rendering` | Typed drawing factory, procedural drawings, subject bounds, camera and PNG capture |
+| `src/features/repair/domain` | Sourced issue/check/remedy/verification graph, explicit stop conditions and transition validation |
+| `src/features/repair/presentation` | Observation trail, accessible step guidance and links to exploration items |
 | `src/components` | Accessible HTML panels, reusable controls, photographs and book rendering |
 | `public/books` | Original Markdown companion books, with anchors matching part IDs |
 | `public/media` | Committed, attributed real photographs; no runtime image-host dependency |
@@ -51,11 +129,30 @@ route configuration with TLS disabled only in the isolated test configuration.
    `/?car=<id>&part=<id>`. Sources must identify what they actually support.
 3. Add licensed imagery with author, license URL, source URL and an honest variant
    note. Do not pass off another engine or market as an exact match.
-4. Supply geometry and map selectable groups to catalog IDs in the scene.
+4. Define occurrence/parent/specification mappings in the exploration domain;
+   register the typed drawing in `rendering/drawings/DrawingFactory.tsx`.
+   Supply geometry and map selectable groups to item IDs in the scene.
    Current `compact-suv` and `classic-sedan` geometry families are illustrative.
    Replace this renderer with a licensed GLTFLoader-backed scene when verified
    separable assets become available; keep domain IDs and UI contracts unchanged.
 5. Run content and browser checks. Invalid or dangling references fail loudly.
+
+## Feature quality
+
+`.github/workflows/verify-30s.yml` runs lint (including cognitive complexity <=15),
+unit tests, type-check/build and browser tests on every `feat/30s-*` push, and on
+web changes in PRs targeting `sub/30s`. It does not publish or deploy.
+Browser evidence and failure traces are uploaded even when checks fail.
+This workflow takes effect only when the user publishes the branch/workflow.
+Required branch-protection checks must be configured separately.
+
+The reviewed screenshot baselines use Windows Chromium/SwiftShader, fixed views,
+reduced motion and deterministic Arial fonts. The Windows CI job matches them.
+To intentionally update baselines, run `npm run test:browser -- tests/visual.spec.ts
+--update-snapshots`, inspect the images, then rerun without that flag. CI never
+updates them. Use `--output` to keep local captures outside the repository;
+only reviewed comparison baselines live in `tests/visual.spec.ts-snapshots`.
+Rendering budgets and known dependency/performance limitations are in the plan.
 
 ## Accuracy and rights
 
