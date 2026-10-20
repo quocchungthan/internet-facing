@@ -17,20 +17,25 @@ compliance. Do not introduce a factory, interface, or file just to fill a cell.
 
 ## Source baseline and status
 
-Reviewed on 2026-10-20 against committed baseline `b5fbbe9` and the local
-`feat/30s-component-workshop` worktree. At review, the workshop hierarchy,
-drawing factory, wiper guide, complexity configuration and feature-quality
-workflow were **staged, uncommitted work**.
+Reviewed on 2026-10-20 against target baseline `b5fbbe9` and feature implementation
+commit `704eec6` on `feat/30s-component-workshop`. The workshop hierarchy, drawing
+factory, wiper guide, complexity configuration and feature-quality workflow
+are committed and included alongside this document for review.
 
 - **B**: present in the committed baseline.
-- **P**: observed in the pending feature worktree; not delivered by this
-  documentation-only change.
+- **P**: feature implementation included in this PR, not yet integrated into
+  the target baseline.
 - **Gap**: absent or not separated into the stated responsibility.
 
-The PR for this document deliberately does not publish the pending application
-changes. Paths below are relative to `web/` unless prefixed with `../`.
-Pending paths are written as code rather than links to files absent from the
-committed baseline. Status must change when that implementation is integrated.
+Paths below are relative to `web/` unless prefixed with `../`. **P** describes
+review/integration status, not hypothetical or uncommitted code. Change these
+labels when the implementation is integrated into the target baseline.
+
+Source entry points: [catalog](src/domain/catalog.ts),
+[exploration hierarchy](src/features/exploration/domain/items.ts),
+[drawing factory](src/features/exploration/rendering/drawings/DrawingFactory.tsx),
+[repair graph](src/features/repair/domain/wiperGuide.ts), and
+[learning panel](src/components/DetailPanel.tsx).
 
 ## Business hierarchy used by the columns
 
@@ -84,13 +89,13 @@ Repeated occurrences share specifications, never selection identity.
 
 ## Cross-cutting enforcement and open gaps
 
-**Pending quality wiring:** `eslint.config.js` configures complexity;
+**Feature quality wiring:** `eslint.config.js` configures complexity;
 `package.json` exposes lint/unit/build/browser commands;
 `../.github/workflows/verify-30s.yml` runs them for `feat/30s-*` pushes
 and relevant PRs into `sub/30s`. Reviewed image baselines are versioned;
 CI uploads evidence and must not auto-approve changed screenshots.
-This wiring is pending source, not proof that a remote check or branch
-protection is active.
+This wiring is included in the PR, not proof that a remote check has passed or
+branch protection is active.
 
 The following limitations must stay visible rather than being filled with
 aspirational component names:
@@ -111,7 +116,7 @@ When a change adds/removes a business capability, changes hierarchy or moves a
 responsibility, update the affected column/cells **in the same PR**:
 
 1. Record the source revision/date and whether the described implementation is
-   committed, pending or a gap.
+   in the target baseline, feature code awaiting integration, or a gap.
 2. Name the actual module/symbol and its responsibility; do not list only a
    principle or an intended future component.
 3. Preserve the two axes: hierarchical business capability columns and technical
