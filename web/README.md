@@ -40,6 +40,8 @@ PLAYWRIGHT_BASE_URL=http://127.0.0.1:5183 npm run test:browser
 The dedicated Compose project does not start or modify the monorepo's other apps.
 See [FEATURE-PLAN.md](FEATURE-PLAN.md) for the architecture, implementation
 increments and quality budgets.
+The [architecture matrix](ARCHITECTURE-MATRIX.md) maps hierarchical business
+capabilities to technical practices, responsible modules and current gaps.
 
 ## Start with an issue
 
@@ -143,7 +145,7 @@ route configuration with TLS disabled only in the isolated test configuration.
 unit tests, type-check/build and browser tests on every `feat/30s-*` push, and on
 web changes in PRs targeting `sub/30s`. It does not publish or deploy.
 Browser evidence and failure traces are uploaded even when checks fail.
-This workflow takes effect only when the user publishes the branch/workflow.
+This workflow takes effect on matching published feature branches.
 Required branch-protection checks must be configured separately.
 
 The reviewed screenshot baselines use Windows Chromium/SwiftShader, fixed views,

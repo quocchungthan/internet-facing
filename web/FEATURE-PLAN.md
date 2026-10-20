@@ -34,24 +34,22 @@ segments, normals and geometry; OEM accuracy is not an acceptance claim.
 - Docker development: `docker compose -f compose.dev.yml up --build -d --wait`
   from `web`; open http://localhost:5183/. This is the feature worktree, with
   live source mounts, not a deployed production build.
-- The user manually handles publishing and rebase/PR integration into `sub/30s`.
-  The existing main-owned deployment workflow remains unchanged.
+- The user authorized publication of this feature and its architecture document
+  for PR review into `sub/30s`. Merge/integration and production deployment
+  remain human decisions. The main-owned deployment workflow remains unchanged.
 
-Source changes are local to this feature branch. No publishing, integration,
+This feature branch is prepared for the authorized review PR. No merge,
 branch-protection configuration or production deployment is performed here.
 
 ## Architecture direction
 
-Use business features as vertical slices and technical responsibilities as
-horizontal layers. Do not manufacture a file or abstraction for every matrix
-intersection. Preserve current catalog IDs, share links, books and source claims.
-
-| Business slice | Domain | Application | Rendering / UI |
-| --- | --- | --- | --- |
-| Vehicle catalog | Vehicle, Item, ItemSpecification, hierarchy integrity | Resolve selected vehicle/item | Catalog adapter, car picker, component tree |
-| Component exploration | Subtree membership and selection rules | Focus, isolate, restore subject | Drawing factory, scene groups, camera controls |
-| Learning | Facts, checks, provenance and variant limits | Lessons and related-part navigation | Detail panels, field books, reference photos |
-| Issue guidance | General wiper symptom, observations, stop conditions, remedy and verification graph | Observation transitions and reversible in-memory trail | Step guidance linked to isolated arm/blade/rubber items |
+Use business features as vertical slices with explicit technical responsibility
+boundaries. The maintained [architecture matrix](ARCHITECTURE-MATRIX.md) uses
+hierarchical business capabilities as columns and technical practices as rows,
+with actual components and responsibilities in each cell. Implementation tiers
+such as domain/application/presentation/rendering are not that matrix's axes.
+Do not manufacture a file or abstraction for every intersection. Preserve
+current catalog IDs, share links, books and source claims.
 
 ## First issue-to-resolution slice
 
@@ -175,18 +173,19 @@ varied substantially, so these are diagnostic observations, not GPU benchmarks.
 The full-car scene remains expensive on software rendering; no claim of smooth
 60fps on arbitrary hardware is made.
 
-CI is authored and locally exercised, but remote workflow execution awaits the
-user publishing the branch. Windows snapshots are platform-specific; Linux
+CI is authored and locally exercised; remote results must be checked on the
+published review branch. Windows snapshots are platform-specific; Linux
 contributors need separately reviewed baselines rather than silently updating
 the Windows references.
 
 ## Local verification
 
-The final source passes `npm run lint`, `npm test` (16 tests),
-`npm run build`, and `npm run test:browser` (15 scenarios against the production
+The review source passes `npm run lint`, `npm test` (19 tests),
+`npm run build`, and `npm run test:browser` (20 scenarios against the production
 preview, without updating snapshots). This includes real mesh picking,
 engine/subtree isolation, occurrence selection, bounds-relative camera controls,
 history/restoration, field-book compatibility, four visual comparisons and
 portrait/landscape checks. The same browser runner supports the Docker dev URL.
-Screenshots and traces from final verification are retained outside the repo
-under `C:\Users\727124\src\prompts\30s-final-demand`.
+Latest review screenshots and traces are retained outside the repo under
+`C:\Users\727124\src\prompts\30s-pr-review-results`; earlier feature evidence
+remains under `C:\Users\727124\src\prompts\30s-final-demand`.
