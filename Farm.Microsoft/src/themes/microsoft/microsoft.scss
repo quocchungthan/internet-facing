@@ -20,7 +20,7 @@ $ms-font-mono: 'Cascadia Code', 'Segoe UI Mono', Consolas, 'Courier New', monosp
 
   font-family: $ms-font-family;
   color: var(--ms-text);
-  padding: 1rem 0 0;
+  // padding: 1rem 0 0;
 
   @media (prefers-color-scheme: dark) {
     --ms-ok: #57d983;
