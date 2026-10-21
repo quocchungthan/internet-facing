@@ -12,7 +12,10 @@ test('isolates engine descendants, controls their bounds, drills down and restor
   await expect(canvas).toHaveAttribute('data-isolated', 'true');
   await expect(canvas).toHaveAttribute('data-ready', 'true');
   const visible = (await canvas.getAttribute('data-items'))!.split(',').sort();
-  expect(visible).toEqual(['engine-block', 'engine-cover', 'engine-head', 'intake', 'lubrication']);
+  expect(visible).toEqual([
+    'engine-block', 'engine-cover', 'engine-head', 'intake', 'lubrication',
+    'engine-cylinder-study', 'engine-piston-study', 'engine-rod-study', 'engine-crankshaft-study',
+  ].sort());
   await expect(page.getByRole('button', { name: 'Explore Wheels & tires', exact: true })).toHaveCount(0);
   const before = Number(await canvas.getAttribute('data-camera-distance'));
   await page.getByRole('button', { name: 'Zoom in', exact: true }).click();
@@ -69,9 +72,28 @@ test('clicking the isolated 3D engine picks a drawable child', async ({ page }) 
   await expect.poll(() => canvas.getAttribute('data-subject')).not.toBe('engine');
   await expect(canvas).toHaveAttribute('data-ready', 'true');
   const item = await canvas.getAttribute('data-subject');
-  expect(['engine-block', 'engine-head', 'engine-cover', 'intake', 'lubrication']).toContain(item);
+  expect([
+    'engine-block', 'engine-head', 'engine-cover', 'intake', 'lubrication',
+    'engine-cylinder-study', 'engine-piston-study', 'engine-rod-study', 'engine-crankshaft-study',
+  ]).toContain(item);
   await expect(canvas).toHaveAttribute('data-items', item!);
 });
+
+for (const itemId of [
+  'engine-cylinder-study', 'engine-piston-study', 'engine-rod-study', 'engine-crankshaft-study',
+]) {
+  test(`${itemId} renders as a selectable isolated subject with measured bounds`, async ({ page }, testInfo) => {
+    await page.goto(`/?car=raize&part=engine&item=${itemId}&isolate=1`);
+    const canvas = page.locator('canvas');
+    await expect(canvas).toHaveAttribute('data-ready', 'true');
+    await expect(canvas).toHaveAttribute('data-subject', itemId);
+    await expect(canvas).toHaveAttribute('data-isolated', 'true');
+    await expect(canvas).toHaveAttribute('data-items', itemId);
+    expect(Number(await canvas.getAttribute('data-radius'))).toBeGreaterThan(0);
+    expect(Number(await canvas.getAttribute('data-triangles'))).toBeGreaterThan(0);
+    await page.screenshot({ path: testInfo.outputPath(`${itemId}.png`) });
+  });
+}
 
 test('field book exits isolation so its learning panel remains reachable', async ({ page }) => {
   await page.goto('/?car=raize&part=engine&isolate=1');

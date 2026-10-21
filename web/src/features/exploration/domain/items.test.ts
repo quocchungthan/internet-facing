@@ -47,11 +47,22 @@ describe('vehicle item hierarchy', () => {
     validateEngineLayoutLessons(engineLessons);
 
     const tree = createVehicleItems(vehicles[0]);
-    expect(tree.items.map(item => item.id)).not.toEqual(expect.arrayContaining([...engineLessonItemIds]));
-    expect(tree.specifications.some(spec => engineLessonItemIds.some(id => id === spec.id))).toBe(false);
+    const itemIds = new Set(tree.items.map(item => item.id));
+    const specificationIds = new Set(tree.specifications.map(spec => spec.id));
+    expect(engineLessonItemIds.slice(4).some(id => itemIds.has(id))).toBe(false);
+    expect(engineLessonItemIds.slice(4).some(id => specificationIds.has(id))).toBe(false);
   });
   it('rejects placement lessons with duplicate or missing Raize identities', () => {
     expect(() => validateEngineLayoutLessons([...engineLessons.slice(1), engineLessons[1]])).toThrow('match the seven Raize');
     expect(() => validateEngineLayoutLessons(engineLessons.slice(1))).toThrow('match the seven Raize');
+  });
+  it('mounts only the four subjects that have real registered drawings', () => {
+    const raize = createVehicleItems(vehicles.find(vehicle => vehicle.id === 'raize')!);
+    const coreIds = new Set<string>(engineLessonItemIds.slice(0, 4));
+    const studies = raize.items.filter(item => coreIds.has(item.id));
+    expect(studies).toHaveLength(4);
+    expect(studies.every(item => item.parentId === 'engine' && item.partId === 'engine')).toBe(true);
+    expect(studies.map(item => item.position)).toEqual(placementsForVehicle('raize').slice(0, 4).map(item => item.position));
+    expect(raize.items.some(item => engineLessonItemIds.slice(4).some(id => id === item.id))).toBe(false);
   });
 });
