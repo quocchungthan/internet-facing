@@ -2,15 +2,32 @@ import { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { ArrowDownToLine, ArrowLeft, ArrowRight, ArrowUpRight, BookOpen, ChevronLeft, ChevronRight, ShieldAlert, X } from 'lucide-react';
 import type { Part, Vehicle } from '../domain/catalog';
+import { engineLessons } from '../content';
+import { lessonFor } from '../domain/engineLessons';
+import { itemLabel, type Item, type ItemTree } from '../features/exploration/domain/items';
 import { IconButton } from './IconButton';
 import { ReferencePhoto } from './ReferencePhoto';
 
 type Props = {
-  vehicle: Vehicle; part: Part; onSelect: (p?: Part) => void; tour?: boolean;
+  vehicle: Vehicle; part?: Part; onSelect: (p?: Part) => void; tour?: boolean;
   onTourStep?: (delta: number) => void; onEndTour?: () => void;
   openBook: boolean; onBookOpened: () => void;
+  subject?: { item: Item; tree: ItemTree; onSelectItem: (id: string) => void };
 };
-export function DetailPanel({ vehicle, part, onSelect, tour, onTourStep, onEndTour, openBook, onBookOpened }: Props) {
+const fourStrokeSteps = [
+  { name: 'Intake', description: 'Intake open for entry; piston down.' },
+  { name: 'Compression', description: 'Both valves closed; piston up.' },
+  { name: 'Power', description: 'Expanding gas drives the piston down.' },
+  { name: 'Exhaust', description: 'Exhaust outlet open; piston up.' },
+];
+
+export function DetailPanel(props: Props) {
+  if (props.subject) return <SubjectLessonPanel {...props} subject={props.subject} />;
+  if (!props.part) return null;
+  return <PartDetailPanel {...props} part={props.part} />;
+}
+
+function PartDetailPanel({ vehicle, part, onSelect, tour, onTourStep, onEndTour, openBook, onBookOpened }: Props & { part: Part }) {
   const [tab, setTab] = useState<'learn' | 'book' | 'sources'>('learn');
   const [slide, setSlide] = useState(0);
   const [book, setBook] = useState('');
@@ -109,5 +126,61 @@ export function DetailPanel({ vehicle, part, onSelect, tour, onTourStep, onEndTo
       {index === vehicle.parts.length - 1 ? <button className="finish-tour" onClick={onEndTour}>Finish</button>
         : <IconButton label="Next tour part" onClick={() => onTourStep?.(1)}><ArrowRight /></IconButton>}
     </div>}
+  </aside>;
+}
+
+function SubjectLessonPanel({ vehicle, onSelect, subject }: Props & {
+  subject: { item: Item; tree: ItemTree; onSelectItem: (id: string) => void };
+}) {
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    heading.current?.focus({ preventScroll: true });
+  }, [subject.item.id, vehicle.id]);
+  const lookup = lessonFor(engineLessons, vehicle.id, subject.item.id);
+  return <aside className="detail-panel glass" aria-label={`${itemLabel(subject.tree, subject.item)} learning`}>
+    <div className="detail-top"><span className="eyebrow">SELECTED COMPONENT / SOURCES</span>
+      <IconButton label="Close part details" onClick={() => onSelect()}><X /></IconButton></div>
+    <h2 tabIndex={-1} ref={heading}>{itemLabel(subject.tree, subject.item)}</h2>
+    <div className="detail-scroll">
+      {lookup.status === 'ready' ? <>
+        <p className="detail-summary">{lookup.lesson.purpose}</p>
+        {subject.item.id === 'engine-cylinder-study' && <p className="muted">The chamber is the region above the piston, not a separate manufactured component.</p>}
+        <section className="subject-strokes" aria-label="Generic four-stroke sequence">
+          <h3>Four strokes · generic sequence</h3>
+          <ol>{fourStrokeSteps.map(step => <li key={step.name}><strong>{step.name}</strong> — {step.description}</li>)}</ol>
+          <p className="muted">Static teaching states only; exact timing and configuration are not specified.</p>
+        </section>
+        <section className="related-parts" role="group" aria-label="Connected subjects">
+          <span className="eyebrow">CONNECTED TO</span>
+          <div>{lookup.lesson.connections.map(connection => {
+            const target = subject.tree.items.find(candidate => candidate.id === connection.itemId);
+            return target
+              ? <button key={connection.itemId} aria-label={`Explore connected subject ${itemLabel(subject.tree, target)}: ${connection.relationship}`}
+                onClick={() => subject.onSelectItem(target.id)}>
+                <span>{itemLabel(subject.tree, target)}</span><small>{connection.relationship}</small>
+              </button>
+              : <p key={connection.itemId} role="status">{connection.itemId} is not available in this vehicle.</p>;
+          })}</div>
+        </section>
+        <section className="subject-sources" aria-label="Sources and limitations">
+          <h3>Sources and limits</h3>
+          <ul>{lookup.lesson.sourceRefs.map(reference => {
+            const source = vehicle.sources.find(candidate => candidate.id === reference.sourceId);
+            return source
+              ? <li key={`${reference.sourceId}-${reference.locator}`}>
+                <a href={source.url} target="_blank" rel="noreferrer">{source.title}</a>
+                <p>{reference.locator}</p>
+                <small>Retrieved {reference.retrievedOn}. {source.scope}</small>
+              </li>
+              : <li key={reference.sourceId} role="status">Source record {reference.sourceId} is unavailable for this vehicle.</li>;
+          })}</ul>
+          <p>{lookup.lesson.limitations}</p>
+          <p className="image-disclosure">Original teaching text and independently authored representative geometry; no OEM geometry or source artwork.</p>
+        </section>
+      </> : <p role="status">{lookup.reason}</p>}
+      <div className="safety-note"><ShieldAlert size={18} /><div><strong>Educational use only</strong>
+        <p>Representative cutaway, not OEM geometry, service access or repair instructions. Verify the actual vehicle and its correct manual; safety-critical work belongs with a qualified professional.</p>
+      </div></div>
+    </div>
   </aside>;
 }

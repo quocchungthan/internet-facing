@@ -143,6 +143,51 @@ test('component search Enter activation works at the mobile viewport', async ({ 
   await expect(page.locator('#selected-subject-heading')).toBeFocused();
 });
 
+const engineSubjectCases = [
+  ['engine-cylinder-study', 'Cylinder wall / bore', 'The cylindrical surface guides the piston', 'NASA Glenn - Engine Parts'],
+  ['engine-piston-study', 'Piston', 'Gas pressure acts on the crown', 'NASA Glenn - Engine Parts'],
+  ['engine-rod-study', 'Connecting rod', 'Connects the piston motion to a crank throw', 'NASA Glenn - Four-Stroke Engine Operation'],
+  ['engine-crankshaft-study', 'Crankshaft', 'Converts the constrained piston/rod movement', 'NASA Glenn - Engine Parts'],
+  ['engine-intake-valve-study', 'Intake valve', 'Controls the entry path', 'NASA Glenn - Engine Parts'],
+  ['engine-exhaust-valve-study', 'Exhaust valve', 'Controls the exit path', 'NASA Glenn - Engine Parts'],
+  ['engine-spark-plug-study', 'Spark plug', 'Produces the spark initiating combustion', 'U.S. Department of Energy AFDC - How Do Gasoline Cars Work?'],
+];
+
+test('all seven Raize child subjects show their own sourced generic lesson', async ({ page }, testInfo) => {
+  for (const [itemId, label, purpose, sourceTitle] of engineSubjectCases) {
+    await page.goto(`/?car=raize&part=engine&item=${itemId}&isolate=1`);
+    const panel = page.getByRole('complementary', { name: `${label} learning` });
+    await expect(panel).toBeVisible();
+    await expect(panel.getByRole('heading', { name: label, exact: true })).toBeVisible();
+    await expect(panel.getByText(purpose, { exact: false })).toBeVisible();
+    await expect(panel.getByText(sourceTitle, { exact: true })).toBeVisible();
+    await expect(panel.getByRole('heading', { name: 'Four strokes · generic sequence' })).toBeVisible();
+    await expect(panel.getByRole('group', { name: 'Connected subjects' }).getByRole('button').first()).toBeVisible();
+    await expect(panel.getByText(/Retrieved 2026-10-21/).first()).toBeVisible();
+    await expect(panel.getByText('Three cylinders. A turbo.', { exact: false })).toHaveCount(0);
+    await expect(page.locator('canvas')).toHaveAttribute('data-isolated', 'true');
+    await page.screenshot({ path: testInfo.outputPath(`${itemId}-lesson.png`) });
+  }
+});
+
+test('connected child lessons navigate by exact identity and missing lessons do not inherit engine text', async ({ page }) => {
+  await page.goto('/?car=raize&part=engine&item=engine-rod-study');
+  let panel = page.getByRole('complementary', { name: 'Connecting rod learning' });
+  await panel.getByRole('button', { name: /Explore connected subject Piston:/ }).click();
+  await expect(page.locator('canvas')).toHaveAttribute('data-subject', 'engine-piston-study');
+  await expect(page).toHaveURL(/item=engine-piston-study/);
+  await expect(page.getByRole('complementary', { name: 'Piston learning' })).toBeVisible();
+  await page.goBack();
+  await expect(page.locator('canvas')).toHaveAttribute('data-subject', 'engine-rod-study');
+  await expect(page.getByRole('complementary', { name: 'Connecting rod learning' })).toBeVisible();
+
+  await page.goto('/?car=raize&part=engine&item=engine-head');
+  panel = page.getByRole('complementary', { name: 'Engine head learning' });
+  await expect(panel.getByRole('status')).toHaveText('No reviewed explanation for this subject.');
+  await expect(panel.getByText('Three cylinders. A turbo.', { exact: false })).toHaveCount(0);
+  await expect(panel.getByText(/not OEM geometry, service access or repair instructions/)).toBeVisible();
+});
+
 test('clicking the isolated 3D engine picks a drawable child', async ({ page }) => {
   await page.goto('/?car=raize&part=engine&isolate=1');
   const canvas = page.locator('canvas');
