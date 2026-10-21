@@ -284,6 +284,17 @@ test('clicking the isolated 3D engine picks a drawable child', async ({ page }) 
   await expect(canvas).toHaveAttribute('data-items', item!);
 });
 
+test('clicking the isolated Impala engine picks a drawable child', async ({ page }) => {
+  await page.goto('/?car=impala&part=engine&isolate=1');
+  const canvas = page.locator('canvas');
+  await expect(canvas).toHaveAttribute('data-ready', 'true');
+  await canvas.click({ position: { x: 720, y: 450 } });
+  await expect.poll(() => canvas.getAttribute('data-subject')).not.toBe('engine');
+  const item = await canvas.getAttribute('data-subject');
+  expect(['engine-block', 'engine-head', 'engine-cover', 'intake', 'lubrication']).toContain(item);
+  await expect(canvas).toHaveAttribute('data-items', item!);
+});
+
 for (const itemId of [
   'engine-cylinder-study', 'engine-piston-study', 'engine-rod-study', 'engine-crankshaft-study',
   'engine-intake-valve-study', 'engine-exhaust-valve-study', 'engine-spark-plug-study',
