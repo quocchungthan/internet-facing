@@ -53,14 +53,14 @@ current catalog IDs, share links, books and source claims.
 
 ### Independent feature composition
 
-Build-time `VITE_FEATURE_EXPLORATION`, `VITE_FEATURE_REPAIR` and
-`VITE_FEATURE_LEARNING` default to `true` and accept only exact `true`/`false`.
+Build-time `VITE_FEATURE_EXPLORATION`, `VITE_FEATURE_REPAIR`,
+`VITE_FEATURE_LEARNING` and `VITE_FEATURE_ONBOARDING` default to `true` and accept only exact `true`/`false`.
 `App` selects the exploration shell or the HTML-only `ContentWorkshop`.
 Repair's optional location adapter and learning's standalone part selector
 remove their runtime dependency on exploration. Disabled feature components
 are not mounted/loaded; flags are not authorization or output-asset removal.
 See the README for build configuration and the architecture matrix for ownership.
-`npm run test:features` exercises all eight real builds sequentially, including
+`npm run test:features` exercises all sixteen real builds sequentially, including
 an all-disabled state, and is wired into the feature-quality workflow.
 
 ## First issue-to-resolution slice

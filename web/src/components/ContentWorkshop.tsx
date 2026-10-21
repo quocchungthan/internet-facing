@@ -7,6 +7,8 @@ import { createVehicleItems, itemLabel, validateEngineLessonsAgainstItems } from
 
 const DetailPanel = lazy(() => import('./DetailPanel').then(module => ({ default: module.DetailPanel })));
 const RepairGuide = lazy(() => import('../features/repair/presentation/RepairGuide').then(module => ({ default: module.RepairGuide })));
+const ObservationLog = lazy(() => import('../features/observations/presentation/ObservationLog').then(module => ({ default: module.ObservationLog })));
+const FirstVisitGuide = lazy(() => import('../features/onboarding/presentation/FirstVisitGuide').then(module => ({ default: module.FirstVisitGuide })));
 
 function selectionFromSearch(search: string) {
   const selection = readSelection(search, vehicles);
@@ -50,6 +52,8 @@ function useCatalogSelection() {
 export default function ContentWorkshop() {
   const { vehicle, part, subject, invalid, navigate, navigateItem } = useCatalogSelection();
   const [repair, setRepair] = useState(false);
+  const [log, setLog] = useState(false);
+  const [replayIntro, setReplayIntro] = useState(0);
   const [openBook, setOpenBook] = useState(false);
   const tree = useMemo(() => {
     const items = createVehicleItems(vehicle);
@@ -60,10 +64,11 @@ export default function ContentWorkshop() {
     ? { item: subject.item, tree, onSelectItem: (itemId: string) => navigateItem(vehicle.id, itemId) }
     : undefined;
   useEffect(() => {
-    const closeGuide = () => { setRepair(false); setOpenBook(false); };
+    const closeGuide = () => { setRepair(false); setLog(false); setOpenBook(false); };
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
       if (repair) setRepair(false);
+      else if (log) setLog(false);
       else navigate(vehicle.id);
     };
     window.addEventListener('popstate', closeGuide);
@@ -72,7 +77,7 @@ export default function ContentWorkshop() {
       window.removeEventListener('popstate', closeGuide);
       window.removeEventListener('keydown', onKey);
     };
-  }, [repair, vehicle.id, navigate]);
+  }, [repair, log, vehicle.id, navigate]);
   const selectPart = (next?: Part) => { setOpenBook(false); navigate(vehicle.id, next?.id); };
   const active = features.repair || features.learning;
   return <main className="content-workshop">
@@ -81,6 +86,7 @@ export default function ContentWorkshop() {
       <h1>Know your machine.</h1>
       <p>Practical car checks and learning, without the 3D viewer.</p>
       <p className="content-disclosure" role="note">Explanations are source-scoped. Schematics are representative, not OEM geometry or repair access; verify service work in the manual for the actual vehicle.</p>
+      {features.onboarding && active && <button className="replay-intro" onClick={() => setReplayIntro(count => count + 1)}>Replay introduction</button>}
     </header>
     {!active ? <section aria-labelledby="features-disabled">
       <h2 id="features-disabled">No features are enabled in this build.</h2>
@@ -88,7 +94,7 @@ export default function ContentWorkshop() {
     </section> : <>
       <label className="content-vehicle">Choose car model
         <select value={vehicle.id} onChange={event => {
-          setRepair(false); setOpenBook(false); navigate(event.target.value);
+          setRepair(false); setLog(false); setOpenBook(false); navigate(event.target.value);
         }}>
           {vehicles.map(car => <option key={car.id} value={car.id}>{car.year} {car.name}</option>)}
         </select>
@@ -97,9 +103,13 @@ export default function ContentWorkshop() {
       <div className="content-features">
         {features.repair && <section aria-label="Repair guidance">
           <h2>Repair guidance</h2>
-          <button className="primary-button" onClick={() => setRepair(true)}>Troubleshoot wiper streaks</button>
+          <button className="primary-button" data-onboarding="repair" onClick={() => { setLog(false); setRepair(true); }}>Troubleshoot wiper streaks</button>
+          <button className="secondary-button" aria-pressed={log} onClick={() => { setRepair(false); setLog(!log); }}>Observation log</button>
           {repair && <Suspense fallback={<p role="status">Opening repair guidance...</p>}>
             <RepairGuide key={vehicle.id} vehicle={vehicle} onClose={() => setRepair(false)} />
+          </Suspense>}
+          {log && <Suspense fallback={<p role="status">Opening observation log...</p>}>
+            <ObservationLog vehicle={vehicle} onClose={() => setLog(false)} />
           </Suspense>}
         </section>}
         {features.learning && <section aria-label="Learning and field books">
@@ -118,7 +128,7 @@ export default function ContentWorkshop() {
               </optgroup>}
             </select>
           </label>
-          <button className="primary-button" onClick={() => {
+          <button className="primary-button" data-onboarding="learning" onClick={() => {
             navigate(vehicle.id, part?.id ?? vehicle.parts[0].id); setOpenBook(true);
           }}>Open field book</button>
           {(part || subjectContext) && <Suspense fallback={<p role="status">Opening learning...</p>}>
@@ -128,5 +138,6 @@ export default function ContentWorkshop() {
         </section>}
       </div>
     </>}
+    {features.onboarding && <Suspense fallback={null}><FirstVisitGuide replay={replayIntro} /></Suspense>}
   </main>;
 }

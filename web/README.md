@@ -9,13 +9,14 @@ Powerglide. Real-world vehicle identity must be verified separately.
 
 ## Independent features (build-time)
 
-The static app supports three independent environment flags:
+The static app supports four independent environment flags:
 
 | Flag | Default | Responsibility |
 | --- | --- | --- |
 | `VITE_FEATURE_EXPLORATION` | `true` | Interactive 3D, component hierarchy, focus/isolation and camera controls |
-| `VITE_FEATURE_REPAIR` | `true` | Wiper symptom/check/remedy/verification guidance |
+| `VITE_FEATURE_REPAIR` | `true` | Wiper symptom/check/remedy/verification guidance, outcomes and the tab-only observation log/mechanic handoff |
 | `VITE_FEATURE_LEARNING` | `true` | Part explanations, learning tour, reference panels and field books |
+| `VITE_FEATURE_ONBOARDING` | `true` | Skippable first-visit introduction for the enabled features (state kept in `localStorage` key `30s.onboarding.v1`) |
 
 Set flags in the build environment, for example in Git Bash:
 
@@ -35,8 +36,15 @@ With exploration disabled, repair and learning use a scrollable HTML workshop
 with vehicle selection. Repair keeps its complete observation flow without any
 3D-location controls; learning has an independent part selector and field books.
 Disabling repair or learning removes their entry points and lazy component
-mounts while leaving exploration usable. All eight combinations are supported;
+mounts while leaving exploration usable. All sixteen combinations are supported;
 all-disabled shows an explicit configuration message rather than a blank page.
+The introduction never appears when the three business features are all off.
+
+The observation log keeps entries only in memory for the current tab; nothing is
+saved, uploaded or shared, and reloading discards it. The handoff is plain text
+for copy or print. The wiper guide is labelled as generic guidance (not verified
+for the model) and links official recall services externally; 30s performs no
+recall lookup itself.
 
 These flags control feature execution, not authorization or asset secrecy.
 Build output may still include disabled-feature chunks, books and images; they
