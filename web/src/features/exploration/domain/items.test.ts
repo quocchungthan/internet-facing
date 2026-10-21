@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { engineLessons, vehicles } from '../../../content';
 import { engineLessonItemIds } from '../../../domain/engineLessons';
 import { engineLayout, placementsForVehicle, validateEngineLayoutLessons } from './engineLayout';
-import { createVehicleItems, itemLabel, subtreeIds, validateEngineLessonsAgainstItems, validateItems,
+import { createVehicleItems, itemLabel, searchItemTree, subtreeIds, validateEngineLessonsAgainstItems, validateItems,
   worldPosition, type ItemTree } from './items';
 
 describe('vehicle item hierarchy', () => {
@@ -70,5 +70,34 @@ describe('vehicle item hierarchy', () => {
     expect(impala.items.some(item => studyIds.has(item.id))).toBe(false);
     expect(() => validateEngineLessonsAgainstItems(engineLessons, raize.items.filter(item => item.id !== 'engine-piston-study')))
       .toThrow('Missing mounted engine lesson subject');
+  });
+  it('searches exact occurrences by normalized label, curated aliases and ancestry', () => {
+    const raize = vehicles.find(vehicle => vehicle.id === 'raize')!;
+    const tree = createVehicleItems(raize);
+    expect(searchItemTree(tree, raize, engineLessons, ' PISTON ROD ').map(result => result.itemId))
+      .toEqual(['engine-rod-study']);
+    expect(searchItemTree(tree, raize, engineLessons, 'bore').map(result => result.itemId))
+      .toEqual(['engine-cylinder-study']);
+    expect(searchItemTree(tree, raize, engineLessons, 'piston crown').map(result => result.itemId))
+      .toEqual(['engine-piston-study']);
+    expect(searchItemTree(tree, raize, engineLessons, 'powertrain')
+      .some(result => result.itemId === 'engine-rod-study')).toBe(true);
+    expect(searchItemTree(tree, raize, engineLessons, 'nothing matches')).toEqual([]);
+  });
+  it('retains repeated wheel identities, system filters and drawable status', () => {
+    const impala = vehicles.find(vehicle => vehicle.id === 'impala')!;
+    const tree = createVehicleItems(impala);
+    const wheels = searchItemTree(tree, impala, engineLessons, 'wheel', 'chassis')
+      .filter(result => result.itemId.startsWith('wheel-'));
+    expect(wheels.map(result => result.itemId)).toEqual([
+      'wheel-front-left', 'wheel-front-right', 'wheel-rear-left', 'wheel-rear-right',
+    ]);
+    expect(new Set(wheels.map(result => result.label)).size).toBe(4);
+    expect(searchItemTree(tree, impala, engineLessons, '', 'powertrain')
+      .every(result => result.system === 'powertrain')).toBe(true);
+    const assembly = searchItemTree(tree, impala, engineLessons, 'powertrain system')
+      .find(result => result.itemId === 'powertrain-assembly');
+    expect(assembly).toMatchObject({ drawable: false, reason: 'No drawing available' });
+    expect(searchItemTree(tree, impala, engineLessons, '')).toHaveLength(tree.items.length - 1);
   });
 });

@@ -1,4 +1,4 @@
-import type { Vehicle } from '../../../domain/catalog';
+import type { System, Vehicle } from '../../../domain/catalog';
 import { engineLessonItemIds, type EngineLesson } from '../../../domain/engineLessons';
 import { placementsForVehicle } from './engineLayout';
 
@@ -13,6 +13,11 @@ export type Item = {
   id: string; specificationId: string; parentId?: string; partId?: string; position: Vector;
 };
 export type ItemTree = { items: Item[]; specifications: ItemSpecification[] };
+export type ItemSearchResult = {
+  itemId: string; label: string; pathLabel: string; system: System | 'all'; drawable: boolean; reason?: string;
+};
+
+const searchableSystems: readonly System[] = ['powertrain', 'chassis', 'electrical', 'body'];
 
 export function validateItems(tree: ItemTree): ItemTree {
   const ids = new Set(tree.items.map(item => item.id));
@@ -83,6 +88,55 @@ export function itemLabel(tree: ItemTree, item: Item): string {
   if (location) return `${label} (${location[1]} ${location[2]})`;
   const wiperSide = item.id.match(/^wiper-(?:arm|blade|rubber)-(left|right)$/);
   return wiperSide ? `${label} (${wiperSide[1]})` : label;
+}
+
+export function searchItemTree(
+  tree: ItemTree, vehicle: Vehicle, lessons: readonly EngineLesson[], query: string, system: System | 'all' = 'all',
+): ItemSearchResult[] {
+  const term = query.trim().toLowerCase();
+  return tree.items.filter(item => item.id !== 'vehicle').map(item => {
+    const specification = specificationFor(tree, item);
+    const label = itemLabel(tree, item);
+    const lesson = lessons.find(candidate => candidate.carId === vehicle.id && candidate.itemId === item.id);
+    const ancestors = itemAncestors(tree, item);
+    const pathLabel = [...ancestors, item].map(candidate => itemLabel(tree, candidate)).join(' / ');
+    const resolvedSystem = itemSystem(tree, vehicle, item);
+    const drawable = specification.drawing !== 'assembly';
+    const searchText = [
+      label, specification.label, pathLabel, ...(lesson?.aliases ?? []), ...(lesson ? [lesson.label] : []),
+    ].join(' ').toLowerCase();
+    return {
+      itemId: item.id, label, pathLabel, system: resolvedSystem, drawable,
+      ...(drawable ? {} : { reason: 'No drawing available' }),
+      searchText,
+    };
+  }).filter(result => (system === 'all' || result.system === system)
+    && (!term || result.searchText.includes(term)))
+    .map(({ searchText: _searchText, ...result }) => result);
+}
+
+function itemAncestors(tree: ItemTree, item: Item): Item[] {
+  const ancestors: Item[] = [];
+  let parentId = item.parentId;
+  while (parentId) {
+    const parent = tree.items.find(candidate => candidate.id === parentId);
+    if (!parent) throw new Error(`Missing item ancestor ${parentId} for ${item.id}.`);
+    ancestors.unshift(parent);
+    parentId = parent.parentId;
+  }
+  return ancestors;
+}
+
+function itemSystem(tree: ItemTree, vehicle: Vehicle, item: Item): System | 'all' {
+  let current: Item | undefined = item;
+  while (current) {
+    const part = vehicle.parts.find(candidate => candidate.id === current?.partId);
+    if (part) return part.system;
+    const assembly = current.id.replace(/-assembly$/, '') as System;
+    if (searchableSystems.includes(assembly)) return assembly;
+    current = tree.items.find(candidate => candidate.id === current?.parentId);
+  }
+  return 'all';
 }
 
 export function worldPosition(tree: ItemTree, item: Item): Vector {
