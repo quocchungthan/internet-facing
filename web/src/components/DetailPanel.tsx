@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { ArrowDownToLine, ArrowLeft, ArrowRight, ArrowUpRight, BookOpen, ChevronLeft, ChevronRight, ShieldAlert, X } from 'lucide-react';
+import { ArrowDownToLine, ArrowLeft, ArrowRight, ArrowUpRight, BookOpen, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ShieldAlert, X } from 'lucide-react';
 import type { Part, Vehicle } from '../domain/catalog';
 import { engineLessons } from '../content';
 import { lessonFor } from '../domain/engineLessons';
@@ -12,6 +12,7 @@ type Props = {
   vehicle: Vehicle; part?: Part; onSelect: (p?: Part) => void; tour?: boolean;
   onTourStep?: (delta: number) => void; onEndTour?: () => void;
   openBook: boolean; onBookOpened: () => void;
+  onCloseSubject?: () => void;
   subject?: { item: Item; tree: ItemTree; onSelectItem: (id: string) => void };
 };
 const fourStrokeSteps = [
@@ -129,19 +130,32 @@ function PartDetailPanel({ vehicle, part, onSelect, tour, onTourStep, onEndTour,
   </aside>;
 }
 
-function SubjectLessonPanel({ vehicle, onSelect, subject }: Props & {
+function SubjectLessonPanel({ vehicle, onSelect, onCloseSubject, subject }: Props & {
   subject: { item: Item; tree: ItemTree; onSelectItem: (id: string) => void };
 }) {
   const heading = useRef<HTMLHeadingElement>(null);
+  const lessonContentId = useId();
+  const [collapsed, setCollapsed] = useState(false);
   useEffect(() => {
+    setCollapsed(false);
     heading.current?.focus({ preventScroll: true });
   }, [subject.item.id, vehicle.id]);
   const lookup = lessonFor(engineLessons, vehicle.id, subject.item.id);
-  return <aside className="detail-panel glass" aria-label={`${itemLabel(subject.tree, subject.item)} learning`}>
+  return <aside className={`detail-panel glass subject-lesson-panel${collapsed ? ' is-collapsed' : ''}`}
+    aria-label={`${itemLabel(subject.tree, subject.item)} learning`}>
     <div className="detail-top"><span className="eyebrow">SELECTED COMPONENT / SOURCES</span>
-      <IconButton label="Close part details" onClick={() => onSelect()}><X /></IconButton></div>
+      <IconButton label={collapsed ? 'Expand selected subject lesson' : 'Collapse selected subject lesson'}
+        aria-expanded={!collapsed} aria-controls={lessonContentId} onClick={() => setCollapsed(value => !value)}>
+        {collapsed ? <ChevronUp /> : <ChevronDown />}
+      </IconButton>
+      <IconButton label="Close part details" onClick={() => {
+        if (onCloseSubject) onCloseSubject();
+        else onSelect();
+      }}><X /></IconButton>
+    </div>
     <h2 tabIndex={-1} ref={heading}>{itemLabel(subject.tree, subject.item)}</h2>
-    <div className="detail-scroll">
+    <p className="subject-lesson-fidelity">Representative schematic · not OEM geometry or service guidance</p>
+    <div className="detail-scroll" id={lessonContentId} hidden={collapsed}>
       {lookup.status === 'ready' ? <>
         <p className="detail-summary">{lookup.lesson.purpose}</p>
         {subject.item.id === 'engine-cylinder-study' && <p className="muted">The chamber is the region above the piston, not a separate manufactured component.</p>}

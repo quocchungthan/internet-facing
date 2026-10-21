@@ -170,6 +170,86 @@ test('all seven Raize child subjects show their own sourced generic lesson', asy
   }
 });
 
+test('mobile subject lesson collapses without losing the selected drawable or camera access', async ({ page }, testInfo) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto('/?car=raize&part=engine&item=engine-rod-study&isolate=1');
+  const panel = page.getByRole('complementary', { name: 'Connecting rod learning' });
+  const canvas = page.locator('canvas');
+  const camera = page.getByRole('group', { name: 'Camera controls' });
+  const heading = panel.getByRole('heading', { name: 'Connecting rod', exact: true });
+  const expectCameraReachable = async () => {
+    const panelBounds = await panel.boundingBox();
+    const cameraBounds = await camera.boundingBox();
+    if (!panelBounds || !cameraBounds) throw new Error('The lesson sheet and camera controls must have visible bounds.');
+    const separated = cameraBounds.y + cameraBounds.height <= panelBounds.y
+      || cameraBounds.x + cameraBounds.width <= panelBounds.x
+      || cameraBounds.x >= panelBounds.x + panelBounds.width
+      || cameraBounds.y >= panelBounds.y + panelBounds.height;
+    expect(separated).toBe(true);
+    const dimensions = await page.evaluate(() => ({
+      width: document.documentElement.scrollWidth,
+      height: document.documentElement.scrollHeight,
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight,
+    }));
+    expect(dimensions.width).toBe(dimensions.viewportWidth);
+    expect(dimensions.height).toBe(dimensions.viewportHeight);
+  };
+
+  await expect(heading).toBeFocused();
+  await expect(canvas).toHaveAttribute('data-subject', 'engine-rod-study');
+  await expect(canvas).toHaveAttribute('data-isolated', 'true');
+  await expectCameraReachable();
+  const originalUrl = page.url();
+  const collapse = panel.getByRole('button', { name: 'Collapse selected subject lesson' });
+  await expect(collapse).toHaveAttribute('aria-expanded', 'true');
+  await collapse.press('Enter');
+  const expand = panel.getByRole('button', { name: 'Expand selected subject lesson' });
+  await expect(expand).toBeFocused();
+  await expect(expand).toHaveAttribute('aria-expanded', 'false');
+  await expect(heading).toBeVisible();
+  await expect(panel.getByText('Representative schematic · not OEM geometry or service guidance', { exact: true })).toBeVisible();
+  await expect(panel.getByText('Connects the piston motion to a crank throw;', { exact: false })).toBeHidden();
+  await expect(panel.locator('.detail-scroll')).toBeHidden();
+  await expect(camera).toBeVisible();
+  await expect(canvas).toBeVisible();
+  expect(page.url()).toBe(originalUrl);
+  await expectCameraReachable();
+  await page.screenshot({ path: testInfo.outputPath('rod-lesson-mobile-collapsed.png') });
+
+  await expand.press('Enter');
+  await expect(panel.getByRole('button', { name: 'Collapse selected subject lesson' })).toBeFocused();
+  await expect(panel.getByText('Connects the piston motion to a crank throw;', { exact: false })).toBeVisible();
+  await expect(canvas).toHaveAttribute('data-subject', 'engine-rod-study');
+  await expect(canvas).toHaveAttribute('data-isolated', 'true');
+  await page.screenshot({ path: testInfo.outputPath('rod-lesson-mobile-expanded-375.png') });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(panel.getByRole('heading', { name: 'Connecting rod', exact: true })).toBeVisible();
+  await expectCameraReachable();
+  await page.setViewportSize({ width: 740, height: 390 });
+  await expect(panel.getByRole('heading', { name: 'Connecting rod', exact: true })).toBeVisible();
+  await expectCameraReachable();
+  await page.screenshot({ path: testInfo.outputPath('rod-lesson-mobile-landscape.png') });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await expect(panel.getByRole('button', { name: 'Collapse selected subject lesson' })).toBeHidden();
+  await expect(panel.getByText('Connects the piston motion to a crank throw;', { exact: false })).toBeVisible();
+  const desktopDimensions = await page.evaluate(() => ({
+    width: document.documentElement.scrollWidth,
+    height: document.documentElement.scrollHeight,
+    viewportWidth: window.innerWidth,
+    viewportHeight: window.innerHeight,
+  }));
+  expect(desktopDimensions.width).toBe(desktopDimensions.viewportWidth);
+  expect(desktopDimensions.height).toBe(desktopDimensions.viewportHeight);
+  await page.screenshot({ path: testInfo.outputPath('rod-lesson-desktop.png') });
+
+  await panel.getByRole('button', { name: 'Close part details' }).press('Enter');
+  await expect(page.getByRole('button', { name: 'Component index', exact: true })).toBeFocused();
+  await expect(canvas).toHaveAttribute('data-subject', 'vehicle');
+});
+
 test('connected child lessons navigate by exact identity and missing lessons do not inherit engine text', async ({ page }) => {
   await page.goto('/?car=raize&part=engine&item=engine-rod-study');
   let panel = page.getByRole('complementary', { name: 'Connecting rod learning' });
