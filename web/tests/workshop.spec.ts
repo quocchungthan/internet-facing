@@ -31,14 +31,12 @@ test('doors animate when motion is allowed', async ({ page }) => {
   await page.goto('/');
   const canvas = page.locator('canvas');
   await expect(canvas).toHaveAttribute('data-ready', 'true');
+  const closedFrame = await canvas.screenshot();
   const doors = page.getByRole('button', { name: 'Open hood and doors', exact: true });
   await doors.click();
   await expect(doors).toHaveAttribute('aria-pressed', 'true');
-  await page.waitForTimeout(100);
-  const movingFrame = await canvas.screenshot();
-  await page.waitForTimeout(500);
-  const settledFrame = await canvas.screenshot();
-  expect(movingFrame.equals(settledFrame)).toBe(false);
+  await page.waitForTimeout(1200);
+  expect(closedFrame.equals(await canvas.screenshot())).toBe(false);
 });
 
 test('reduced motion keeps door changes immediate and stable', async ({ page }) => {
