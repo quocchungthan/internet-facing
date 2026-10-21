@@ -40,7 +40,9 @@ async function checkExploration(page: Page, enabled: boolean) {
   }
   await expect(canvas).toHaveAttribute('data-ready', 'true');
   await page.getByRole('button', { name: 'Component index', exact: true }).click();
-  await page.getByRole('button', { name: /01 Engine/ }).click();
+  const index = page.getByRole('complementary', { name: 'Component index' });
+  await index.getByRole('textbox', { name: 'Search components' }).fill('Engine');
+  await index.getByRole('button', { name: /Engine Toyota Raize \/ Powertrain system \/ Engine/ }).click();
   await page.getByRole('button', { name: 'Isolate selection', exact: true }).click();
   await expect(canvas).toHaveAttribute('data-subject', 'engine');
   await page.getByRole('button', { name: 'Show whole car', exact: true }).click();
@@ -69,18 +71,34 @@ async function checkRepair(page: Page, flags: FeatureFlags) {
   await expect(guide).toHaveCount(0);
 }
 
-async function checkLearning(page: Page, enabled: boolean) {
+async function checkLearning(page: Page, flags: FeatureFlags) {
   const book = page.getByRole('button', { name: 'Open field book', exact: true });
-  if (!enabled) {
+  if (!flags.learning) {
     await expect(book).toHaveCount(0);
     await expect(page.getByRole('group', { name: 'Part information' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Take a guided look' })).toHaveCount(0);
+    await expect(page.getByText(/not OEM geometry/).first()).toBeVisible();
     return;
   }
   await book.click();
   await expect(page.getByRole('heading', { name: 'Toyota Raize — a field book' })).toBeVisible();
   await page.getByRole('button', { name: 'Close part details' }).click();
   await expect(page.getByRole('group', { name: 'Part information' })).toHaveCount(0);
+  if (flags.exploration) {
+    await page.getByRole('button', { name: 'Component index', exact: true }).click();
+    const index = page.getByRole('complementary', { name: 'Component index' });
+    await index.getByRole('textbox', { name: 'Search components' }).fill('piston rod');
+    await index.getByRole('button', { name: /Connecting rod/ }).click();
+  } else {
+    await page.getByRole('combobox', { name: 'Choose a part' }).selectOption('engine-rod-study');
+  }
+  let subject = page.getByRole('complementary', { name: 'Connecting rod learning' });
+  await expect(subject.getByText('Connects the piston motion to a crank throw;', { exact: false })).toBeVisible();
+  await expect(subject.getByText('NASA Glenn - Four-Stroke Engine Operation', { exact: true })).toBeVisible();
+  await subject.getByRole('button', { name: /Explore connected subject Piston:/ }).click();
+  subject = page.getByRole('complementary', { name: 'Piston learning' });
+  await expect(subject.getByText('Gas pressure acts on the crown;', { exact: false })).toBeVisible();
+  await expect(page.locator('canvas')).toHaveCount(flags.exploration ? 1 : 0);
 }
 
 async function checkSmallScreens(page: Page, flags: FeatureFlags) {
@@ -123,7 +141,7 @@ for (let mask = 0; mask < 8; mask++) {
       await expect(page.getByRole('main')).toBeVisible();
       await checkExploration(page, flags.exploration);
       await checkRepair(page, flags);
-      await checkLearning(page, flags.learning);
+      await checkLearning(page, flags);
       if (!flags.exploration && !flags.repair && !flags.learning) {
         await expect(page.getByRole('heading', { name: 'No features are enabled in this build.' })).toBeVisible();
       } else {
