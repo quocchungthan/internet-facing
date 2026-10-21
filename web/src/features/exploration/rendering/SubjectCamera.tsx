@@ -22,6 +22,7 @@ export default function SubjectCamera(props: Props) {
   const { vehicle, selectedId, isolated, mode, open, reducedMotion, action, part, onError } = props;
   const controls = useRef<OrbitControlsImpl>(null);
   const handledAction = useRef<number | undefined>(action?.id);
+  const interactedBeforeFit = useRef(false);
   const pendingFit = useRef(2);
   const sphere = useRef(new Sphere());
   const { gl, scene, camera, size, invalidate } = useThree();
@@ -70,15 +71,36 @@ export default function SubjectCamera(props: Props) {
     return true;
   }
 
+  function preserveCurrentView(model: Object3D) {
+    if (!hasGeometry) {
+      publishCanvasState(model, false, 0);
+      return false;
+    }
+    try {
+      sphere.current = subjectBounds(model, selected);
+      configureCamera(true);
+      publishCanvasState(model, true, sphere.current.radius);
+    } catch (error) {
+      onError(error instanceof Error ? error.message : String(error));
+      return false;
+    }
+    return true;
+  }
+
   useFrame(() => {
     const c = controls.current;
     const model = scene.getObjectByName('vehicle-model');
-    if (!c || !model || !(camera instanceof PerspectiveCamera)) return;
-    if (pendingFit.current > 0) invalidate();
-    if (pendingFit.current > 0 && --pendingFit.current === 0) {
+    if (!c || !(camera instanceof PerspectiveCamera)) return;
+    if (pendingFit.current > 0 || interactedBeforeFit.current) invalidate();
+    if (!model) return;
+    if (interactedBeforeFit.current) {
+      interactedBeforeFit.current = false;
+      if (!preserveCurrentView(model)) return;
+    } else if (pendingFit.current > 0 && --pendingFit.current === 0) {
       if (!completePendingFit(model)) return;
     }
     gl.domElement.dataset.cameraDistance = String(camera.position.distanceTo(c.target));
+    gl.domElement.dataset.cameraPosition = camera.position.toArray().join(',');
     gl.domElement.dataset.target = c.target.toArray().join(',');
     if (pendingFit.current > 0 || !action || handledAction.current === action.id) return;
     handledAction.current = action.id;
@@ -86,17 +108,44 @@ export default function SubjectCamera(props: Props) {
     invalidate();
   });
 
+  function preserveInteraction() {
+    if (pendingFit.current === 0) return;
+    const model = scene.getObjectByName('vehicle-model');
+    pendingFit.current = 0;
+    if (!model) {
+      interactedBeforeFit.current = true;
+      invalidate();
+      return;
+    }
+    if (!preserveCurrentView(model)) return;
+    if (action && handledAction.current !== action.id) {
+      handledAction.current = action.id;
+      performAction();
+    }
+    invalidate();
+  }
+
+  function configureCamera(preserveDistance = false) {
+    const c = controls.current;
+    if (!c || !(camera instanceof PerspectiveCamera)) return undefined;
+    const subject = sphere.current;
+    const distance = fitDistance(subject.radius, camera.fov, size.width / size.height);
+    const currentDistance = camera.position.distanceTo(c.target);
+    c.minDistance = preserveDistance ? Math.min(subject.radius * 1.15, currentDistance) : subject.radius * 1.15;
+    c.maxDistance = preserveDistance ? Math.max(distance * 4, currentDistance) : distance * 4;
+    camera.near = Math.max(0.005, subject.radius / 100);
+    camera.far = Math.max(100, distance * 10);
+    camera.updateProjectionMatrix();
+    return distance;
+  }
+
   function fit() {
     const c = controls.current;
     if (!c || !(camera instanceof PerspectiveCamera)) return;
     const subject = sphere.current;
-    const distance = fitDistance(subject.radius, camera.fov, size.width / size.height);
+    const distance = configureCamera();
+    if (distance === undefined) return;
     c.target.copy(subject.center);
-    c.minDistance = subject.radius * 1.15;
-    c.maxDistance = distance * 4;
-    camera.near = Math.max(0.005, subject.radius / 100);
-    camera.far = Math.max(100, distance * 10);
-    camera.updateProjectionMatrix();
     camera.position.copy(subject.center).addScaledVector(viewingDirection, distance);
     c.update();
   }
@@ -138,6 +187,7 @@ export default function SubjectCamera(props: Props) {
     c.update();
   }
 
-  return <OrbitControls ref={controls} makeDefault enableDamping={!reducedMotion} dampingFactor={0.08}
+  return <OrbitControls ref={controls} makeDefault onStart={preserveInteraction}
+    enableDamping={!reducedMotion} dampingFactor={0.08}
     maxPolarAngle={Math.PI - 0.15} minPolarAngle={0.15} enablePan={false} />;
 }
