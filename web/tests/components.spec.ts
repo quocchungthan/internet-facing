@@ -105,7 +105,8 @@ test('component search trims aliases, preserves identity and activates with Ente
   await search.press('Enter');
   await expect(canvas).toHaveAttribute('data-subject', 'engine-rod-study');
   await expect(page).toHaveURL(/item=engine-rod-study/);
-  await expect(page.locator('#selected-subject-heading')).toBeFocused();
+  await expect(page.getByRole('complementary', { name: 'Connecting rod learning' })
+    .getByRole('heading', { name: 'Connecting rod', exact: true })).toBeFocused();
   await page.screenshot({ path: testInfo.outputPath('component-search-selected-rod.png') });
 });
 
@@ -140,7 +141,8 @@ test('component search Enter activation works at the mobile viewport', async ({ 
   await search.fill('bore');
   await search.press('Enter');
   await expect(page.locator('canvas')).toHaveAttribute('data-subject', 'engine-cylinder-study');
-  await expect(page.locator('#selected-subject-heading')).toBeFocused();
+  await expect(page.getByRole('complementary', { name: 'Cylinder wall / bore learning' })
+    .getByRole('heading', { name: 'Cylinder wall / bore', exact: true })).toBeFocused();
 });
 
 const engineSubjectCases = [

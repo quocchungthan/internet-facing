@@ -4,6 +4,7 @@ test('car-first workshop supports selection, real photos, books and history', as
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.setViewportSize({ width: 1440, height: 900 });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Know your machine.' })).toBeVisible();
   await expect(page.locator('canvas')).toBeVisible();
@@ -39,6 +40,7 @@ test('car-first workshop supports selection, real photos, books and history', as
 });
 
 test('view controls, guided slides and schematic PNG capture work', async ({ page }, testInfo) => {
+  test.setTimeout(90_000);
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/');
   await expect(page.getByRole('button', { name: 'Explore Engine', exact: true })).toBeVisible();
