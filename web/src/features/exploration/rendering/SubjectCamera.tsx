@@ -23,6 +23,7 @@ export default function SubjectCamera(props: Props) {
   const controls = useRef<OrbitControlsImpl>(null);
   const handledAction = useRef<number | undefined>(action?.id);
   const interactedBeforeFit = useRef(false);
+  const initialFitScheduled = useRef(false);
   const pendingFit = useRef(2);
   const sphere = useRef(new Sphere());
   const { gl, scene, camera, size, invalidate } = useThree();
@@ -32,7 +33,8 @@ export default function SubjectCamera(props: Props) {
     && specificationFor(tree, item).drawing !== 'assembly'), [tree, selected]);
 
   useEffect(() => {
-    pendingFit.current = reducedMotion ? 2 : 20;
+    pendingFit.current = initialFitScheduled.current ? 1 : reducedMotion ? 2 : 20;
+    initialFitScheduled.current = true;
     gl.domElement.dataset.ready = 'false';
     invalidate();
   }, [vehicle.id, selectedId, isolated, mode, open, reducedMotion, size.width, size.height, gl, invalidate]);
@@ -180,7 +182,10 @@ export default function SubjectCamera(props: Props) {
         camera.position.copy(c.target).add(offset);
         break;
       case 'capture':
-        try { captureSchematic(gl, scene, camera, vehicle, part); }
+        try {
+          void captureSchematic(gl, scene, camera, vehicle, part)
+            .catch(error => onError(`Could not capture the view: ${error instanceof Error ? error.message : String(error)}`));
+        }
         catch (error) { onError(`Could not capture the view: ${error instanceof Error ? error.message : String(error)}`); }
         break;
     }

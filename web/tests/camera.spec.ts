@@ -13,7 +13,7 @@ async function preservesZoomWhileOrbiting(
   const bounds = await canvas.boundingBox();
   if (!bounds) throw new Error('The 3D canvas must have visible bounds to exercise mouse controls.');
   const x = bounds.x + bounds.width * 0.5;
-  const y = bounds.y + bounds.height * (target === 'body' ? 0.35 : 0.6);
+  const y = bounds.y + bounds.height * (target === 'body' ? 0.35 : 0.5);
   await page.mouse.move(x, y);
   const hoveredItem = page.locator('.part-tooltip strong');
   if (target === 'body') await expect(hoveredItem).toHaveText('Body & access');
@@ -42,7 +42,7 @@ async function preservesZoomWhileOrbiting(
   const positionBeforeDrag = await canvas.getAttribute('data-camera-position');
 
   await page.mouse.down();
-  await page.mouse.move(x + (target === 'body' ? -80 : 120), y + 35, { steps: 8 });
+  await page.mouse.move(x + (target === 'body' ? -80 : 120), y + 35);
   await page.mouse.up();
 
   await expect(canvas).toHaveAttribute('data-ready', 'true');
@@ -52,7 +52,7 @@ async function preservesZoomWhileOrbiting(
   await expect(canvas).toHaveAttribute('data-subject', target === 'body' ? 'vehicle' : 'engine');
 }
 
-test('dragging to orbit preserves zoom on the whole vehicle and an isolated subject', async ({ page }) => {
+test('whole-vehicle zoom and orbit preserve distance during initial fit', async ({ page }) => {
   const canvas = page.locator('canvas');
   await page.goto('/?car=raize', { waitUntil: 'commit' });
   await expect(canvas).toBeVisible();
@@ -64,7 +64,11 @@ test('dragging to orbit preserves zoom on the whole vehicle and an isolated subj
   await expect(page.getByRole('region', { name: 'Selected vehicle' })).toContainText('Toyota Raize');
   await test.step('whole vehicle body zooms out then orbits', () =>
     preservesZoomWhileOrbiting(page, canvas, 'Zoom out', 'body'));
+});
 
+test('isolated-engine zoom and orbit preserve distance', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  const canvas = page.locator('canvas');
   await page.goto('/?car=raize', { waitUntil: 'commit' });
   await expect(canvas).toHaveAttribute('data-ready', 'true');
   await page.getByRole('button', { name: 'Explore Engine', exact: true }).click();

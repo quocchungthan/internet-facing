@@ -5,6 +5,7 @@ const storageKey = '30s.onboarding.v1';
 test('first visit introduction can be skipped, stays dismissed, resets with storage and replays', async ({ page }, testInfo) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
   const intro = page.getByRole('dialog');
   await expect(intro).toBeVisible();

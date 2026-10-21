@@ -36,7 +36,7 @@ test('wiper check links observations to 3D, cleaning and verified outcome', asyn
   await guide.getByRole('button', { name: 'Clear sweep, no streaks or chatter', exact: true }).click();
   await expect(guide.getByRole('heading', { name: 'Check passed for this observation' })).toBeVisible();
   await guide.getByText('Your observation trail (4)', { exact: true }).click();
-  await expect(guide.getByRole('list')).toContainText('Glass and blades cleaned, arms lowered');
+  await expect(guide.locator('.repair-evidence ol')).toContainText('Glass and blades cleaned, arms lowered');
   await guide.getByRole('button', { name: 'Show windshield location on car', exact: true }).click();
   await expect(canvas).toHaveAttribute('data-isolated', 'false');
   await guide.getByRole('button', { name: 'Close troubleshooting', exact: true }).click();
