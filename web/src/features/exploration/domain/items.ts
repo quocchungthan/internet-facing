@@ -1,7 +1,10 @@
 import type { Vehicle } from '../../../domain/catalog';
+import { engineLessonItemIds } from '../../../domain/engineLessons';
+import { placementsForVehicle } from './engineLayout';
 
 export type Vector = [number, number, number];
 export type DrawingKind = 'assembly' | 'body' | 'engine-block' | 'engine-head' | 'engine-cover'
+  | 'engine-cylinder-wall' | 'engine-piston' | 'engine-rod' | 'engine-crankshaft'
   | 'lubrication' | 'intake' | 'cooling' | 'transmission' | 'wheel' | 'brake'
   | 'suspension' | 'electrical' | 'fuel' | 'exhaust' | 'wiper-arm' | 'wiper-blade' | 'wiper-rubber';
 export type ItemSpecification = { id: string; label: string; drawing: DrawingKind };
@@ -81,6 +84,18 @@ const partDrawings: Record<string, DrawingKind> = {
   suspension: 'assembly', electrical: 'electrical', fuel: 'fuel', exhaust: 'exhaust', body: 'body',
 };
 
+const coreEngineDrawings = [
+  ['engine-cylinder-study', 'engine-cylinder-wall'],
+  ['engine-piston-study', 'engine-piston'],
+  ['engine-rod-study', 'engine-rod'],
+  ['engine-crankshaft-study', 'engine-crankshaft'],
+] as const satisfies readonly (readonly [typeof engineLessonItemIds[number], DrawingKind])[];
+
+type AddItem = (
+  id: string, label: string, drawing: DrawingKind, parentId?: string,
+  position?: Vector, partId?: string, specificationId?: string
+) => void;
+
 export function createVehicleItems(vehicle: Vehicle): ItemTree {
   const items: Item[] = [];
   const specifications: ItemSpecification[] = [];
@@ -108,6 +123,7 @@ export function createVehicleItems(vehicle: Vehicle): ItemTree {
   for (const drawing of ['engine-block', 'engine-head', 'engine-cover'] as const) {
     add(drawing, drawing.replace('engine-', 'Engine '), drawing, 'engine', [0, 0, 0], 'engine');
   }
+  addCoreEngineItems(vehicle, add);
   addRunningGear(vehicle, add);
   add('wipers', 'Front windshield wipers', 'assembly', 'body', [0, 0, 0], 'body');
   for (const side of ['left', 'right'] as const) {
@@ -118,6 +134,16 @@ export function createVehicleItems(vehicle: Vehicle): ItemTree {
     add(`wiper-rubber-${side}`, 'Rubber contact edge', 'wiper-rubber', `wiper-blade-${side}`, [0, -0.035, 0], 'body', 'wiper-rubber');
   }
   return validateItems({ items, specifications });
+}
+
+function addCoreEngineItems(vehicle: Vehicle, add: AddItem) {
+  if (vehicle.id !== 'raize') return;
+  const placements = placementsForVehicle(vehicle.id);
+  for (const [itemId, drawing] of coreEngineDrawings) {
+    const placement = placements.find(candidate => candidate.itemId === itemId);
+    if (!placement) throw new Error(`Missing Raize engine placement for ${itemId}.`);
+    add(itemId, placement.label, drawing, 'engine', placement.position, 'engine');
+  }
 }
 
 function addRunningGear(vehicle: Vehicle, add: (

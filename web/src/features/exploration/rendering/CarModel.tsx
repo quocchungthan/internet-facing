@@ -2,6 +2,7 @@ import { useMemo, useState, type RefObject } from 'react';
 import { Html, useCursor } from '@react-three/drei';
 import type { Vehicle, ViewMode } from '../../../domain/catalog';
 import { createVehicleItems, itemLabel, specificationFor, subtreeIds, worldPosition, type Item, type ItemTree, type Vector } from '../domain/items';
+import { engineLessonItemIds } from '../../../domain/engineLessons';
 import { DrawingFactory } from './drawings/DrawingFactory';
 
 type Props = {
@@ -18,6 +19,21 @@ function drawingPosition(tree: ItemTree, item: Item, mode: ViewMode): Vector {
 }
 
 function labelPosition(vehicle: Vehicle, tree: ItemTree, item: Item, mode: ViewMode): Vector {
+  const studyOffsets: Record<typeof engineLessonItemIds[number], Vector> = {
+    'engine-cylinder-study': [0, 0.37, 0],
+    'engine-piston-study': [-0.15, 0.22, 0.03],
+    'engine-rod-study': [0.17, 0.01, 0.03],
+    'engine-crankshaft-study': [0, -0.27, 0],
+    'engine-intake-valve-study': [-0.17, 0.21, 0],
+    'engine-exhaust-valve-study': [0.17, 0.21, 0],
+    'engine-spark-plug-study': [0, 0.38, 0],
+  };
+  const studyId = engineLessonItemIds.find(id => id === item.id);
+  if (studyId) {
+    const [x, y, z] = drawingPosition(tree, item, mode);
+    const offset = studyOffsets[studyId];
+    return [x + offset[0], y + offset[1], z + offset[2]];
+  }
   const part = vehicle.parts.find(candidate => candidate.id === item.id);
   if (!part) return drawingPosition(tree, item, mode);
   const [x, y, z] = part.position;
@@ -25,7 +41,7 @@ function labelPosition(vehicle: Vehicle, tree: ItemTree, item: Item, mode: ViewM
   return [x, y + (part.system === 'chassis' ? 0.15 : 1.4), z + (z >= 0 ? 0.5 : -0.5)];
 }
 
-function ItemDrawing({ item, tree, props }: { item: Item; tree: ItemTree; props: Props }) {
+function ItemDrawing({ item, tree, props, cutaway }: { item: Item; tree: ItemTree; props: Props; cutaway: boolean }) {
   const [hovered, setHovered] = useState(false);
   useCursor(hovered);
   const spec = specificationFor(tree, item);
@@ -38,7 +54,8 @@ function ItemDrawing({ item, tree, props }: { item: Item; tree: ItemTree; props:
     onPointerOut={() => setHovered(false)}>
     <DrawingFactory kind={spec.drawing} classic={vehicle.geometry === 'classic-sedan'}
       length={vehicle.dimensions.length} width={vehicle.dimensions.width} axle={vehicle.dimensions.wheelbase / 2}
-      color={vehicle.color} ghost={mode !== 'exterior'} open={props.open || mode === 'exploded'} reducedMotion={props.reducedMotion} />
+      color={vehicle.color} ghost={mode !== 'exterior'} open={props.open || mode === 'exploded'} reducedMotion={props.reducedMotion}
+      cutaway={cutaway} />
     {hovered && <Html position={[0, 0.5, 0]} center style={{ pointerEvents: 'none' }}>
       <div className="part-tooltip"><strong>{itemLabel(tree, item)}</strong><small>Click to select this item</small></div>
     </Html>}
@@ -46,14 +63,19 @@ function ItemDrawing({ item, tree, props }: { item: Item; tree: ItemTree; props:
 }
 
 export default function CarModel(props: Props) {
-  const { vehicle, isolated, selectedId, mode, labels, portal } = props;
+  const { vehicle, isolated, selectedId, mode, labels, portal, open } = props;
   const tree = useMemo(() => createVehicleItems(vehicle), [vehicle]);
   const visible = isolated ? subtreeIds(tree, selectedId) : subtreeIds(tree, 'vehicle');
-  const drawable = tree.items.filter(item => visible.has(item.id) && specificationFor(tree, item).drawing !== 'assembly');
+  const lessonItems = new Set<string>(engineLessonItemIds);
+  const selectedStudy = lessonItems.has(selectedId);
+  const cutaway = vehicle.id === 'raize' && (open || mode !== 'exterior' || selectedId === 'engine' || selectedStudy);
+  const drawable = tree.items.filter(item => visible.has(item.id) && specificationFor(tree, item).drawing !== 'assembly'
+    && (cutaway || !lessonItems.has(item.id)));
   const labelItems = tree.items.filter(item => visible.has(item.id) && item.partId === item.id
-    && (isolated || mode !== 'exterior' || ['engine', 'wheels', 'body', 'cooling'].includes(item.id)));
+    && (isolated || mode !== 'exterior' || ['engine', 'wheels', 'body', 'cooling'].includes(item.id))
+    || cutaway && (selectedId === 'engine' || selectedStudy) && visible.has(item.id) && lessonItems.has(item.id));
   return <group name="vehicle-model" userData={{ subject: isolated ? selectedId : 'vehicle' }}>
-    {drawable.map(item => <ItemDrawing key={item.id} item={item} tree={tree} props={props} />)}
+    {drawable.map(item => <ItemDrawing key={item.id} item={item} tree={tree} props={props} cutaway={cutaway} />)}
     {labels && labelItems.map(item => {
       const position = labelPosition(vehicle, tree, item, mode);
       const spec = specificationFor(tree, item);
