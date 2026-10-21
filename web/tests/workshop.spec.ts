@@ -1,5 +1,61 @@
 import { expect, test } from './fixtures';
 
+test('selected vehicle paint drives a stable, readable interface theme', async ({ page }) => {
+  await page.goto('/?car=raize');
+  const workshop = page.locator('.workshop');
+  const theme = async () => workshop.evaluate(element => {
+    const style = getComputedStyle(element);
+    return {
+      vehicle: element.getAttribute('data-car-theme'),
+      paint: style.getPropertyValue('--vehicle-paint').trim(),
+      accent: style.getPropertyValue('--accent').trim(),
+    };
+  });
+
+  const redRaize = await theme();
+  expect(redRaize).toMatchObject({ vehicle: 'raize', paint: '#c83f38' });
+  expect(redRaize.accent).toMatch(/^#d[0-9a-f]{5}$/i);
+
+  await page.getByRole('combobox', { name: 'Choose car model' }).selectOption('impala');
+  const impala = await theme();
+  expect(impala).toMatchObject({ vehicle: 'impala', paint: '#383e48' });
+  expect(impala.accent).not.toBe(redRaize.accent);
+
+  await page.getByRole('combobox', { name: 'Choose car model' }).selectOption('raize');
+  expect(await theme()).toEqual(redRaize);
+});
+
+test('doors animate when motion is allowed', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.setViewportSize({ width: 640, height: 360 });
+  await page.goto('/');
+  const canvas = page.locator('canvas');
+  await expect(canvas).toHaveAttribute('data-ready', 'true');
+  const doors = page.getByRole('button', { name: 'Open hood and doors', exact: true });
+  await doors.click();
+  await expect(doors).toHaveAttribute('aria-pressed', 'true');
+  await page.waitForTimeout(100);
+  const movingFrame = await canvas.screenshot();
+  await page.waitForTimeout(500);
+  const settledFrame = await canvas.screenshot();
+  expect(movingFrame.equals(settledFrame)).toBe(false);
+});
+
+test('reduced motion keeps door changes immediate and stable', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.setViewportSize({ width: 640, height: 360 });
+  await page.goto('/');
+  const canvas = page.locator('canvas');
+  await expect(canvas).toHaveAttribute('data-ready', 'true');
+  const doors = page.getByRole('button', { name: 'Open hood and doors', exact: true });
+  await doors.click();
+  await expect(doors).toHaveAttribute('aria-pressed', 'true');
+  await page.waitForTimeout(300);
+  const settledFrame = await canvas.screenshot();
+  await page.waitForTimeout(300);
+  expect((await canvas.screenshot()).equals(settledFrame)).toBe(true);
+});
+
 test('car-first workshop supports selection, real photos, books and history', async ({ page }, testInfo) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));

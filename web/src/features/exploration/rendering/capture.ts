@@ -1,5 +1,6 @@
 import type { WebGLRenderer, Scene, Camera } from 'three';
 import type { Part, Vehicle } from '../../../domain/catalog';
+import { vehicleThemeStyle } from '../presentation/vehicleTheme';
 
 export function captureSchematic(gl: WebGLRenderer, scene: Scene, camera: Camera, vehicle: Vehicle, part?: Part): Promise<void> {
   gl.render(scene, camera);
@@ -13,7 +14,7 @@ export function captureSchematic(gl: WebGLRenderer, scene: Scene, camera: Camera
   const textScale = Math.max(1, capture.width / 1440);
   context.fillStyle = '#101716';
   context.fillRect(0, capture.height - 65 * textScale, capture.width, 65 * textScale);
-  context.fillStyle = '#d9f690';
+  context.fillStyle = vehicleThemeStyle(vehicle.color)['--accent'];
   context.font = `${16 * textScale}px sans-serif`;
   context.fillText(`30s / ${vehicle.year} ${vehicle.name}${part ? ` / ${part.label}` : ''}`, 22 * textScale, capture.height - 37 * textScale);
   context.fillStyle = '#c4ceba';
