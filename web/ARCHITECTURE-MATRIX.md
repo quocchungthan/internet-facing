@@ -115,7 +115,14 @@ removing/renaming fields, tightening input, or changing failure codes needs a ne
 operation version. Future HTTP/MCP/agent adapters call `runOperation` and map
 results (e.g. to RFC 9457 problem details); authorization, confirmation and
 idempotency for consequential writes belong in those adapters, not here.
-Domain adapters for catalog queries and wiper transitions are #49.
+First domain contracts (#49): `features/catalog/application/catalogOperations.ts`
+(`catalog.listVehicles` returns the bounded `Vehicle[]` without pagination;
+`catalog.getVehicle` returns `Vehicle | null` for a well-formed missing id) and
+`features/repair/application/wiperOperations.ts` (`repair.wiper.advance` wraps
+`advanceWiperGuide`; unavailable choices are `invalid_argument`). They wrap the
+existing data/transition without presentation imports or persistence. The React
+shells still call the domain directly; routing them through these contracts is
+not yet done and needs no behavior change when it is.
 
 The following limitations must stay visible rather than being filled with
 aspirational component names:
