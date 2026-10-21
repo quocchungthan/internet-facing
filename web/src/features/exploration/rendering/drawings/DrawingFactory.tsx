@@ -1,7 +1,7 @@
 import type { ComponentType } from 'react';
 import type { DrawingKind } from '../../domain/items';
 import { BodyDrawing } from './BodyDrawing';
-import { EngineBlock, EngineCover, EngineHead } from './EngineDrawing';
+import { EngineBlock, EngineCover, EngineCrankshaft, EngineCylinderWall, EngineHead, EnginePiston, EngineRod } from './EngineDrawing';
 import { BrakeDrawing, CoolingDrawing, ElectricalDrawing, ExhaustDrawing, IntakeDrawing,
   SuspensionDrawing, TransmissionDrawing, WheelDrawing, type DrawingProps } from './MechanicalDrawings';
 import { Box } from './primitives';
@@ -14,6 +14,10 @@ const drawings: Record<DrawingKind, ComponentType<Props>> = {
   'engine-block': EngineBlock,
   'engine-head': EngineHead,
   'engine-cover': EngineCover,
+  'engine-cylinder-wall': EngineCylinderWall,
+  'engine-piston': EnginePiston,
+  'engine-rod': EngineRod,
+  'engine-crankshaft': EngineCrankshaft,
   lubrication: () => <Box size={[0.55, 0.16, 0.42]} color="#b19b65" />,
   intake: IntakeDrawing,
   cooling: CoolingDrawing,
