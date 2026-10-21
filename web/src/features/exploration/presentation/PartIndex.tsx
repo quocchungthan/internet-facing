@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ArrowUpRight, Search, X } from 'lucide-react';
 import type { Part, System, Vehicle } from '../../../domain/catalog';
 import { IconButton } from '../../../components/IconButton';
-import { createVehicleItems, specificationFor, type ItemTree } from '../domain/items';
+import { createVehicleItems, itemLabel, type ItemTree } from '../domain/items';
 
 const systems: { id: System | 'all'; label: string }[] = [
   { id: 'all', label: 'All' }, { id: 'powertrain', label: 'Powertrain' },
@@ -12,7 +12,7 @@ function Hierarchy({ tree, parentId, onSelect }: { tree: ItemTree; parentId?: st
   return <ul className="item-children">{tree.items.filter(item => item.parentId === parentId).map(item =>
     <li key={item.id}>
       <button className="item-choice" onClick={() => onSelect(item.id)}>
-        {specificationFor(tree, item).label}
+        {itemLabel(tree, item)}
         {item.id.includes('-front-') || item.id.includes('-rear-') ? <small>{item.id.split('-').slice(1).join(' ')}</small> : null}
       </button>
       <Hierarchy tree={tree} parentId={item.id} onSelect={onSelect} />
