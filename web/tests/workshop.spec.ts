@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 
 test('car-first workshop supports selection, real photos, books and history', async ({ page }, testInfo) => {
   const errors: string[] = [];
