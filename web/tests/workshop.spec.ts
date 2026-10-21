@@ -193,6 +193,16 @@ test('invalid engine item links stay explicit and do not claim a focused scene',
   await expect(page.locator('.notification')).toContainText('not found');
 });
 
+test('a Raize lesson link on the Impala does not resolve across vehicles', async ({ page }) => {
+  await page.goto('/?car=impala&part=engine&item=engine-rod-study&isolate=1');
+  const canvas = page.locator('canvas');
+  await expect(canvas).toHaveAttribute('data-ready', 'true');
+  await expect(canvas).toHaveAttribute('data-subject', 'vehicle');
+  await expect(canvas).toHaveAttribute('data-isolated', 'false');
+  await expect(page.locator('.notification')).toContainText('not found');
+  await expect(page.getByRole('complementary', { name: 'Connecting rod learning' })).toHaveCount(0);
+});
+
 test('activating a child subject stops the guided tour', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Take a guided look' }).click();
