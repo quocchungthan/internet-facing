@@ -51,7 +51,11 @@ function ItemDrawing({ item, tree, props, cutaway }: { item: Item; tree: ItemTre
   return <group name={`item:${item.id}`} userData={{ itemId: item.id }}
     position={drawingPosition(tree, item, mode)}
     rotation={[0, spec.drawing === 'wheel' && item.position[2] < 0 ? Math.PI : 0, 0]}
-    onClick={event => { event.stopPropagation(); props.onSelect(item.id); }}
+    onClick={event => {
+      event.stopPropagation();
+      if (event.delta > 5) return;
+      props.onSelect(item.id);
+    }}
     onPointerOver={event => { event.stopPropagation(); setHovered(true); }}
     onPointerOut={() => setHovered(false)}>
     <DrawingFactory kind={spec.drawing} exhaust={item.id === 'engine-exhaust-valve-study'}
