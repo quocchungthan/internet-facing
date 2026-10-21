@@ -99,6 +99,15 @@ async function checkLearning(page: Page, flags: FeatureFlags) {
   subject = page.getByRole('complementary', { name: 'Piston learning' });
   await expect(subject.getByText('Gas pressure acts on the crown;', { exact: false })).toBeVisible();
   await expect(page.locator('canvas')).toHaveCount(flags.exploration ? 1 : 0);
+  if (!flags.exploration) {
+    const missingLessonUrl = new URL(page.url());
+    missingLessonUrl.search = '?car=raize&part=engine&item=engine-head';
+    await page.goto(missingLessonUrl.toString());
+    const missing = page.getByRole('complementary', { name: 'Engine head learning' });
+    await expect(missing.getByRole('status')).toHaveText('No reviewed explanation for this subject.');
+    await expect(missing.getByText('Three cylinders. A turbo.', { exact: false })).toHaveCount(0);
+    await expect(page.getByText(/Schematics are representative, not OEM geometry or repair access/)).toBeVisible();
+  }
 }
 
 async function checkSmallScreens(page: Page, flags: FeatureFlags) {
