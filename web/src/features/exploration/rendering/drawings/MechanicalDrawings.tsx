@@ -1,6 +1,6 @@
 import { Box, Pipe } from './primitives';
 
-export type DrawingProps = { classic: boolean; width: number; length: number; open: boolean; ghost: boolean; color: string; reducedMotion: boolean };
+export type DrawingProps = { classic: boolean; width: number; length: number; open: boolean; ghost: boolean; color: string; reducedMotion: boolean; cutaway?: boolean };
 
 export function WheelDrawing({ classic }: DrawingProps) {
   return <group>
