@@ -100,6 +100,23 @@ CI uploads evidence and must not auto-approve changed screenshots.
 This wiring is included in the PR, not proof that a remote check has passed or
 branch protection is active.
 
+**Operation boundary (contract v1, #48):** `src/application/contracts/operation.ts`
+defines `defineOperation`/`runOperation`. Each operation declares a dotted
+domain name, `query`/`mutation` kind, Zod input/output schemas and the domain
+failures it may report (`invalid_argument`, `not_found`, `conflict`,
+`unavailable`). Input is validated before execution; output is validated before
+return. Undeclared failures and invalid output are `contract_violation`;
+unexpected exceptions are `internal`. `AbortSignal` is execution context:
+a pre-aborted call is `cancelled` without validation or execution, and abort
+during execution is `cancelled` without any rollback claim. The module has no
+React, browser, server or transport dependency and implies no persistence.
+v1 compatibility: adding optional input fields or new operations is compatible;
+removing/renaming fields, tightening input, or changing failure codes needs a new
+operation version. Future HTTP/MCP/agent adapters call `runOperation` and map
+results (e.g. to RFC 9457 problem details); authorization, confirmation and
+idempotency for consequential writes belong in those adapters, not here.
+Domain adapters for catalog queries and wiper transitions are #49.
+
 The following limitations must stay visible rather than being filled with
 aspirational component names:
 
