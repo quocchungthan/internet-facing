@@ -21,7 +21,25 @@
   "sources": [
     { "id": "toyota-launch", "title": "Toyota launches the new Raize in Japan · 5 Nov 2019", "url": "https://global.toyota/en/newsroom/toyota/29251184.html", "scope": "Primary source: Japanese launch powertrain, dimensions, suspension and equipment. Not a service schedule." },
     { "id": "toyota-manuals", "title": "Toyota Japan · owner manual library", "url": "https://toyota.jp/ownersmanual/", "scope": "Locate the manual matching build date and chassis. Exact fluids, intervals, lift points and torque settings must be verified there." },
-    { "id": "tire-safety", "title": "NHTSA · Tires", "url": "https://www.nhtsa.gov/vehicle-safety/tires", "scope": "General cold-pressure, tread, age and damage guidance; use the vehicle placard rather than tire-sidewall maximum pressure." }
+    { "id": "tire-safety", "title": "NHTSA · Tires", "url": "https://www.nhtsa.gov/vehicle-safety/tires", "scope": "General cold-pressure, tread, age and damage guidance; use the vehicle placard rather than tire-sidewall maximum pressure." },
+    {
+      "id": "nasa-engine-fundamentals",
+      "title": "NASA Glenn - Engine Parts",
+      "url": "https://www.grc.nasa.gov/www/k-12/airplane/engparts.html",
+      "scope": "Generic cylinder, piston, crankshaft and valve principles only. Historical Wright1903 aircraft example, not Raize fitment, internal geometry, dimensions, cylinder order or repair access. Exclude automatic inlet valve, contact ignition, horizontal layout, gravity fuel supply and propeller drive. Independently worded facts only; no source artwork."
+    },
+    {
+      "id": "nasa-four-stroke-operation",
+      "title": "NASA Glenn - Four-Stroke Engine Operation",
+      "url": "https://www.grc.nasa.gov/www/k-12/airplane/engopt.html",
+      "scope": "Generic intake, compression, power, exhaust and piston-rod/crank relationships only. Historical aircraft example, not configuration-specific actuation, valve timing, firing order, measured performance or repair procedure. Independently worded facts only; no source artwork."
+    },
+    {
+      "id": "doe-gasoline-general",
+      "title": "U.S. Department of Energy AFDC - How Do Gasoline Cars Work?",
+      "url": "https://afdc.energy.gov/vehicles/how-do-gasoline-cars-work",
+      "scope": "Generic automotive spark-plug and spark-ignited combustion vocabulary only, not Raize internal geometry, injection layout or service applicability. Do not transfer modern component fitment to Impala. Independently worded facts only; no source artwork."
+    }
   ],
   "photos": [
     { "id": "raize-engine", "src": "/media/raize-engine.jpg", "title": "The real 1KR-VET engine bay", "author": "オーバードライブ83 / Wikimedia Commons", "license": "CC BY-SA 4.0", "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/", "sourceUrl": "https://commons.wikimedia.org/wiki/File:2021_Toyota_Raize_1.0_Turbo_S_GR_Sport_A250RA_1KR-VET_engine_(20210521).jpg", "note": "2021 Indonesian GR Sport reference, not the 2019 Japanese Z. Shared engine family; trim and component packaging can differ. Resized, uncropped." },

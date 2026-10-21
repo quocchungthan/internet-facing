@@ -1,0 +1,163 @@
+[
+  {
+    "carId": "raize",
+    "itemId": "engine-cylinder-study",
+    "label": "Cylinder wall / bore",
+    "aliases": ["bore"],
+    "purpose": "The cylindrical surface guides the piston; the chamber is the variable space above it.",
+    "connections": [
+      { "itemId": "engine-piston-study", "relationship": "contains the piston path" }
+    ],
+    "scope": "generic-four-stroke",
+    "limitations": "One representative chamber, not exact 1KR-VET internal geometry, fitment, valve count/timing, cylinder order or repair access.",
+    "sourceRefs": [
+      {
+        "sourceId": "nasa-engine-fundamentals",
+        "locator": "Single-cylinder cutaway: piston inside cylinder and chamber at its end",
+        "retrievedOn": "2026-10-21"
+      }
+    ],
+    "authorship": "original"
+  },
+  {
+    "carId": "raize",
+    "itemId": "engine-piston-study",
+    "label": "Piston",
+    "aliases": ["piston crown"],
+    "purpose": "Gas pressure acts on the crown; its constrained motion is transmitted through the rod.",
+    "connections": [
+      { "itemId": "engine-rod-study", "relationship": "connects at the piston pin region" }
+    ],
+    "scope": "generic-four-stroke",
+    "limitations": "One representative chamber, not exact 1KR-VET internal geometry, fitment, valve count/timing, cylinder order or repair access.",
+    "sourceRefs": [
+      {
+        "sourceId": "nasa-engine-fundamentals",
+        "locator": "Paragraph beginning The crankshaft is turned by four pistons; hot gases drive pistons",
+        "retrievedOn": "2026-10-21"
+      },
+      {
+        "sourceId": "nasa-four-stroke-operation",
+        "locator": "Power Stroke: high-pressure gases acting on piston face; motion transmitted through piston rod",
+        "retrievedOn": "2026-10-21"
+      }
+    ],
+    "authorship": "original"
+  },
+  {
+    "carId": "raize",
+    "itemId": "engine-rod-study",
+    "label": "Connecting rod",
+    "aliases": ["piston rod"],
+    "purpose": "Connects the piston motion to a crank throw; it is not a pushrod or valve train part.",
+    "connections": [
+      { "itemId": "engine-crankshaft-study", "relationship": "joins a crank throw" },
+      { "itemId": "engine-piston-study", "relationship": "joins the piston pin region" }
+    ],
+    "scope": "generic-four-stroke",
+    "limitations": "One representative chamber, not exact 1KR-VET internal geometry, fitment, valve count/timing, cylinder order or repair access.",
+    "sourceRefs": [
+      {
+        "sourceId": "nasa-four-stroke-operation",
+        "locator": "Power Stroke: force transmitted by piston rod to crankshaft; linear motion converted to angular motion",
+        "retrievedOn": "2026-10-21"
+      }
+    ],
+    "authorship": "original"
+  },
+  {
+    "carId": "raize",
+    "itemId": "engine-crankshaft-study",
+    "label": "Crankshaft",
+    "aliases": ["crank"],
+    "purpose": "Converts the constrained piston/rod movement to shaft rotation.",
+    "connections": [
+      { "itemId": "engine-rod-study", "relationship": "receives load through the connecting rod" }
+    ],
+    "scope": "generic-four-stroke",
+    "limitations": "One representative chamber, not exact 1KR-VET internal geometry, fitment, valve count/timing, cylinder order or repair access.",
+    "sourceRefs": [
+      {
+        "sourceId": "nasa-engine-fundamentals",
+        "locator": "Paragraph beginning The crankshaft is turned by four pistons",
+        "retrievedOn": "2026-10-21"
+      },
+      {
+        "sourceId": "nasa-four-stroke-operation",
+        "locator": "Power Stroke: piston rod transmits force to crankshaft, converting linear to angular motion",
+        "retrievedOn": "2026-10-21"
+      }
+    ],
+    "authorship": "original"
+  },
+  {
+    "carId": "raize",
+    "itemId": "engine-intake-valve-study",
+    "label": "Intake valve",
+    "aliases": ["inlet valve"],
+    "purpose": "Controls the entry path to the representative cylinder; exact timing/count not specified.",
+    "connections": [
+      { "itemId": "engine-cylinder-study", "relationship": "opens to the chamber region" }
+    ],
+    "scope": "generic-four-stroke",
+    "limitations": "One representative chamber, not exact 1KR-VET internal geometry, fitment, valve count/timing, cylinder order or repair access.",
+    "sourceRefs": [
+      {
+        "sourceId": "nasa-engine-fundamentals",
+        "locator": "Single-cylinder discussion: intake valve opens/closes entry to combustion chamber",
+        "retrievedOn": "2026-10-21"
+      },
+      {
+        "sourceId": "nasa-four-stroke-operation",
+        "locator": "Intake Stroke: intake open, exhaust closed; exclude historical automatic actuation",
+        "retrievedOn": "2026-10-21"
+      }
+    ],
+    "authorship": "original"
+  },
+  {
+    "carId": "raize",
+    "itemId": "engine-exhaust-valve-study",
+    "label": "Exhaust valve",
+    "aliases": ["outlet valve"],
+    "purpose": "Controls the exit path for burned gases; no emissions/diagnosis claim.",
+    "connections": [
+      { "itemId": "engine-cylinder-study", "relationship": "opens from the chamber region" }
+    ],
+    "scope": "generic-four-stroke",
+    "limitations": "One representative chamber, not exact 1KR-VET internal geometry, fitment, valve count/timing, cylinder order or repair access.",
+    "sourceRefs": [
+      {
+        "sourceId": "nasa-engine-fundamentals",
+        "locator": "Single-cylinder discussion: exhaust gases leave through exhaust valve",
+        "retrievedOn": "2026-10-21"
+      },
+      {
+        "sourceId": "nasa-four-stroke-operation",
+        "locator": "Exhaust Stroke: exhaust open, intake closed; spent gases exit",
+        "retrievedOn": "2026-10-21"
+      }
+    ],
+    "authorship": "original"
+  },
+  {
+    "carId": "raize",
+    "itemId": "engine-spark-plug-study",
+    "label": "Spark plug",
+    "aliases": ["ignition plug"],
+    "purpose": "Produces the spark initiating combustion; expanding gas, not the spark itself, drives the piston.",
+    "connections": [
+      { "itemId": "engine-cylinder-study", "relationship": "tip faces the chamber region" }
+    ],
+    "scope": "generic-four-stroke",
+    "limitations": "One representative chamber, not exact 1KR-VET internal geometry, fitment, valve count/timing, cylinder order or repair access.",
+    "sourceRefs": [
+      {
+        "sourceId": "doe-gasoline-general",
+        "locator": "Internal combustion engine (spark-ignited) entry: mixture ignited by spark from spark plug; first paragraph",
+        "retrievedOn": "2026-10-21"
+      }
+    ],
+    "authorship": "original"
+  }
+]
