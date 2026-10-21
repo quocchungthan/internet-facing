@@ -87,3 +87,64 @@ test('malformed shared state produces an explicit notice rather than a blank sce
   await expect(page.locator('.notification')).toContainText('not found');
   await expect(page.getByRole('combobox', { name: 'Choose car model' })).toHaveValue('raize');
 });
+
+test('exact engine subject survives reload, connected navigation, history and car switching', async ({ page }) => {
+  const subjectUrl = '/?car=raize&part=engine&item=engine-exhaust-valve-study&isolate=1';
+  await page.goto(subjectUrl);
+  const canvas = page.locator('canvas');
+  await expect(canvas).toHaveAttribute('data-ready', 'true');
+  await expect(canvas).toHaveAttribute('data-focusable', 'true');
+  await expect(canvas).toHaveAttribute('data-subject', 'engine-exhaust-valve-study');
+  await expect(canvas).toHaveAttribute('data-isolated', 'true');
+  await expect(page).toHaveURL(/item=engine-exhaust-valve-study/);
+  await page.reload();
+  await expect(canvas).toHaveAttribute('data-subject', 'engine-exhaust-valve-study');
+  await expect(canvas).toHaveAttribute('data-isolated', 'true');
+
+  const controls = page.getByRole('region', { name: 'Selected subject controls' });
+  const ancestry = controls.getByRole('group', { name: 'Subject ancestry' });
+  await expect(ancestry.getByRole('button', { name: 'Up to Powertrain system' })).toBeVisible();
+  await expect(ancestry.getByRole('button', { name: 'Up to Engine' })).toBeVisible();
+  const connected = controls.getByRole('group', { name: 'Connected subjects' }).getByRole('button').first();
+  await connected.click();
+  await expect(canvas).toHaveAttribute('data-subject', 'engine-cylinder-study');
+  await expect(page).toHaveURL(/item=engine-cylinder-study/);
+  await page.goBack();
+  await expect(canvas).toHaveAttribute('data-subject', 'engine-exhaust-valve-study');
+  await expect(canvas).toHaveAttribute('data-isolated', 'true');
+
+  await controls.getByRole('group', { name: 'Subject ancestry' }).getByRole('button', { name: 'Up to Engine' }).click();
+  await expect(canvas).toHaveAttribute('data-subject', 'engine');
+  await page.goBack();
+  await expect(canvas).toHaveAttribute('data-subject', 'engine-exhaust-valve-study');
+  await expect(canvas).toHaveAttribute('data-isolated', 'true');
+  await page.goForward();
+  await expect(canvas).toHaveAttribute('data-subject', 'engine');
+  await page.goBack();
+  await expect(canvas).toHaveAttribute('data-subject', 'engine-exhaust-valve-study');
+  await page.getByRole('combobox', { name: 'Choose car model' }).selectOption('impala');
+  await expect(canvas).toHaveAttribute('data-subject', 'vehicle');
+  await expect(canvas).toHaveAttribute('data-isolated', 'false');
+  await expect(page).toHaveURL(/car=impala$/);
+});
+
+test('invalid engine item links stay explicit and do not claim a focused scene', async ({ page }) => {
+  await page.goto('/?car=raize&part=engine&item=unknown-study&isolate=1');
+  const canvas = page.locator('canvas');
+  await expect(canvas).toHaveAttribute('data-ready', 'true');
+  await expect(canvas).toHaveAttribute('data-subject', 'vehicle');
+  await expect(canvas).toHaveAttribute('data-focusable', 'true');
+  await expect(page.locator('.notification')).toContainText('not found');
+});
+
+test('activating a child subject stops the guided tour', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Take a guided look' }).click();
+  await expect(page.getByText('GUIDED WALKTHROUGH')).toBeVisible();
+  await page.getByRole('button', { name: 'Component index', exact: true }).click();
+  const index = page.getByRole('complementary', { name: 'Component index' });
+  await index.getByText('Car / assembly / part hierarchy', { exact: true }).click();
+  await index.getByRole('button', { name: 'Spark plug', exact: true }).click();
+  await expect(page.locator('canvas')).toHaveAttribute('data-subject', 'engine-spark-plug-study');
+  await expect(page.getByText('GUIDED WALKTHROUGH')).toHaveCount(0);
+});

@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { ArrowUpRight, Search, X } from 'lucide-react';
-import type { Part, System, Vehicle } from '../../../domain/catalog';
+import type { System, Vehicle } from '../../../domain/catalog';
 import { IconButton } from '../../../components/IconButton';
-import { createVehicleItems, itemLabel, type ItemTree } from '../domain/items';
+import { engineLessons } from '../../../content';
+import { createVehicleItems, itemLabel, searchItemTree, type ItemTree } from '../domain/items';
 
 const systems: { id: System | 'all'; label: string }[] = [
   { id: 'all', label: 'All' }, { id: 'powertrain', label: 'Powertrain' },
@@ -19,30 +20,40 @@ function Hierarchy({ tree, parentId, onSelect }: { tree: ItemTree; parentId?: st
     </li>)}</ul>;
 }
 
-export function PartIndex({ vehicle, onSelect, onSelectItem, onClose }: {
-  vehicle: Vehicle; onSelect: (p: Part) => void; onSelectItem: (id: string) => void; onClose: () => void;
+export function PartIndex({ vehicle, onSelectItem, onClose }: {
+  vehicle: Vehicle; onSelectItem: (id: string) => void; onClose: () => void;
 }) {
   const [query, setQuery] = useState('');
   const [system, setSystem] = useState<System | 'all'>('all');
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => input.current?.focus(), []);
-  const matches = vehicle.parts.filter(p => (system === 'all' || p.system === system)
-    && `${p.label} ${p.description}`.toLowerCase().includes(query.toLowerCase()));
+  const tree = createVehicleItems(vehicle);
+  const matches = searchItemTree(tree, vehicle, engineLessons, query, system);
+  const activate = (itemId: string) => {
+    onSelectItem(itemId);
+    window.requestAnimationFrame(() => document.getElementById('selected-subject-heading')?.focus());
+  };
+  const activateFirstMatch = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== 'Enter' || !query.trim() || !matches[0]) return;
+    event.preventDefault();
+    activate(matches[0].itemId);
+  };
   return <aside className="part-index glass" aria-label="Component index">
     <div className="panel-heading"><div><span className="eyebrow">THE ANATOMY</span><h2>Find your part.</h2></div><IconButton label="Close component index" onClick={onClose}><X /></IconButton></div>
-    <label className="search-field"><Search size={17} /><input ref={input} value={query} onChange={e => setQuery(e.target.value)} placeholder="Search systems, parts, symptoms…" aria-label="Search components" /></label>
+    <label className="search-field"><Search size={17} /><input ref={input} value={query} onChange={e => setQuery(e.target.value)} onKeyDown={activateFirstMatch} placeholder="Search systems and components…" aria-label="Search components" /></label>
     <div className="system-filter">{systems.map(s => <button key={s.id} aria-pressed={s.id === system} onClick={() => setSystem(s.id)}>{s.label}</button>)}</div>
     <div className="index-results" aria-live="polite">
       {!query && system === 'all' && <details className="item-hierarchy">
         <summary>Car / assembly / part hierarchy</summary>
-        <Hierarchy tree={createVehicleItems(vehicle)} onSelect={onSelectItem} />
+        <Hierarchy tree={tree} onSelect={activate} />
       </details>}
-      {matches.map((p, i) => <button className="part-row" key={p.id} onClick={() => onSelect(p)}>
+      {matches.map((result, i) => <button className="part-row" key={result.itemId} onClick={() => activate(result.itemId)}>
         <span className="part-number">{String(i + 1).padStart(2, '0')}</span>
-        <span><strong>{p.label}</strong><small>{p.system}</small></span><ArrowUpRight size={17} />
+        <span><strong>{result.label}</strong><small>{result.pathLabel}</small>
+          <small>{result.system}{result.drawable ? '' : ` · ${result.reason}`}</small></span><ArrowUpRight size={17} />
       </button>)}
-      {!matches.length && <p className="muted">No matching parts. Try a different term or system.</p>}
+      {!matches.length && <p className="muted">No matching components. Try a different term or system.</p>}
     </div>
-    <div className="index-footer">{vehicle.parts.length} linked components · 4 systems</div>
+    <div className="index-footer">{matches.length} matching components · 4 systems</div>
   </aside>;
 }

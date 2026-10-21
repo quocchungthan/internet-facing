@@ -124,9 +124,10 @@ export default function ExplorationWorkshop() {
         <button key={id} aria-pressed={workshop.mode === id} onClick={() => workshop.setMode(id)}><Icon size={16} /><span>{label}</span></button>)}</div>
       <button className="schematic-disclosure" onClick={() => workshop.setDrawer('help')}><Sparkles size={13} /> Educational schematic <ArrowUpRight size={12} /></button>
     </footer>
-    {drawer === 'parts' && <PartIndex vehicle={vehicle} onSelect={workshop.selectPart} onSelectItem={workshop.selectItem} onClose={() => workshop.setDrawer(null)} />}
-    {workshop.item.id !== 'vehicle' && !drawer && !repair && <SubjectControls tree={workshop.tree} item={workshop.item}
-      isolated={workshop.isolated} onFocus={() => camera('focus')} onIsolate={workshop.isolate}
+    {drawer === 'parts' && <PartIndex vehicle={vehicle} onSelectItem={workshop.selectItem} onClose={() => workshop.setDrawer(null)} />}
+    {workshop.item.id !== 'vehicle' && !drawer && !repair && <SubjectControls carId={vehicle.id} tree={workshop.tree}
+      item={workshop.item} activation={workshop.activation} isolated={workshop.isolated}
+      onFocus={() => camera('focus')} onIsolate={workshop.isolate}
       onRestore={workshop.restore} onSelect={workshop.selectItem} />}
     {drawer === 'help' && <aside className="help-panel glass" aria-label="About this workshop">
       <div className="panel-heading"><span className="eyebrow">A LITTLE CONTEXT</span><IconButton label="Close help" onClick={() => workshop.setDrawer(null)}><X /></IconButton></div>

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { readSelection, type Part, type Vehicle, type ViewMode } from '../../../domain/catalog';
 import { createVehicleItems } from '../domain/items';
-import { readSubject, subjectSearch } from '../domain/subject';
+import { activateSubject, readSubject, subjectSearch } from '../domain/subject';
 
 export function useWorkshop(vehicles: Vehicle[]) {
   const initial = readSelection(window.location.search, vehicles);
@@ -9,7 +9,9 @@ export function useWorkshop(vehicles: Vehicle[]) {
   const [carId, setCarId] = useState(initial.vehicle.id);
   const [itemId, setItemId] = useState(initialSubject.item.id);
   const [isolated, setIsolated] = useState(initialSubject.isolated);
-  const [notice, setNotice] = useState(initial.invalid || initialSubject.invalid ? 'That vehicle or part link was not found. Showing the available catalog.' : '');
+  const [notice, setNotice] = useState(initial.invalid || initialSubject.invalid
+    ? 'That vehicle or part link was not found. Showing the available catalog.'
+    : initialSubject.activation.kind === 'information-only' ? initialSubject.activation.reason : '');
   const [mode, setMode] = useState<ViewMode>('exterior');
   const [open, setOpen] = useState(false);
   const [labels, setLabels] = useState(true);
@@ -18,16 +20,26 @@ export function useWorkshop(vehicles: Vehicle[]) {
   const vehicle = vehicles.find(v => v.id === carId)!;
   const tree = useMemo(() => createVehicleItems(vehicle), [vehicle]);
   const item = tree.items.find(candidate => candidate.id === itemId)!;
+  const activation = activateSubject(tree, itemId);
   const part = vehicle.parts.find(p => p.id === item.partId);
 
   const navigate = useCallback((nextVehicle: Vehicle, nextItem = 'vehicle', isolate = false) => {
+    const nextTree = nextVehicle.id === vehicle.id ? tree : createVehicleItems(nextVehicle);
+    const result = activateSubject(nextTree, nextItem);
+    if (result.kind === 'unavailable') {
+      setNotice(result.reason);
+      return result;
+    }
+    const nextIsolation = result.kind === 'focus' && isolate && nextItem !== 'vehicle';
     const url = new URL(window.location.href);
-    url.search = subjectSearch(url.search, nextVehicle, nextItem, isolate);
+    url.search = subjectSearch(url.search, nextVehicle, nextItem, nextIsolation);
     window.history.pushState(null, '', url);
     setCarId(nextVehicle.id);
     setItemId(nextItem);
-    setIsolated(isolate && nextItem !== 'vehicle');
-  }, []);
+    setIsolated(nextIsolation);
+    setNotice(result.kind === 'information-only' ? result.reason : '');
+    return result;
+  }, [tree, vehicle]);
 
   useEffect(() => {
     const onPop = () => {
@@ -37,26 +49,39 @@ export function useWorkshop(vehicles: Vehicle[]) {
       setItemId(subject.item.id);
       setIsolated(subject.isolated);
       setTour(false);
-      setNotice(selection.invalid || subject.invalid ? 'That vehicle or part link was not found.' : '');
+      setNotice(selection.invalid || subject.invalid
+        ? 'That vehicle or part link was not found.'
+        : subject.activation.kind === 'information-only' ? subject.activation.reason : '');
     };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, [vehicles]);
 
   const selectPart = (next?: Part, keepIsolation = isolated) => {
-    navigate(vehicle, next?.id, keepIsolation);
-    setDrawer(null);
+    const result = navigate(vehicle, next?.id, keepIsolation);
+    if (result.kind !== 'unavailable') setDrawer(null);
+    return result;
   };
   const selectItem = (id: string, keepIsolation = isolated) => {
-    navigate(vehicle, id, keepIsolation);
+    const result = activateSubject(tree, id);
+    if (result.kind === 'unavailable') {
+      setNotice(result.reason);
+      return result;
+    }
+    const navigated = navigate(vehicle, id, keepIsolation);
+    if (navigated.kind === 'unavailable') return navigated;
     setTour(false);
     setDrawer(null);
+    return navigated;
   };
-  const isolate = () => navigate(vehicle, itemId, true);
-  const restore = () => {
-    navigate(vehicle);
-    setTour(false);
+  const isolate = () => {
+    if (activation.kind !== 'focus') {
+      setNotice(activation.reason);
+      return activation;
+    }
+    return navigate(vehicle, itemId, true);
   };
+  const restore = () => { navigate(vehicle); setTour(false); };
   const selectCar = (next: string) => {
     const nextVehicle = vehicles.find(candidate => candidate.id === next);
     if (!nextVehicle) throw new Error(`Unknown vehicle ${next}.`);
@@ -78,7 +103,7 @@ export function useWorkshop(vehicles: Vehicle[]) {
     selectPart(vehicle.parts[next]);
   };
   return {
-    vehicle, part, tree, item, isolated, selectItem, isolate, restore,
+    vehicle, part, tree, item, activation, isolated, selectItem, isolate, restore,
     mode, setMode, open, setOpen, labels, setLabels, tour, setTour,
     drawer, setDrawer, selectPart, selectCar, startTour, stepTour, notice, setNotice,
   };

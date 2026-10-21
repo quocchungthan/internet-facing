@@ -1,14 +1,18 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
-import { PerspectiveCamera, Sphere } from 'three';
+import { Object3D, PerspectiveCamera, Sphere } from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import type { Part, Vehicle, ViewMode } from '../../../domain/catalog';
-import { createVehicleItems, subtreeIds } from '../domain/items';
+import { createVehicleItems, specificationFor, subtreeIds } from '../domain/items';
 import { captureSchematic } from './capture';
 import { fitDistance, subjectBounds, viewingDirection } from './subjectBounds';
 
 export type CameraAction = { id: number; kind: 'reset' | 'focus' | 'left' | 'right' | 'zoom-in' | 'zoom-out' | 'capture' };
+function focusesSelection(kind: CameraAction['kind']) {
+  return kind === 'reset' || kind === 'focus';
+}
+
 type Props = {
   vehicle: Vehicle; part?: Part; selectedId: string; isolated: boolean; mode: ViewMode;
   open: boolean; reducedMotion: boolean; action?: CameraAction; onError: (message: string) => void;
@@ -23,6 +27,8 @@ export default function SubjectCamera(props: Props) {
   const { gl, scene, camera, size, invalidate } = useThree();
   const tree = useMemo(() => createVehicleItems(vehicle), [vehicle]);
   const selected = useMemo(() => subtreeIds(tree, selectedId), [tree, selectedId]);
+  const hasGeometry = useMemo(() => tree.items.some(item => selected.has(item.id)
+    && specificationFor(tree, item).drawing !== 'assembly'), [tree, selected]);
 
   useEffect(() => {
     pendingFit.current = reducedMotion ? 2 : 20;
@@ -39,25 +45,38 @@ export default function SubjectCamera(props: Props) {
     return () => node.removeEventListener('webglcontextlost', lost);
   }, [gl, onError]);
 
+  function publishCanvasState(model: Object3D, focusable: boolean, radius: number) {
+    const visible: string[] = [];
+    model.traverse(object => { if (object.userData.itemId) visible.push(object.userData.itemId); });
+    Object.assign(gl.domElement.dataset, {
+      ready: 'true', focusable: String(focusable), subject: selectedId, isolated: String(isolated),
+      items: visible.join(','), triangles: String(gl.info.render.triangles),
+      drawCalls: String(gl.info.render.calls), radius: String(radius),
+    });
+  }
+
+  function completePendingFit(model: Object3D) {
+    if (!hasGeometry) {
+      publishCanvasState(model, false, 0);
+      return false;
+    }
+    try {
+      sphere.current = subjectBounds(model, selected);
+      fit();
+      publishCanvasState(model, true, sphere.current.radius);
+    } catch (error) {
+      onError(error instanceof Error ? error.message : String(error));
+    }
+    return true;
+  }
+
   useFrame(() => {
     const c = controls.current;
     const model = scene.getObjectByName('vehicle-model');
     if (!c || !model || !(camera instanceof PerspectiveCamera)) return;
     if (pendingFit.current > 0) invalidate();
     if (pendingFit.current > 0 && --pendingFit.current === 0) {
-      try {
-        sphere.current = subjectBounds(model, selected);
-        fit();
-        const visible: string[] = [];
-        model.traverse(object => { if (object.userData.itemId) visible.push(object.userData.itemId); });
-        Object.assign(gl.domElement.dataset, {
-          ready: 'true', subject: selectedId, isolated: String(isolated), items: visible.join(','),
-          triangles: String(gl.info.render.triangles), drawCalls: String(gl.info.render.calls),
-          radius: String(sphere.current.radius),
-        });
-      } catch (error) {
-        onError(error instanceof Error ? error.message : String(error));
-      }
+      if (!completePendingFit(model)) return;
     }
     gl.domElement.dataset.cameraDistance = String(camera.position.distanceTo(c.target));
     gl.domElement.dataset.target = c.target.toArray().join(',');
@@ -85,19 +104,36 @@ export default function SubjectCamera(props: Props) {
   function performAction() {
     const c = controls.current;
     if (!c || !action) return;
+    if (focusesSelection(action.kind) && !hasGeometry) {
+      onError('This subject has no drawable geometry to focus. Use the component index to explore available geometry.');
+      return;
+    }
     const offset = camera.position.clone().sub(c.target);
-    if (action.kind === 'reset' || action.kind === 'focus') fit();
-    if (action.kind === 'left' || action.kind === 'right') {
-      offset.applyAxisAngle(camera.up, action.kind === 'left' ? 0.3 : -0.3);
-      camera.position.copy(c.target).add(offset);
-    }
-    if (action.kind === 'zoom-in' || action.kind === 'zoom-out') {
-      offset.multiplyScalar(action.kind === 'zoom-in' ? 0.85 : 1.15).clampLength(c.minDistance, c.maxDistance);
-      camera.position.copy(c.target).add(offset);
-    }
-    if (action.kind === 'capture') {
-      try { captureSchematic(gl, scene, camera, vehicle, part); }
-      catch (error) { onError(`Could not capture the view: ${error instanceof Error ? error.message : String(error)}`); }
+    switch (action.kind) {
+      case 'reset':
+      case 'focus':
+        fit();
+        break;
+      case 'left':
+        offset.applyAxisAngle(camera.up, 0.3);
+        camera.position.copy(c.target).add(offset);
+        break;
+      case 'right':
+        offset.applyAxisAngle(camera.up, -0.3);
+        camera.position.copy(c.target).add(offset);
+        break;
+      case 'zoom-in':
+        offset.multiplyScalar(0.85).clampLength(c.minDistance, c.maxDistance);
+        camera.position.copy(c.target).add(offset);
+        break;
+      case 'zoom-out':
+        offset.multiplyScalar(1.15).clampLength(c.minDistance, c.maxDistance);
+        camera.position.copy(c.target).add(offset);
+        break;
+      case 'capture':
+        try { captureSchematic(gl, scene, camera, vehicle, part); }
+        catch (error) { onError(`Could not capture the view: ${error instanceof Error ? error.message : String(error)}`); }
+        break;
     }
     c.update();
   }
