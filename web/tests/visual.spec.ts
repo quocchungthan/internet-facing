@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 
 test.use({ reducedMotion: 'reduce', viewport: { width: 1440, height: 900 } });
 
