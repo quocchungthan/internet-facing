@@ -34,12 +34,23 @@ export default function ExplorationWorkshop() {
   const reducedMotion = useReducedMotion();
   const camera = (kind: CameraAction['kind']) => setAction(previous => ({ id: (previous?.id ?? 0) + 1, kind }));
   const reportError = useCallback((message: string) => workshop.setNotice(message), [workshop.setNotice]);
+  const focusWorkshopControl = (label: string) => {
+    window.requestAnimationFrame(() => {
+      document.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)?.focus();
+    });
+  };
+  const closeSubjectLesson = () => {
+    workshop.selectPart();
+    focusWorkshopControl('Component index');
+  };
   useEffect(() => {
     const escape = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       if (repair) { setRepair(false); workshop.restore(); }
-      else if (drawer) workshop.setDrawer(null);
-      else { workshop.selectPart(); workshop.setTour(false); }
+      else if (drawer) {
+        workshop.setDrawer(null);
+        focusWorkshopControl(drawer === 'parts' ? 'Component index' : 'Workshop help');
+      } else { closeSubjectLesson(); workshop.setTour(false); }
     };
     window.addEventListener('keydown', escape);
     return () => window.removeEventListener('keydown', escape);
@@ -68,7 +79,7 @@ export default function ExplorationWorkshop() {
     setRepair(true);
     locateRepair('wipers');
   };
-  return <main className={`workshop ${hasDetail && !repair ? 'has-detail' : ''} ${repair ? 'has-repair' : ''}`}>
+  return <main className={`workshop ${hasDetail && !repair ? 'has-detail' : ''} ${hasDetail && learningSubject ? 'has-subject-lesson' : ''} ${repair ? 'has-repair' : ''}`}>
     <div className="scene" aria-label={`${vehicle.name} interactive schematic`} role="region">
       <Suspense fallback={<div className="scene-loading" role="status"><span className="loader" />Preparing your workshop…</div>}>
         <WorkshopScene vehicle={vehicle} part={part} selectedId={workshop.item.id} isolated={workshop.isolated} mode={workshop.mode} open={workshop.open}
@@ -130,13 +141,19 @@ export default function ExplorationWorkshop() {
         <button key={id} aria-pressed={workshop.mode === id} onClick={() => workshop.setMode(id)}><Icon size={16} /><span>{label}</span></button>)}</div>
       <button className="schematic-disclosure" onClick={() => workshop.setDrawer('help')}><Sparkles size={13} /> Educational schematic <ArrowUpRight size={12} /></button>
     </footer>
-    {drawer === 'parts' && <PartIndex vehicle={vehicle} onSelectItem={workshop.selectItem} onClose={() => workshop.setDrawer(null)} />}
+    {drawer === 'parts' && <PartIndex vehicle={vehicle} onSelectItem={workshop.selectItem} onClose={() => {
+      workshop.setDrawer(null);
+      focusWorkshopControl('Component index');
+    }} />}
     {workshop.item.id !== 'vehicle' && !drawer && !repair && <SubjectControls carId={vehicle.id} tree={workshop.tree}
       item={workshop.item} activation={workshop.activation} isolated={workshop.isolated}
       onFocus={() => camera('focus')} onIsolate={workshop.isolate}
       onRestore={workshop.restore} onSelect={workshop.selectItem} />}
     {drawer === 'help' && <aside className="help-panel glass" aria-label="About this workshop">
-      <div className="panel-heading"><span className="eyebrow">A LITTLE CONTEXT</span><IconButton label="Close help" onClick={() => workshop.setDrawer(null)}><X /></IconButton></div>
+      <div className="panel-heading"><span className="eyebrow">A LITTLE CONTEXT</span><IconButton label="Close help" onClick={() => {
+        workshop.setDrawer(null);
+        focusWorkshopControl('Workshop help');
+      }}><X /></IconButton></div>
       <h2>Curiosity, with care.</h2>
       <p>Orbit the car, click a marker or use the component index. X-ray reveals the systems; exploded view separates them. Open access panels and capture a PNG of any view.</p>
       <p>Open the hierarchy in the component index to select a system or an individual occurrence. Focus selection fits its geometry; Isolate selection keeps only that item and its descendants. Drill into the engine or a single wheel, then orbit, zoom and reset using the same camera controls. Show whole car restores the complete vehicle.</p>
@@ -150,7 +167,8 @@ export default function ExplorationWorkshop() {
     <Suspense fallback={<p className="notification glass" role="status">Opening feature...</p>}>
     {features.repair && repair && !drawer && <RepairGuide key={vehicle.id} vehicle={vehicle} onLocate={locateRepair}
       onClose={() => { setRepair(false); workshop.restore(); }} />}
-    {hasDetail && part && !drawer && !repair && <DetailPanel vehicle={vehicle} part={part} subject={learningSubject} onSelect={workshop.selectPart}
+    {hasDetail && part && !drawer && !repair && <DetailPanel vehicle={vehicle} part={part} subject={learningSubject}
+      onSelect={workshop.selectPart} onCloseSubject={closeSubjectLesson}
       tour={workshop.tour} onTourStep={workshop.stepTour} onEndTour={() => workshop.setTour(false)}
       openBook={openBook} onBookOpened={() => setOpenBook(false)} />}
     </Suspense>
