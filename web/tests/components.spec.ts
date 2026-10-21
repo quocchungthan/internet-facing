@@ -15,6 +15,7 @@ test('isolates engine descendants, controls their bounds, drills down and restor
   expect(visible).toEqual([
     'engine-block', 'engine-cover', 'engine-head', 'intake', 'lubrication',
     'engine-cylinder-study', 'engine-piston-study', 'engine-rod-study', 'engine-crankshaft-study',
+    'engine-intake-valve-study', 'engine-exhaust-valve-study', 'engine-spark-plug-study',
   ].sort());
   await expect(page.getByRole('button', { name: 'Explore Wheels & tires', exact: true })).toHaveCount(0);
   const before = Number(await canvas.getAttribute('data-camera-distance'));
@@ -64,6 +65,23 @@ test('component hierarchy selects a system and a distinct wheel occurrence', asy
   await page.screenshot({ path: testInfo.outputPath('single-wheel.png') });
 });
 
+test('component hierarchy distinguishes the shared Raize valve specification by occurrence', async ({ page }) => {
+  await page.goto('/?car=raize');
+  await page.getByRole('button', { name: 'Component index', exact: true }).click();
+  const index = page.getByRole('complementary', { name: 'Component index' });
+  await index.getByText('Car / assembly / part hierarchy', { exact: true }).click();
+  await index.getByRole('button', { name: 'Intake valve', exact: true }).click();
+  const canvas = page.locator('canvas');
+  await expect(canvas).toHaveAttribute('data-subject', 'engine-intake-valve-study');
+  await expect(page).toHaveURL(/item=engine-intake-valve-study/);
+  await page.getByRole('button', { name: 'Component index', exact: true }).click();
+  const reopenedIndex = page.getByRole('complementary', { name: 'Component index' });
+  await reopenedIndex.getByText('Car / assembly / part hierarchy', { exact: true }).click();
+  await reopenedIndex.getByRole('button', { name: 'Exhaust valve', exact: true }).click();
+  await expect(canvas).toHaveAttribute('data-subject', 'engine-exhaust-valve-study');
+  await expect(page).toHaveURL(/item=engine-exhaust-valve-study/);
+});
+
 test('clicking the isolated 3D engine picks a drawable child', async ({ page }) => {
   await page.goto('/?car=raize&part=engine&isolate=1');
   const canvas = page.locator('canvas');
@@ -75,12 +93,14 @@ test('clicking the isolated 3D engine picks a drawable child', async ({ page }) 
   expect([
     'engine-block', 'engine-head', 'engine-cover', 'intake', 'lubrication',
     'engine-cylinder-study', 'engine-piston-study', 'engine-rod-study', 'engine-crankshaft-study',
+    'engine-intake-valve-study', 'engine-exhaust-valve-study', 'engine-spark-plug-study',
   ]).toContain(item);
   await expect(canvas).toHaveAttribute('data-items', item!);
 });
 
 for (const itemId of [
   'engine-cylinder-study', 'engine-piston-study', 'engine-rod-study', 'engine-crankshaft-study',
+  'engine-intake-valve-study', 'engine-exhaust-valve-study', 'engine-spark-plug-study',
 ]) {
   test(`${itemId} renders as a selectable isolated subject with measured bounds`, async ({ page }, testInfo) => {
     await page.goto(`/?car=raize&part=engine&item=${itemId}&isolate=1`);
@@ -91,7 +111,19 @@ for (const itemId of [
     await expect(canvas).toHaveAttribute('data-items', itemId);
     expect(Number(await canvas.getAttribute('data-radius'))).toBeGreaterThan(0);
     expect(Number(await canvas.getAttribute('data-triangles'))).toBeGreaterThan(0);
+    const labels = page.getByRole('button', { name: 'Show part labels', exact: true });
+    await expect(labels).toHaveAttribute('aria-pressed', 'true');
+    await labels.click();
+    await expect(labels).toHaveAttribute('aria-pressed', 'false');
     await page.screenshot({ path: testInfo.outputPath(`${itemId}.png`) });
+    if (itemId.endsWith('valve-study') || itemId === 'engine-spark-plug-study') {
+      await page.goto('/?car=raize&part=engine&isolate=1');
+      await expect(canvas).toHaveAttribute('data-ready', 'true');
+      const sceneLabels = page.getByRole('button', { name: 'Show part labels', exact: true });
+      await sceneLabels.click();
+      await expect(sceneLabels).toHaveAttribute('aria-pressed', 'false');
+      await page.screenshot({ path: testInfo.outputPath(`${itemId}-whole-engine-cutaway.png`) });
+    }
   });
 }
 

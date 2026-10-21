@@ -1,5 +1,17 @@
 import { Box, Pipe } from './primitives';
 import { engineLayout } from '../../domain/engineLayout';
+import { Vector2 } from 'three';
+
+const valveProfile = [
+  new Vector2(0, -0.057), new Vector2(0.034, -0.057), new Vector2(0.034, -0.043),
+  new Vector2(0.01, -0.025), new Vector2(0.01, 0.095), new Vector2(0, 0.095),
+];
+const sparkPlugProfile = [
+  new Vector2(0, -0.13), new Vector2(0.004, -0.13), new Vector2(0.004, -0.105),
+  new Vector2(0.011, -0.095), new Vector2(0.011, -0.06), new Vector2(0.025, -0.06),
+  new Vector2(0.025, -0.034), new Vector2(0.015, -0.034), new Vector2(0.015, 0.07),
+  new Vector2(0, 0.07),
+];
 
 export function EngineBlock({ classic, cutaway = false }: { classic: boolean; cutaway?: boolean }) {
   if (!classic && cutaway) return <group scale={0.72}>
@@ -114,4 +126,19 @@ export function EngineCrankshaft() {
       <meshStandardMaterial color="#c0c8be" metalness={0.84} roughness={0.24} />
     </mesh>
   </group>;
+}
+
+export function EngineValve({ exhaust = false }: { exhaust?: boolean }) {
+  const lean = exhaust ? -0.16 : 0.16;
+  return <mesh rotation={[0, 0, lean]} castShadow>
+    <latheGeometry args={[valveProfile, 16]} />
+    <meshStandardMaterial color={exhaust ? '#c47b55' : '#72b9b2'} metalness={0.78} roughness={0.25} />
+  </mesh>;
+}
+
+export function EngineSparkPlug() {
+  return <mesh castShadow>
+    <latheGeometry args={[sparkPlugProfile, 16]} />
+    <meshStandardMaterial color="#d0d7cd" metalness={0.62} roughness={0.28} />
+  </mesh>;
 }

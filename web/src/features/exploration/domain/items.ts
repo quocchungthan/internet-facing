@@ -1,10 +1,11 @@
 import type { Vehicle } from '../../../domain/catalog';
-import { engineLessonItemIds } from '../../../domain/engineLessons';
+import { engineLessonItemIds, type EngineLesson } from '../../../domain/engineLessons';
 import { placementsForVehicle } from './engineLayout';
 
 export type Vector = [number, number, number];
 export type DrawingKind = 'assembly' | 'body' | 'engine-block' | 'engine-head' | 'engine-cover'
   | 'engine-cylinder-wall' | 'engine-piston' | 'engine-rod' | 'engine-crankshaft'
+  | 'engine-valve' | 'engine-spark-plug'
   | 'lubrication' | 'intake' | 'cooling' | 'transmission' | 'wheel' | 'brake'
   | 'suspension' | 'electrical' | 'fuel' | 'exhaust' | 'wiper-arm' | 'wiper-blade' | 'wiper-rubber';
 export type ItemSpecification = { id: string; label: string; drawing: DrawingKind };
@@ -59,7 +60,24 @@ export function specificationFor(tree: ItemTree, item: Item): ItemSpecification 
   return spec;
 }
 
+export function validateEngineLessonsAgainstItems(lessons: readonly EngineLesson[], items: readonly Item[]) {
+  const itemIds = new Set(items.map(item => item.id));
+  for (const itemId of engineLessonItemIds) {
+    if (!itemIds.has(itemId)) throw new Error(`Missing mounted engine lesson subject ${itemId}.`);
+  }
+  for (const lesson of lessons) {
+    if (!itemIds.has(lesson.itemId)) throw new Error(`Missing mounted engine lesson subject ${lesson.itemId}.`);
+    for (const connection of lesson.connections) {
+      if (!itemIds.has(connection.itemId)) {
+        throw new Error(`Missing mounted connection ${connection.itemId} in ${lesson.itemId}.`);
+      }
+    }
+  }
+}
+
 export function itemLabel(tree: ItemTree, item: Item): string {
+  if (item.id === 'engine-intake-valve-study') return 'Intake valve';
+  if (item.id === 'engine-exhaust-valve-study') return 'Exhaust valve';
   const label = specificationFor(tree, item).label;
   const location = item.id.match(/-(front|rear)-(left|right)$/);
   if (location) return `${label} (${location[1]} ${location[2]})`;
@@ -84,11 +102,14 @@ const partDrawings: Record<string, DrawingKind> = {
   suspension: 'assembly', electrical: 'electrical', fuel: 'fuel', exhaust: 'exhaust', body: 'body',
 };
 
-const coreEngineDrawings = [
+const engineLessonDrawings = [
   ['engine-cylinder-study', 'engine-cylinder-wall'],
   ['engine-piston-study', 'engine-piston'],
   ['engine-rod-study', 'engine-rod'],
   ['engine-crankshaft-study', 'engine-crankshaft'],
+  ['engine-intake-valve-study', 'engine-valve'],
+  ['engine-exhaust-valve-study', 'engine-valve'],
+  ['engine-spark-plug-study', 'engine-spark-plug'],
 ] as const satisfies readonly (readonly [typeof engineLessonItemIds[number], DrawingKind])[];
 
 type AddItem = (
@@ -123,7 +144,7 @@ export function createVehicleItems(vehicle: Vehicle): ItemTree {
   for (const drawing of ['engine-block', 'engine-head', 'engine-cover'] as const) {
     add(drawing, drawing.replace('engine-', 'Engine '), drawing, 'engine', [0, 0, 0], 'engine');
   }
-  addCoreEngineItems(vehicle, add);
+  addEngineLessonItems(vehicle, add);
   addRunningGear(vehicle, add);
   add('wipers', 'Front windshield wipers', 'assembly', 'body', [0, 0, 0], 'body');
   for (const side of ['left', 'right'] as const) {
@@ -136,13 +157,15 @@ export function createVehicleItems(vehicle: Vehicle): ItemTree {
   return validateItems({ items, specifications });
 }
 
-function addCoreEngineItems(vehicle: Vehicle, add: AddItem) {
+function addEngineLessonItems(vehicle: Vehicle, add: AddItem) {
   if (vehicle.id !== 'raize') return;
   const placements = placementsForVehicle(vehicle.id);
-  for (const [itemId, drawing] of coreEngineDrawings) {
+  for (const [itemId, drawing] of engineLessonDrawings) {
     const placement = placements.find(candidate => candidate.itemId === itemId);
     if (!placement) throw new Error(`Missing Raize engine placement for ${itemId}.`);
-    add(itemId, placement.label, drawing, 'engine', placement.position, 'engine');
+    const specificationId = drawing === 'engine-valve' ? 'engine-valve-study' : itemId;
+    const label = drawing === 'engine-valve' ? 'Engine valve' : placement.label;
+    add(itemId, label, drawing, 'engine', placement.position, 'engine', specificationId);
   }
 }
 

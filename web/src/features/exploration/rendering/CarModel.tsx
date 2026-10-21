@@ -1,8 +1,10 @@
 import { useMemo, useState, type RefObject } from 'react';
 import { Html, useCursor } from '@react-three/drei';
 import type { Vehicle, ViewMode } from '../../../domain/catalog';
-import { createVehicleItems, itemLabel, specificationFor, subtreeIds, worldPosition, type Item, type ItemTree, type Vector } from '../domain/items';
+import { createVehicleItems, itemLabel, specificationFor, subtreeIds, validateEngineLessonsAgainstItems,
+  worldPosition, type Item, type ItemTree, type Vector } from '../domain/items';
 import { engineLessonItemIds } from '../../../domain/engineLessons';
+import { engineLessons } from '../../../content';
 import { DrawingFactory } from './drawings/DrawingFactory';
 
 type Props = {
@@ -24,9 +26,9 @@ function labelPosition(vehicle: Vehicle, tree: ItemTree, item: Item, mode: ViewM
     'engine-piston-study': [-0.15, 0.22, 0.03],
     'engine-rod-study': [0.17, 0.01, 0.03],
     'engine-crankshaft-study': [0, -0.27, 0],
-    'engine-intake-valve-study': [-0.17, 0.21, 0],
-    'engine-exhaust-valve-study': [0.17, 0.21, 0],
-    'engine-spark-plug-study': [0, 0.38, 0],
+    'engine-intake-valve-study': [-0.17, 0, 0],
+    'engine-exhaust-valve-study': [0.17, 0, 0],
+    'engine-spark-plug-study': [0.5, -0.1, 0],
   };
   const studyId = engineLessonItemIds.find(id => id === item.id);
   if (studyId) {
@@ -52,7 +54,8 @@ function ItemDrawing({ item, tree, props, cutaway }: { item: Item; tree: ItemTre
     onClick={event => { event.stopPropagation(); props.onSelect(item.id); }}
     onPointerOver={event => { event.stopPropagation(); setHovered(true); }}
     onPointerOut={() => setHovered(false)}>
-    <DrawingFactory kind={spec.drawing} classic={vehicle.geometry === 'classic-sedan'}
+    <DrawingFactory kind={spec.drawing} exhaust={item.id === 'engine-exhaust-valve-study'}
+      classic={vehicle.geometry === 'classic-sedan'}
       length={vehicle.dimensions.length} width={vehicle.dimensions.width} axle={vehicle.dimensions.wheelbase / 2}
       color={vehicle.color} ghost={mode !== 'exterior'} open={props.open || mode === 'exploded'} reducedMotion={props.reducedMotion}
       cutaway={cutaway} />
@@ -64,7 +67,11 @@ function ItemDrawing({ item, tree, props, cutaway }: { item: Item; tree: ItemTre
 
 export default function CarModel(props: Props) {
   const { vehicle, isolated, selectedId, mode, labels, portal, open } = props;
-  const tree = useMemo(() => createVehicleItems(vehicle), [vehicle]);
+  const tree = useMemo(() => {
+    const items = createVehicleItems(vehicle);
+    if (vehicle.id === 'raize') validateEngineLessonsAgainstItems(engineLessons, items.items);
+    return items;
+  }, [vehicle]);
   const visible = isolated ? subtreeIds(tree, selectedId) : subtreeIds(tree, 'vehicle');
   const lessonItems = new Set<string>(engineLessonItemIds);
   const selectedStudy = lessonItems.has(selectedId);
@@ -78,12 +85,11 @@ export default function CarModel(props: Props) {
     {drawable.map(item => <ItemDrawing key={item.id} item={item} tree={tree} props={props} cutaway={cutaway} />)}
     {labels && labelItems.map(item => {
       const position = labelPosition(vehicle, tree, item, mode);
-      const spec = specificationFor(tree, item);
       return <Html key={`label-${item.id}`} portal={portal} position={[position[0], position[1] + 0.3, position[2]]}
         center zIndexRange={[10, 1]}>
         <button className={`hotspot ${selectedId === item.id ? 'selected' : ''}`}
-          onClick={() => props.onSelect(item.id)} aria-label={`Explore ${spec.label}`}>
-          <span className="hotspot-dot" /><span className="hotspot-label">{spec.label}</span>
+          onClick={() => props.onSelect(item.id)} aria-label={`Explore ${itemLabel(tree, item)}`}>
+          <span className="hotspot-dot" /><span className="hotspot-label">{itemLabel(tree, item)}</span>
         </button>
       </Html>;
     })}

@@ -1,13 +1,14 @@
 import type { ComponentType } from 'react';
 import type { DrawingKind } from '../../domain/items';
 import { BodyDrawing } from './BodyDrawing';
-import { EngineBlock, EngineCover, EngineCrankshaft, EngineCylinderWall, EngineHead, EnginePiston, EngineRod } from './EngineDrawing';
+import { EngineBlock, EngineCover, EngineCrankshaft, EngineCylinderWall, EngineHead,
+  EnginePiston, EngineRod, EngineSparkPlug, EngineValve } from './EngineDrawing';
 import { BrakeDrawing, CoolingDrawing, ElectricalDrawing, ExhaustDrawing, IntakeDrawing,
   SuspensionDrawing, TransmissionDrawing, WheelDrawing, type DrawingProps } from './MechanicalDrawings';
 import { Box } from './primitives';
 import { WiperArm, WiperBlade, WiperRubber } from './WiperDrawing';
 
-type Props = DrawingProps & { axle: number };
+type Props = DrawingProps & { axle: number; exhaust?: boolean };
 const drawings: Record<DrawingKind, ComponentType<Props>> = {
   assembly: () => null,
   body: BodyDrawing,
@@ -18,6 +19,8 @@ const drawings: Record<DrawingKind, ComponentType<Props>> = {
   'engine-piston': EnginePiston,
   'engine-rod': EngineRod,
   'engine-crankshaft': EngineCrankshaft,
+  'engine-valve': EngineValve,
+  'engine-spark-plug': EngineSparkPlug,
   lubrication: () => <Box size={[0.55, 0.16, 0.42]} color="#b19b65" />,
   intake: IntakeDrawing,
   cooling: CoolingDrawing,

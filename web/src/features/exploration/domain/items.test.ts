@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { engineLessons, vehicles } from '../../../content';
 import { engineLessonItemIds } from '../../../domain/engineLessons';
 import { engineLayout, placementsForVehicle, validateEngineLayoutLessons } from './engineLayout';
-import { createVehicleItems, subtreeIds, validateItems, worldPosition, type ItemTree } from './items';
+import { createVehicleItems, itemLabel, subtreeIds, validateEngineLessonsAgainstItems, validateItems,
+  worldPosition, type ItemTree } from './items';
 
 describe('vehicle item hierarchy', () => {
   it.each(vehicles)('keeps engine descendants and repeated occurrences distinct for $id', vehicle => {
@@ -29,7 +30,7 @@ describe('vehicle item hierarchy', () => {
     expect(invalid(t => { t.items[1].parentId = undefined; })).toThrow('one item root');
     expect(invalid(t => { t.items[1].parentId = 'engine'; })).toThrow('cycle');
   });
-  it('prepares seven Raize placements without adding unregistered drawings to the active tree', () => {
+  it('prepares seven Raize placements in the shared layout', () => {
     const placements = placementsForVehicle('raize');
     expect(placements.map(placement => placement.itemId)).toEqual(engineLessonItemIds);
     expect(placements.map(placement => placement.label)).toEqual([
@@ -46,23 +47,28 @@ describe('vehicle item hierarchy', () => {
     expect(engineLayout.contextCylinderCenters.map(([, , z]) => z)).toEqual([-0.1512, 0, 0.1512]);
     validateEngineLayoutLessons(engineLessons);
 
-    const tree = createVehicleItems(vehicles[0]);
-    const itemIds = new Set(tree.items.map(item => item.id));
-    const specificationIds = new Set(tree.specifications.map(spec => spec.id));
-    expect(engineLessonItemIds.slice(4).some(id => itemIds.has(id))).toBe(false);
-    expect(engineLessonItemIds.slice(4).some(id => specificationIds.has(id))).toBe(false);
   });
   it('rejects placement lessons with duplicate or missing Raize identities', () => {
     expect(() => validateEngineLayoutLessons([...engineLessons.slice(1), engineLessons[1]])).toThrow('match the seven Raize');
     expect(() => validateEngineLayoutLessons(engineLessons.slice(1))).toThrow('match the seven Raize');
   });
-  it('mounts only the four subjects that have real registered drawings', () => {
+  it('mounts every roster subject only with a real drawing entry', () => {
     const raize = createVehicleItems(vehicles.find(vehicle => vehicle.id === 'raize')!);
-    const coreIds = new Set<string>(engineLessonItemIds.slice(0, 4));
-    const studies = raize.items.filter(item => coreIds.has(item.id));
-    expect(studies).toHaveLength(4);
+    const studyIds = new Set<string>(engineLessonItemIds);
+    const studies = raize.items.filter(item => studyIds.has(item.id));
+    expect(studies.map(item => item.id)).toEqual(engineLessonItemIds);
     expect(studies.every(item => item.parentId === 'engine' && item.partId === 'engine')).toBe(true);
-    expect(studies.map(item => item.position)).toEqual(placementsForVehicle('raize').slice(0, 4).map(item => item.position));
-    expect(raize.items.some(item => engineLessonItemIds.slice(4).some(id => id === item.id))).toBe(false);
+    expect(studies.map(item => item.position)).toEqual(placementsForVehicle('raize').map(item => item.position));
+    const valves = studies.filter(item => item.id.includes('valve'));
+    expect(valves).toHaveLength(2);
+    expect(valves[0].specificationId).toBe(valves[1].specificationId);
+    expect(raize.specifications.find(spec => spec.id === valves[0].specificationId)?.drawing).toBe('engine-valve');
+    expect(raize.specifications.find(spec => spec.id === 'engine-spark-plug-study')?.drawing).toBe('engine-spark-plug');
+    expect(valves.map(item => itemLabel(raize, item))).toEqual(['Intake valve', 'Exhaust valve']);
+    validateEngineLessonsAgainstItems(engineLessons, raize.items);
+    const impala = createVehicleItems(vehicles.find(vehicle => vehicle.id === 'impala')!);
+    expect(impala.items.some(item => studyIds.has(item.id))).toBe(false);
+    expect(() => validateEngineLessonsAgainstItems(engineLessons, raize.items.filter(item => item.id !== 'engine-piston-study')))
+      .toThrow('Missing mounted engine lesson subject');
   });
 });
