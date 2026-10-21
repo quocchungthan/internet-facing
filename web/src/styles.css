@@ -156,6 +156,8 @@ svg { flex-shrink: 0; }
 .subject-sources li + li { border-top: 1px solid var(--border); }
 .subject-sources a { color: var(--accent); font-size: 11px; }
 .subject-sources small { display: block; color: #afbea5; font-size: 10px; line-height: 1.65; }
+.subject-lesson-panel .detail-top button[aria-controls], .subject-lesson-fidelity { display: none; }
+.subject-lesson-panel .detail-scroll[hidden] { display: none; }
 .content-disclosure { color: #becab6; font-size: 12px; max-width: 760px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: #d9f69008; }
 .text-action { display: flex; align-items: center; gap: 9px; padding: 13px 0; margin-top: 12px; background: none; color: var(--accent); font-size: 11px; text-decoration: none; text-align: left; }
 .source-card { display: flex; align-items: flex-start; gap: 15px; text-decoration: none; padding: 15px 0; border-bottom: 1px solid var(--border); }
@@ -302,15 +304,31 @@ svg { flex-shrink: 0; }
   .detail-panel .detail-top { padding: 6px 12px 0 19px; }
   .detail-panel > h2 { margin-left: 19px; font-size: 25px; margin-top: 0; }
   .detail-summary { display: none; }
+  .subject-lesson-panel .detail-summary { display: block; margin: 0 0 16px; }
+  .subject-lesson-panel .detail-top button[aria-controls] { display: inline-flex; }
+  .subject-lesson-fidelity { display: block; margin: 0 19px 12px; color: #afbea5; font-size: 8px; line-height: 1.5; }
+  .subject-lesson-panel.is-collapsed { max-height: none; }
+  .subject-lesson-panel.is-collapsed > h2 { margin-bottom: 4px; }
   .detail-tabs { padding-left: 12px; }
   .detail-tabs button { padding-top: 8px; padding-bottom: 8px; }
   .detail-scroll { padding: 17px 19px; }
   .has-detail .scene { right: 0; bottom: 33%; top: -9%; }
   .has-detail .vehicle-caption { display: none; }
   .has-detail .side-rail { top: 24%; }
-  .has-detail .camera-controls { top: 145px; bottom: auto; }
+  .has-detail .camera-controls { top: 125px; bottom: auto; }
   .has-detail .side-rail .icon-button { height: 32px; }
   .has-detail .side-rail .rail-divider { margin: 3px 0; }
+  .has-subject-lesson .subject-controls { max-height: none; overflow: visible; padding: 6px 8px; }
+  .has-subject-lesson .subject-heading { display: block; margin: 0 0 6px; }
+  .has-subject-lesson .subject-heading .eyebrow { display: none; }
+  .has-subject-lesson .subject-heading strong { display: block; font-size: 12px; line-height: 1.3; }
+  .has-subject-lesson .subject-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+  .has-subject-lesson .subject-actions button { min-width: 0; min-height: 36px; padding: 4px 2px; font-size: 8px; white-space: nowrap; }
+  .has-subject-lesson .subject-controls .subject-children[aria-label="Subject ancestry"] { border: 0; padding: 0; margin: 4px 0 0; }
+  .has-subject-lesson .subject-controls .subject-children[aria-label="Subject ancestry"] button { min-height: 24px; padding: 3px 6px; font-size: 8px; }
+  .has-subject-lesson .subject-controls .subject-children[aria-label="Subject ancestry"] button:not(:last-child),
+  .has-subject-lesson .subject-controls .subject-children[aria-label="Subject children"],
+  .has-subject-lesson .subject-controls .subject-children[aria-label="Connected subjects"] { display: none; }
   .part-index { left: 64px; right: 14px; width: auto; top: 119px; bottom: 89px; padding: 14px; }
   .notification { top: 83px; font-size: 11px; }
   .hotspot-label { display: none; }

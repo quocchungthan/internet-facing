@@ -128,6 +128,62 @@ test('exact engine subject survives reload, connected navigation, history and ca
   await expect(page).toHaveURL(/car=impala$/);
 });
 
+test('keyboard search keeps the selected lesson through mobile collapse, Back, and a car change', async ({ page }, testInfo) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Component index', exact: true }).press('Enter');
+  const index = page.getByRole('complementary', { name: 'Component index' });
+  const search = index.getByRole('textbox', { name: 'Search components' });
+  await search.fill('piston rod');
+  await search.press('Enter');
+
+  const canvas = page.locator('canvas');
+  const lesson = page.getByRole('complementary', { name: 'Connecting rod learning' });
+  await expect(lesson.getByRole('heading', { name: 'Connecting rod', exact: true })).toBeFocused();
+  await expect(lesson.getByText('Connects the piston motion to a crank throw;', { exact: false })).toBeVisible();
+  await expect(page).toHaveURL(/item=engine-rod-study/);
+  await page.getByRole('button', { name: 'Isolate selection', exact: true }).press('Enter');
+  await expect(canvas).toHaveAttribute('data-isolated', 'true');
+  await expect(canvas).toHaveAttribute('data-subject', 'engine-rod-study');
+  await page.screenshot({ path: testInfo.outputPath('keyboard-selected-rod-desktop.png') });
+
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.getByRole('button', { name: 'Collapse selected subject lesson' }).press('Enter');
+  const expand = lesson.getByRole('button', { name: 'Expand selected subject lesson' });
+  await expect(expand).toBeFocused();
+  await expand.press('Enter');
+  await expect(lesson.getByRole('button', { name: 'Collapse selected subject lesson' })).toBeFocused();
+  await expect(canvas).toHaveAttribute('data-isolated', 'true');
+  await expect(page).toHaveURL(/item=engine-rod-study.*isolate=1/);
+  await page.screenshot({ path: testInfo.outputPath('keyboard-selected-rod-mobile-expanded.png') });
+
+  await page.goBack();
+  await expect(canvas).toHaveAttribute('data-subject', 'engine-rod-study');
+  await expect(canvas).toHaveAttribute('data-isolated', 'false');
+  await page.getByRole('button', { name: 'Component index', exact: true }).press('Enter');
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('complementary', { name: 'Component index' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Component index', exact: true })).toBeFocused();
+  await expect(canvas).toHaveAttribute('data-subject', 'engine-rod-study');
+
+  await page.getByRole('combobox', { name: 'Choose car model' }).selectOption('impala');
+  await expect(canvas).toHaveAttribute('data-subject', 'vehicle');
+  await expect(page).toHaveURL(/car=impala$/);
+  await page.goBack();
+  await expect(canvas).toHaveAttribute('data-subject', 'engine-rod-study');
+  await expect(canvas).toHaveAttribute('data-isolated', 'false');
+  await expect(lesson).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('keyboard-selected-rod-history-restored.png') });
+
+  await lesson.getByRole('button', { name: 'Close part details' }).press('Enter');
+  await expect(page.getByRole('button', { name: 'Component index', exact: true })).toBeFocused();
+  await expect(canvas).toHaveAttribute('data-subject', 'vehicle');
+  const overflow = await page.evaluate(() =>
+    document.documentElement.scrollWidth > window.innerWidth || document.documentElement.scrollHeight > window.innerHeight);
+  expect(overflow).toBe(false);
+});
+
 test('invalid engine item links stay explicit and do not claim a focused scene', async ({ page }) => {
   await page.goto('/?car=raize&part=engine&item=unknown-study&isolate=1');
   const canvas = page.locator('canvas');
