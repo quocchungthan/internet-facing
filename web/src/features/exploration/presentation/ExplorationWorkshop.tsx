@@ -22,6 +22,11 @@ const modes: { id: ViewMode; label: string; icon: typeof Eye }[] = [
 export default function ExplorationWorkshop() {
   const workshop = useWorkshop(vehicles);
   const { vehicle, part, drawer, notice } = workshop;
+  const selectedChild = Boolean(part && workshop.item.id !== part.id);
+  const learningSubject = selectedChild
+    ? { item: workshop.item, tree: workshop.tree, onSelectItem: workshop.selectItem }
+    : undefined;
+  const hasDetail = features.learning && Boolean(part) && (!workshop.isolated || selectedChild);
   const [action, setAction] = useState<CameraAction>();
   const [copied, setCopied] = useState(false);
   const [openBook, setOpenBook] = useState(false);
@@ -63,7 +68,7 @@ export default function ExplorationWorkshop() {
     setRepair(true);
     locateRepair('wipers');
   };
-  return <main className={`workshop ${features.learning && part && !workshop.isolated && !repair ? 'has-detail' : ''} ${repair ? 'has-repair' : ''}`}>
+  return <main className={`workshop ${hasDetail && !repair ? 'has-detail' : ''} ${repair ? 'has-repair' : ''}`}>
     <div className="scene" aria-label={`${vehicle.name} interactive schematic`} role="region">
       <Suspense fallback={<div className="scene-loading" role="status"><span className="loader" />Preparing your workshop…</div>}>
         <WorkshopScene vehicle={vehicle} part={part} selectedId={workshop.item.id} isolated={workshop.isolated} mode={workshop.mode} open={workshop.open}
@@ -109,6 +114,7 @@ export default function ExplorationWorkshop() {
       <div className="eyebrow">EXPLORE / {vehicle.year}</div>
       <h2>{vehicle.name}<span>{vehicle.subtitle}</span></h2>
       <p>{vehicle.character}</p>
+      <small className="schematic-fidelity">Representative schematic · not OEM geometry or service guidance</small>
     </section>
     <div className="viewport-label"><span className="status-dot" /> LIVE 3D <span className="muted">/</span> SCHEMATIC STUDY</div>
     <div className="camera-controls glass" role="group" aria-label="Camera controls">
@@ -144,7 +150,7 @@ export default function ExplorationWorkshop() {
     <Suspense fallback={<p className="notification glass" role="status">Opening feature...</p>}>
     {features.repair && repair && !drawer && <RepairGuide key={vehicle.id} vehicle={vehicle} onLocate={locateRepair}
       onClose={() => { setRepair(false); workshop.restore(); }} />}
-    {features.learning && part && !drawer && !workshop.isolated && !repair && <DetailPanel vehicle={vehicle} part={part} onSelect={workshop.selectPart}
+    {hasDetail && part && !drawer && !repair && <DetailPanel vehicle={vehicle} part={part} subject={learningSubject} onSelect={workshop.selectPart}
       tour={workshop.tour} onTourStep={workshop.stepTour} onEndTour={() => workshop.setTour(false)}
       openBook={openBook} onBookOpened={() => setOpenBook(false)} />}
     </Suspense>
