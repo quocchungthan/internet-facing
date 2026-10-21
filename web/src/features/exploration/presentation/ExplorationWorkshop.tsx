@@ -9,6 +9,7 @@ import { SubjectControls } from './SubjectControls';
 import type { CameraAction } from '../rendering/WorkshopScene';
 import type { ViewMode } from '../../../domain/catalog';
 import { features } from '../../../config/features';
+import { vehicleThemeStyle } from './vehicleTheme';
 
 const WorkshopScene = lazy(() => import('../rendering/WorkshopScene'));
 const DetailPanel = lazy(() => import('../../../components/DetailPanel').then(module => ({ default: module.DetailPanel })));
@@ -92,7 +93,8 @@ export default function ExplorationWorkshop() {
     workshop.setDrawer(null);
     setLog(!log);
   };
-  return <main className={`workshop ${hasDetail && !panel ? 'has-detail' : ''} ${hasDetail && learningSubject ? 'has-subject-lesson' : ''} ${panel ? 'has-repair' : ''}`}>
+  return <main className={`workshop ${hasDetail && !panel ? 'has-detail' : ''} ${hasDetail && learningSubject ? 'has-subject-lesson' : ''} ${panel ? 'has-repair' : ''}`}
+    data-car-theme={vehicle.id} style={vehicleThemeStyle(vehicle.color)}>
     <div className="scene" aria-label={`${vehicle.name} interactive schematic`} role="region">
       <Suspense fallback={<div className="scene-loading" role="status"><span className="loader" />Preparing your workshop…</div>}>
         <WorkshopScene vehicle={vehicle} part={part} selectedId={workshop.item.id} isolated={workshop.isolated} mode={workshop.mode} open={workshop.open}
