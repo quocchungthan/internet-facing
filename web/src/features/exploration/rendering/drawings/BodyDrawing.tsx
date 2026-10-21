@@ -1,9 +1,10 @@
 import { useMemo, useRef, type ReactNode } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { Group, MathUtils, Shape } from 'three';
+import { Group, Shape } from 'three';
 import type { Vector } from '../../domain/items';
 import { Box, Polygon } from './primitives';
 import type { DrawingProps } from './MechanicalDrawings';
+import { advanceHingeAngle } from './hingeMotion';
 
 function Hinge({ position, angle, axis, reduced, children }: {
   position: Vector; angle: number; axis: 'y' | 'z'; reduced: boolean; children: ReactNode;
@@ -12,8 +13,8 @@ function Hinge({ position, angle, axis, reduced, children }: {
   const invalidate = useThree(state => state.invalidate);
   useFrame((_, dt) => {
     if (!ref.current) return;
-    const next = reduced ? angle : MathUtils.damp(ref.current.rotation[axis], angle, 8, Math.min(dt, 1 / 30));
-    ref.current.rotation[axis] = Math.abs(next - angle) < 0.001 ? angle : next;
+    const next = advanceHingeAngle(ref.current.rotation[axis], angle, reduced, dt);
+    ref.current.rotation[axis] = next;
     if (ref.current.rotation[axis] !== angle) invalidate();
   });
   return <group ref={ref} position={position}>{children}</group>;
