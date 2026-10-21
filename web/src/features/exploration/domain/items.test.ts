@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { vehicles } from '../../../content';
+import { engineLessons, vehicles } from '../../../content';
+import { engineLessonItemIds } from '../../../domain/engineLessons';
+import { engineLayout, placementsForVehicle, validateEngineLayoutLessons } from './engineLayout';
 import { createVehicleItems, subtreeIds, validateItems, worldPosition, type ItemTree } from './items';
 
 describe('vehicle item hierarchy', () => {
@@ -26,5 +28,30 @@ describe('vehicle item hierarchy', () => {
     expect(invalid(t => { t.items.push(t.items[0]); })).toThrow('Duplicate');
     expect(invalid(t => { t.items[1].parentId = undefined; })).toThrow('one item root');
     expect(invalid(t => { t.items[1].parentId = 'engine'; })).toThrow('cycle');
+  });
+  it('prepares seven Raize placements without adding unregistered drawings to the active tree', () => {
+    const placements = placementsForVehicle('raize');
+    expect(placements.map(placement => placement.itemId)).toEqual(engineLessonItemIds);
+    expect(placements.map(placement => placement.label)).toEqual([
+      'Cylinder wall / bore', 'Piston', 'Connecting rod', 'Crankshaft',
+      'Intake valve', 'Exhaust valve', 'Spark plug',
+    ]);
+    expect(placementsForVehicle('impala')).toEqual([]);
+    expect(engineLayout).toMatchObject({
+      cylinderAxis: 'y',
+      crankshaftAxis: 'z',
+      representativeCylinder: 'engine-cylinder-study',
+    });
+    expect(engineLayout.contextCylinderCenters.map(([, y]) => y).every(y => Math.abs(y - 0.1728) < 0.000001)).toBe(true);
+    expect(engineLayout.contextCylinderCenters.map(([, , z]) => z)).toEqual([-0.1512, 0, 0.1512]);
+    validateEngineLayoutLessons(engineLessons);
+
+    const tree = createVehicleItems(vehicles[0]);
+    expect(tree.items.map(item => item.id)).not.toEqual(expect.arrayContaining([...engineLessonItemIds]));
+    expect(tree.specifications.some(spec => engineLessonItemIds.some(id => id === spec.id))).toBe(false);
+  });
+  it('rejects placement lessons with duplicate or missing Raize identities', () => {
+    expect(() => validateEngineLayoutLessons([...engineLessons.slice(1), engineLessons[1]])).toThrow('match the seven Raize');
+    expect(() => validateEngineLayoutLessons(engineLessons.slice(1))).toThrow('match the seven Raize');
   });
 });
