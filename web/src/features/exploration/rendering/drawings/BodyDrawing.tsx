@@ -12,7 +12,7 @@ function Hinge({ position, angle, axis, reduced, children }: {
   const invalidate = useThree(state => state.invalidate);
   useFrame((_, dt) => {
     if (!ref.current) return;
-    const next = reduced ? angle : MathUtils.damp(ref.current.rotation[axis], angle, 8, dt);
+    const next = reduced ? angle : MathUtils.damp(ref.current.rotation[axis], angle, 8, Math.min(dt, 1 / 30));
     ref.current.rotation[axis] = Math.abs(next - angle) < 0.001 ? angle : next;
     if (ref.current.rotation[axis] !== angle) invalidate();
   });

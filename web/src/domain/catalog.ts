@@ -42,7 +42,7 @@ export const vehicleSchema = z.object({
   transmission: z.string(),
   drive: z.string(),
   character: z.string(),
-  color: z.string(),
+  color: z.string().regex(/^#[0-9a-f]{6}$/i),
   geometry: z.enum(['compact-suv', 'classic-sedan']),
   dimensions: z.object({ length: z.number().positive(), width: z.number().positive(), wheelbase: z.number().positive() }),
   facts: z.array(z.object({ label: z.string(), value: z.string(), sourceId: id })),

@@ -4,6 +4,7 @@ import { readSelection, type Part } from '../domain/catalog';
 import { features } from '../config/features';
 import { readSubject, subjectSearch } from '../features/exploration/domain/subject';
 import { createVehicleItems, itemLabel, validateEngineLessonsAgainstItems } from '../features/exploration/domain/items';
+import { vehicleThemeStyle } from '../features/exploration/presentation/vehicleTheme';
 
 const DetailPanel = lazy(() => import('./DetailPanel').then(module => ({ default: module.DetailPanel })));
 const RepairGuide = lazy(() => import('../features/repair/presentation/RepairGuide').then(module => ({ default: module.RepairGuide })));
@@ -80,7 +81,7 @@ export default function ContentWorkshop() {
   }, [repair, log, vehicle.id, navigate]);
   const selectPart = (next?: Part) => { setOpenBook(false); navigate(vehicle.id, next?.id); };
   const active = features.repair || features.learning;
-  return <main className="content-workshop">
+  return <main className="content-workshop" data-car-theme={vehicle.id} style={vehicleThemeStyle(vehicle.color)}>
     <header>
       <a className="brand" href="/" aria-label="30s workshop home">30s</a>
       <h1>Know your machine.</h1>
