@@ -65,6 +65,11 @@ async function checkRepair(page: Page, flags: FeatureFlags) {
   await guide.getByRole('button', { name: 'Glass and blades cleaned, arms lowered' }).click();
   await guide.getByRole('button', { name: 'Clear sweep, no streaks or chatter' }).click();
   await expect(guide.getByRole('heading', { name: 'Check passed for this observation' })).toBeVisible();
+  await expect(guide.getByRole('group', { name: 'Check outcome' })).toContainText('Improved in this parked test');
+  await expect(guide.getByText('Generic guidance · not verified for this model')).toBeVisible();
+  await guide.getByRole('button', { name: 'Previous observation' }).click();
+  await guide.getByRole('button', { name: 'Could not run the parked wet-glass test' }).click();
+  await expect(guide.getByRole('group', { name: 'Check outcome' })).toContainText('Outcome: Not tested');
   await guide.getByRole('button', { name: 'Previous observation' }).click();
   await expect(guide.getByRole('heading', { name: '4. Check the result while parked' })).toBeVisible();
   await guide.getByRole('button', { name: 'Close troubleshooting' }).click();
@@ -126,13 +131,30 @@ async function checkSmallScreens(page: Page, flags: FeatureFlags) {
   }
 }
 
-for (let mask = 0; mask < 8; mask++) {
-  const flags = { exploration: Boolean(mask & 4), repair: Boolean(mask & 2), learning: Boolean(mask & 1) };
-  test(`independent features E${Number(flags.exploration)} R${Number(flags.repair)} L${Number(flags.learning)}`, async ({ page }, testInfo) => {
+async function checkOnboarding(page: Page, flags: FeatureFlags) {
+  const intro = page.getByRole('dialog', { name: 'Welcome to 30s' });
+  const anyFeature = flags.exploration || flags.repair || flags.learning;
+  if (!flags.onboarding || !anyFeature) {
+    await page.waitForTimeout(300);
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Replay introduction' })).toHaveCount(0);
+    return;
+  }
+  await expect(intro).toBeVisible();
+  const expected = 1 + Number(flags.repair) + Number(flags.exploration) + Number(flags.learning);
+  await expect(intro.getByText(`INTRODUCTION · 1 OF ${expected}`)).toBeVisible();
+  await intro.getByRole('button', { name: 'Skip', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+}
+
+for (let mask = 0; mask < 16; mask++) {
+  const flags = { onboarding: Boolean(mask & 8), exploration: Boolean(mask & 4), repair: Boolean(mask & 2), learning: Boolean(mask & 1) };
+  test(`independent features O${Number(flags.onboarding)} E${Number(flags.exploration)} R${Number(flags.repair)} L${Number(flags.learning)}`, async ({ page }, testInfo) => {
     const directory = testInfo.outputPath('build');
     await run(process.execPath, [vite, 'build', '--outDir', directory], {
       env: {
         ...process.env,
+        VITE_FEATURE_ONBOARDING: String(flags.onboarding),
         VITE_FEATURE_EXPLORATION: String(flags.exploration),
         VITE_FEATURE_REPAIR: String(flags.repair),
         VITE_FEATURE_LEARNING: String(flags.learning),
@@ -148,6 +170,7 @@ for (let mask = 0; mask < 8; mask++) {
       page.on('request', request => requests.push(request.url()));
       await page.goto(baseURL);
       await expect(page.getByRole('main')).toBeVisible();
+      await checkOnboarding(page, flags);
       await checkExploration(page, flags.exploration);
       await checkRepair(page, flags);
       await checkLearning(page, flags);
@@ -162,6 +185,7 @@ for (let mask = 0; mask < 8; mask++) {
       if (!flags.exploration) expect(requests.some(url => /\/(?:three|WorkshopScene|ExplorationWorkshop)-/.test(url))).toBe(false);
       if (!flags.repair) expect(requests.some(url => /\/RepairGuide-/.test(url))).toBe(false);
       if (!flags.learning) expect(requests.some(url => /\/(?:DetailPanel|markdown)-/.test(url))).toBe(false);
+      if (!flags.onboarding) expect(requests.some(url => /\/FirstVisitGuide-/.test(url))).toBe(false);
       expect(errors).toEqual([]);
     } finally {
       if (server.exitCode === null && server.signalCode === null) {

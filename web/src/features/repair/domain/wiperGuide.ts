@@ -1,15 +1,24 @@
+import { parseGuideReference } from './guideReference';
+
+export type CheckOutcome = 'improved' | 'unresolved' | 'worse' | 'not-tested';
+
 export type GuideStep = {
   title: string;
   instruction: string;
   target: string;
-  choices: { label: string; next: string }[];
+  choices: { label: string; next: string; outcome?: CheckOutcome }[];
 };
 
-export const wiperSource = {
-  title: 'AAA: Windshield Wiper Safety and Maintenance',
-  url: 'https://www.acg.aaa.com/connect/blogs/4c/auto/windshield-wipers-safety-maintenance',
+export const wiperReference = parseGuideReference({
+  guideId: 'wiper-streaks',
+  source: {
+    title: 'AAA: Windshield Wiper Safety and Maintenance',
+    url: 'https://www.acg.aaa.com/connect/blogs/4c/auto/windshield-wipers-safety-maintenance',
+  },
+  scope: 'Cleaning, parked wet-glass testing, fitment checks and careful handling of conventional windshield wipers. Not blade sizes, attachment types or wiper-motor repair.',
   reviewed: '2026-10-20',
-};
+  applicability: { status: 'generic', appliesTo: 'conventional front windshield wipers on any car' },
+});
 
 export const wiperSteps = {
   prepare: {
@@ -45,9 +54,11 @@ export const wiperSteps = {
     instruction: 'With both blades secured and lowered, everyone clear and the windshield wet using the correct washer fluid, operate the wipers from inside the parked car. Never test on dry or icy glass. Check the swept view for streaks, missed areas and chatter. Switch the system off before any further inspection.',
     target: 'wipers',
     choices: [
-      { label: 'Clear sweep, no streaks or chatter', next: 'resolved' },
-      { label: 'Streaks remain after cleaning', next: 'replace' },
-      { label: 'No washer spray, no movement or abnormal action', next: 'service' },
+      { label: 'Clear sweep, no streaks or chatter', next: 'resolved', outcome: 'improved' },
+      { label: 'Streaks remain after cleaning', next: 'replace', outcome: 'unresolved' },
+      { label: 'No washer spray, no movement or abnormal action', next: 'service', outcome: 'unresolved' },
+      { label: 'Worse than the initial observation', next: 'service', outcome: 'worse' },
+      { label: 'Could not run the parked wet-glass test', next: 'notTested', outcome: 'not-tested' },
     ],
   },
   replace: {
@@ -64,13 +75,21 @@ export const wiperSteps = {
     instruction: 'Confirm both blades are securely attached and lowered. With everyone clear, test from inside the parked car on a wet windshield using the correct washer fluid. Check for a clear sweep without streaking, chatter or missed areas. Stop the wipers before inspecting again. Do not drive if visibility is impaired.',
     target: 'wipers',
     choices: [
-      { label: 'Clear sweep after replacement', next: 'resolved' },
-      { label: 'Still streaking or operation abnormal', next: 'service' },
+      { label: 'Clear sweep after replacement', next: 'resolved', outcome: 'improved' },
+      { label: 'Still streaking or operation abnormal', next: 'service', outcome: 'unresolved' },
+      { label: 'Worse than the initial observation', next: 'service', outcome: 'worse' },
+      { label: 'Could not run the parked wet-glass test', next: 'notTested', outcome: 'not-tested' },
     ],
   },
   resolved: {
     title: 'Check passed for this observation',
-    instruction: 'A clear parked test is useful evidence, not a guarantee in all weather. Recheck visibility before driving and monitor for recurrence. If streaking returns, do not repeatedly replace parts by guesswork: record the conditions and seek an inspection.',
+    instruction: 'A clear parked test is useful evidence, not a guarantee in all weather or a permanent repair. Recheck visibility before driving and monitor for recurrence. If streaking returns, do not repeatedly replace parts by guesswork: record the conditions and seek an inspection.',
+    target: 'wipers',
+    choices: [],
+  },
+  notTested: {
+    title: 'Result not tested yet',
+    instruction: 'Without a parked wet-glass test the result is unknown, so do not assume the streaking is fixed. Do not drive with impaired visibility. Run the parked test once it is safe, or record "not tested" when handing the check to a service provider.',
     target: 'wipers',
     choices: [],
   },
@@ -96,4 +115,41 @@ export function advanceWiperGuide(step: WiperStepId, choice: number): WiperStepI
   const next = option.next;
   if (!(next in wiperSteps)) throw new Error(`Unknown wiper-guide step ${next}.`);
   return next as WiperStepId;
+}
+
+export type WiperTrailEntry = { step: WiperStepId; choice: number };
+
+/** The latest verification decides the outcome; earlier ones are superseded. No verification means no outcome. */
+export function wiperOutcome(trail: readonly WiperTrailEntry[]): CheckOutcome | null {
+  for (let index = trail.length - 1; index >= 0; index--) {
+    const { step, choice } = trail[index];
+    const option: GuideStep['choices'][number] | undefined = wiperSteps[step].choices[choice];
+    if (option?.outcome) return option.outcome;
+  }
+  return null;
+}
+
+export const wiperPatterns = ['streaks', 'missed areas', 'chatter or skipping', 'smearing'] as const;
+export type WiperObservation = {
+  patterns: (typeof wiperPatterns)[number][];
+  side: 'driver' | 'passenger' | 'both' | 'unknown';
+  parkedWetGlass: boolean;
+};
+
+export const outcomeLabels: Record<CheckOutcome, string> = {
+  improved: 'Improved in this parked test (not proof of a permanent repair)',
+  unresolved: 'Unresolved',
+  worse: 'Worse than before',
+  'not-tested': 'Not tested',
+};
+
+/** Before/after are comparable only when both were recorded parked on wet glass. */
+export function compareWiperObservations(initial: WiperObservation | null, result: WiperObservation | null) {
+  if (!initial || !result) return { comparable: false as const, reason: 'Record both the initial and the result observation.' };
+  if (!initial.parkedWetGlass || !result.parkedWetGlass) {
+    return { comparable: false as const, reason: 'Both observations must be made parked, on wet glass, with the same washer test.' };
+  }
+  const describe = (observation: WiperObservation) =>
+    `${observation.patterns.length ? observation.patterns.join(', ') : 'no visible problem'} (${observation.side === 'unknown' ? 'side unknown' : `${observation.side} side`})`;
+  return { comparable: true as const, summary: `Before: ${describe(initial)}. After: ${describe(result)}.` };
 }

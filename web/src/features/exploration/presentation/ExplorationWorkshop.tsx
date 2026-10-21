@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
-import { ArrowLeft, ArrowRight, ArrowUpRight, BookOpen, Camera, Check, ChevronDown, CircleHelp, DoorOpen, Expand, Eye, EyeOff, Layers3, ListFilter, Maximize2, Minus, MousePointer2, Plus, RotateCcw, Share2, Sparkles, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ArrowUpRight, BookOpen, Camera, Check, ChevronDown, CircleHelp, ClipboardList, DoorOpen, Expand, Eye, EyeOff, Layers3, ListFilter, Maximize2, Minus, MousePointer2, Plus, RotateCcw, Share2, Sparkles, X } from 'lucide-react';
 import { vehicles } from '../../../content';
 import { useWorkshop } from '../application/useWorkshop';
 import { useReducedMotion } from '../../../hooks/useReducedMotion';
@@ -13,6 +13,8 @@ import { features } from '../../../config/features';
 const WorkshopScene = lazy(() => import('../rendering/WorkshopScene'));
 const DetailPanel = lazy(() => import('../../../components/DetailPanel').then(module => ({ default: module.DetailPanel })));
 const RepairGuide = lazy(() => import('../../repair/presentation/RepairGuide').then(module => ({ default: module.RepairGuide })));
+const ObservationLog = lazy(() => import('../../observations/presentation/ObservationLog').then(module => ({ default: module.ObservationLog })));
+const FirstVisitGuide = lazy(() => import('../../onboarding/presentation/FirstVisitGuide').then(module => ({ default: module.FirstVisitGuide })));
 const modes: { id: ViewMode; label: string; icon: typeof Eye }[] = [
   { id: 'exterior', label: 'Exterior', icon: Eye },
   { id: 'xray', label: 'X-ray', icon: Layers3 },
@@ -31,6 +33,9 @@ export default function ExplorationWorkshop() {
   const [copied, setCopied] = useState(false);
   const [openBook, setOpenBook] = useState(false);
   const [repair, setRepair] = useState(false);
+  const [log, setLog] = useState(false);
+  const [replayIntro, setReplayIntro] = useState(0);
+  const panel = repair || log;
   const reducedMotion = useReducedMotion();
   const camera = (kind: CameraAction['kind']) => setAction(previous => ({ id: (previous?.id ?? 0) + 1, kind }));
   const reportError = useCallback((message: string) => workshop.setNotice(message), [workshop.setNotice]);
@@ -47,6 +52,7 @@ export default function ExplorationWorkshop() {
     const escape = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       if (repair) { setRepair(false); workshop.restore(); }
+      else if (log) { setLog(false); focusWorkshopControl('Observation log'); }
       else if (drawer) {
         workshop.setDrawer(null);
         focusWorkshopControl(drawer === 'parts' ? 'Component index' : 'Workshop help');
@@ -56,7 +62,7 @@ export default function ExplorationWorkshop() {
     return () => window.removeEventListener('keydown', escape);
   });
   useEffect(() => {
-    const closeGuide = () => setRepair(false);
+    const closeGuide = () => { setRepair(false); setLog(false); };
     window.addEventListener('popstate', closeGuide);
     return () => window.removeEventListener('popstate', closeGuide);
   }, []);
@@ -76,10 +82,17 @@ export default function ExplorationWorkshop() {
     camera('focus');
   };
   const startRepair = () => {
+    setLog(false);
     setRepair(true);
     locateRepair('wipers');
   };
-  return <main className={`workshop ${hasDetail && !repair ? 'has-detail' : ''} ${hasDetail && learningSubject ? 'has-subject-lesson' : ''} ${repair ? 'has-repair' : ''}`}>
+  const openLog = () => {
+    if (repair) workshop.restore();
+    setRepair(false);
+    workshop.setDrawer(null);
+    setLog(!log);
+  };
+  return <main className={`workshop ${hasDetail && !panel ? 'has-detail' : ''} ${hasDetail && learningSubject ? 'has-subject-lesson' : ''} ${panel ? 'has-repair' : ''}`}>
     <div className="scene" aria-label={`${vehicle.name} interactive schematic`} role="region">
       <Suspense fallback={<div className="scene-loading" role="status"><span className="loader" />Preparing your workshop…</div>}>
         <WorkshopScene vehicle={vehicle} part={part} selectedId={workshop.item.id} isolated={workshop.isolated} mode={workshop.mode} open={workshop.open}
@@ -93,28 +106,29 @@ export default function ExplorationWorkshop() {
       <div className="vehicle-picker glass">
         <span className="picker-led" />
         <div><span className="eyebrow">IN YOUR GARAGE</span><label htmlFor="vehicle-select" className="sr-only">Choose car model</label>
-          <select id="vehicle-select" value={vehicle.id} onChange={e => { setRepair(false); workshop.selectCar(e.target.value); camera('reset'); }}>
+          <select id="vehicle-select" value={vehicle.id} onChange={e => { setRepair(false); setLog(false); workshop.selectCar(e.target.value); camera('reset'); }}>
             {vehicles.map(v => <option key={v.id} value={v.id}>{v.year} {v.name}</option>)}
           </select></div><ChevronDown size={15} aria-hidden="true" />
       </div>
       <div className="top-actions glass">
         <IconButton label={copied ? 'Link copied' : 'Copy link to this view'} onClick={share}>{copied ? <Check /> : <Share2 />}</IconButton>
-        <IconButton label="Workshop help" aria-expanded={drawer === 'help'} onClick={() => { setRepair(false); workshop.setDrawer(drawer === 'help' ? null : 'help'); }}><CircleHelp /></IconButton>
+        <IconButton label="Workshop help" aria-expanded={drawer === 'help'} onClick={() => { setRepair(false); setLog(false); workshop.setDrawer(drawer === 'help' ? null : 'help'); }}><CircleHelp /></IconButton>
       </div>
     </header>
     <nav className="side-rail glass" aria-label="Workshop tools">
-      {features.repair && <IconButton label="Troubleshoot wiper streaks" aria-pressed={repair} onClick={startRepair}><CircleHelp /></IconButton>}
-      <IconButton label="Component index" aria-expanded={drawer === 'parts'} onClick={() => { setRepair(false); workshop.setDrawer(drawer === 'parts' ? null : 'parts'); }}><ListFilter /></IconButton>
+      {features.repair && <IconButton label="Troubleshoot wiper streaks" data-onboarding="repair" aria-pressed={repair} onClick={startRepair}><CircleHelp /></IconButton>}
+      {features.repair && <IconButton label="Observation log" aria-pressed={log} onClick={openLog}><ClipboardList /></IconButton>}
+      <IconButton label="Component index" data-onboarding="exploration" aria-expanded={drawer === 'parts'} onClick={() => { setRepair(false); setLog(false); workshop.setDrawer(drawer === 'parts' ? null : 'parts'); }}><ListFilter /></IconButton>
       <span className="rail-divider" />
       <IconButton label="Open hood and doors" aria-pressed={workshop.open} onClick={() => workshop.setOpen(!workshop.open)}><DoorOpen /></IconButton>
       <IconButton label="Show part labels" aria-pressed={workshop.labels} onClick={() => workshop.setLabels(!workshop.labels)}>{workshop.labels ? <Eye /> : <EyeOff />}</IconButton>
       <IconButton label="Capture schematic image" onClick={() => camera('capture')}><Camera /></IconButton>
       {features.learning && <>
         <span className="rail-divider" />
-        <IconButton label="Open field book" onClick={() => { setRepair(false); workshop.selectPart(vehicle.parts[0], false); setOpenBook(true); }}><BookOpen /></IconButton>
+        <IconButton label="Open field book" data-onboarding="learning" onClick={() => { setRepair(false); setLog(false); workshop.selectPart(vehicle.parts[0], false); setOpenBook(true); }}><BookOpen /></IconButton>
       </>}
     </nav>
-    {workshop.item.id === 'vehicle' && !drawer && !repair && <section className="scene-intro">
+    {workshop.item.id === 'vehicle' && !drawer && !panel && <section className="scene-intro">
       <div className="eyebrow intro-tag"><span /> AN OPEN GARAGE FOR CURIOUS MINDS</div>
       <h1>Know your<br /><em>machine.</em></h1>
       <p>Every part has a purpose.<br />Take a closer look at yours.</p>
@@ -145,7 +159,7 @@ export default function ExplorationWorkshop() {
       workshop.setDrawer(null);
       focusWorkshopControl('Component index');
     }} />}
-    {workshop.item.id !== 'vehicle' && !drawer && !repair && <SubjectControls carId={vehicle.id} tree={workshop.tree}
+    {workshop.item.id !== 'vehicle' && !drawer && !panel && <SubjectControls carId={vehicle.id} tree={workshop.tree}
       item={workshop.item} activation={workshop.activation} isolated={workshop.isolated}
       onFocus={() => camera('focus')} onIsolate={workshop.isolate}
       onRestore={workshop.restore} onSelect={workshop.selectItem} />}
@@ -163,16 +177,19 @@ export default function ExplorationWorkshop() {
       <div className="vehicle-facts">{vehicle.facts.map(fact => <a href={vehicle.sources.find(s => s.id === fact.sourceId)!.url} key={fact.label} target="_blank" rel="noreferrer"><span>{fact.label}</span><strong>{fact.value}</strong></a>)}</div>
       <p className="muted">Photo captions disclose market, trim and engine differences. Service intervals, fluids and torque values are intentionally not guessed. Verify the actual vehicle and its correct manual; safety-critical work belongs with a qualified professional.</p>
       {features.learning && <button className="primary-button" onClick={workshop.startTour}>Start the walkthrough <ArrowUpRight size={16} /></button>}
+      {features.onboarding && <button className="replay-intro" onClick={() => { workshop.setDrawer(null); setReplayIntro(count => count + 1); }}>Replay introduction</button>}
     </aside>}
     <Suspense fallback={<p className="notification glass" role="status">Opening feature...</p>}>
     {features.repair && repair && !drawer && <RepairGuide key={vehicle.id} vehicle={vehicle} onLocate={locateRepair}
       onClose={() => { setRepair(false); workshop.restore(); }} />}
-    {hasDetail && part && !drawer && !repair && <DetailPanel vehicle={vehicle} part={part} subject={learningSubject}
+    {features.repair && log && !drawer && <ObservationLog vehicle={vehicle} onClose={() => { setLog(false); focusWorkshopControl('Observation log'); }} />}
+    {hasDetail && part && !drawer && !panel && <DetailPanel vehicle={vehicle} part={part} subject={learningSubject}
       onSelect={workshop.selectPart} onCloseSubject={closeSubjectLesson}
       tour={workshop.tour} onTourStep={workshop.stepTour} onEndTour={() => workshop.setTour(false)}
       openBook={openBook} onBookOpened={() => setOpenBook(false)} />}
     </Suspense>
     {notice && <div className="notification glass" role="status"><span>{notice}</span><IconButton label="Dismiss notification" onClick={() => workshop.setNotice('')}><X /></IconButton></div>}
+    {features.onboarding && <Suspense fallback={null}><FirstVisitGuide replay={replayIntro} /></Suspense>}
     <div className="sr-only" aria-live="polite">{copied ? 'Link copied to clipboard.' : ''}</div>
   </main>;
 }

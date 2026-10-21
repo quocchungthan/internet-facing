@@ -2,6 +2,7 @@ export type FeatureFlags = Readonly<{
   exploration: boolean;
   repair: boolean;
   learning: boolean;
+  onboarding: boolean;
 }>;
 
 function readFlag(env: Record<string, unknown>, name: string): boolean {
@@ -16,5 +17,6 @@ export function readFeatureFlags(env: Record<string, unknown>): FeatureFlags {
     exploration: readFlag(env, 'VITE_FEATURE_EXPLORATION'),
     repair: readFlag(env, 'VITE_FEATURE_REPAIR'),
     learning: readFlag(env, 'VITE_FEATURE_LEARNING'),
+    onboarding: readFlag(env, 'VITE_FEATURE_ONBOARDING'),
   };
 }
