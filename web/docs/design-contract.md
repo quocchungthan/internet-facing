@@ -76,11 +76,16 @@ motion; decorative effects are not a reason to run the canvas continuously.
 ## Screenshot and review provenance
 
 The versioned comparison baselines are in `tests/visual.spec.ts-snapshots` and
-`tests/repair.spec.ts-snapshots`: Windows Chromium, headless ANGLE/SwiftShader,
+`tests/repair.spec.ts-snapshots`: separate Windows and Linux Chromium baselines,
+headless ANGLE/SwiftShader,
 1440x900, reduced motion, blocked remote fonts and explicit Arial override.
 They compare both whole cars, both isolated engines and the wiper guide at
-0.1% maximum differing pixels. Linux needs separately reviewed baselines,
-not overwriting these Windows files.
+0.1% maximum differing pixels. Windows feature-quality checks and Ubuntu
+deployment checks select their own platform-suffixed files. Review intentional
+UI changes on both platforms; neither platform's images replace the other's.
+The Linux engine baselines were reviewed using Playwright 1.64.1's Noble Docker
+image (Chromium 156.0.8078.4) after reproducing the deployment failure. Differences
+were confined to the new question button and shifted subject hierarchy.
 
 Focused captures from the 2026-10-22 run are retained in the session evidence
 directory linked in the GitHub completion note, including desktop/portrait/
