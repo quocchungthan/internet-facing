@@ -10,6 +10,7 @@ import type { CameraAction } from '../rendering/WorkshopScene';
 import type { ViewMode } from '../../../domain/catalog';
 import { features } from '../../../config/features';
 import { vehicleThemeStyle } from './vehicleTheme';
+import { WorkshopPointerLight } from './WorkshopPointerLight';
 
 const WorkshopScene = lazy(() => import('../rendering/WorkshopScene'));
 const DetailPanel = lazy(() => import('../../../components/DetailPanel').then(module => ({ default: module.DetailPanel })));
@@ -102,6 +103,7 @@ export default function ExplorationWorkshop() {
           onSelect={workshop.selectItem} onError={reportError} />
       </Suspense>
     </div>
+    <WorkshopPointerLight reducedMotion={reducedMotion} />
     <div className="scene-vignette" />
     <header className="top-bar">
       <a className="brand" href="/" aria-label="30s workshop home"><span className="brand-mark">30<span>s</span><i /></span><span className="brand-caption">THE EVERYDAY<br />MACHINE, EXPLAINED.</span></a>
