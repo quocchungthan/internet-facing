@@ -52,6 +52,71 @@ are not protected resources. Disabled feature components are not loaded by the
 UI. The Vite manual vendor grouping was removed so shared React code does not
 pull the Three.js renderer into builds running without exploration.
 
+### Optional educational questions and pointer response
+
+Selected-subject controls (and the HTML-only learning selector) provide **Ask
+ChatGPT about this component**. A local dialog previews/edits a question built
+only from public canonical component/parent labels and catalog context. Selection
+changes discard the previous subject's edits. No observation log, private notes,
+URL state or page contents are read. Only explicitly opening the external link
+sends the question; copying uses the clipboard and reports denial visibly.
+Questions can remain in browser/service history. AI output is educational, not
+validated repair guidance or a safe-to-drive verdict; no answer is ingested.
+
+The fixed `https://chatgpt.com/?q=...` destination uses `URL.searchParams`.
+Signed-out desktop Chromium preserved an illustrative public question on
+2026-10-22; account/login and installed-app behavior are not guaranteed. No
+authorized signed-in test account is available. Copy remains usable independently
+of prefill compatibility; select the editable text manually if clipboard access
+is denied. The external service may change without notice.
+
+A faint cursor-responsive radial glow is decorative HTML over the existing
+single scene, not another canvas or a renderer loop. Its centre is bounded to
+45-55% of the scene; one animation-frame update is coalesced per pointer event.
+It never intercepts input, changes the camera or replaces the cursor. It resets
+on leave/drag and is disabled for reduced motion and coarse/no-hover input.
+
+### Publisher metadata
+
+`src/config/publisher.ts` is the single city-level location source: provisional,
+owner-supplied Ho Chi Minh City, country code VN. Vite safely emits one
+`geo.placename` tag in the initial HTML, independently of JavaScript, selected
+car, browser language or WebGL. This is not a verified office, registered
+address, service area or visitor location. Consumer support for geo metadata
+is limited/non-universal; it is not a ranking or display guarantee. No
+Organization/LocalBusiness JSON-LD is emitted because public legal/publisher
+identity and URL approval were not supplied. No address, coordinates, contact
+details or geolocation request are inferred.
+
+The [owner-check review pack](docs/owner-check-review-pack.md) is a versioned,
+non-executable draft for #44/#45/#47. Qualified approval remains #51 and new
+executable gates remain #39; the pack is not loaded by the app.
+The [design contract](docs/design-contract.md), [integration checklist and actual
+CI inspection](docs/integration-review.md), [recovery plan](docs/recovery-plan.md),
+[pilot protocol](docs/pilot-protocol.md) and [request-service decision
+packet](docs/request-service-decision.md) preserve their preparation-only scope.
+They do not appoint reviewers, deploy tracking or provision a request service.
+
+### Identity-only package contract (CAT01)
+
+`features/catalog/domain/vehicleIdentity.ts` defines strict version-1 identity
+metadata separately from the legacy renderer catalog. It can describe partial,
+information-only supported configurations without implying drawings, photos,
+books or approved repair coverage. Unknowns are explicit `null`; make/model,
+generation, model-year range, production span, market, powertrain and variant
+are distinct. A physical vehicle's build date is deliberately not a model year
+or a configuration field. Stable `raize`/`impala` IDs remain unchanged.
+
+Matching normalizes Unicode NFC, case and whitespace only, never punctuation,
+market aliases, powertrain variants or unit meaning. Conflicting known fields
+or disjoint model years differ; unknown fields or overlapping multi-year ranges
+are partial candidates, not exact fitment or canonical request duplicates.
+Even an exact configuration match does not verify a physical vehicle or approve
+a procedure. Duplicate internal IDs, unsupported versions, reversed spans and
+unmodelled claims fail validation. CAT06 owns evidence/capability references;
+CAT02 owns loader integration. This schema-only increment does not migrate the
+legacy catalog or introduce a runtime request service.
+
 Run `npm run test:features -- --output=<external artifact directory>` to build
 and exercise every combination sequentially against its own temporary preview.
 The suite verifies remaining feature workflows, disabled component requests,

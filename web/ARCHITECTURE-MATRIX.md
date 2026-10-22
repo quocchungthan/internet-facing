@@ -92,6 +92,28 @@ Repeated occurrences share specifications, never selection identity.
 
 ## Cross-cutting enforcement and open gaps
 
+**2026-10-22 bounded backlog follow-up:** identity-only version-1 packages in
+`features/catalog/domain/vehicleIdentity.ts` distinguish configuration identity
+and explicit unknowns from legacy drawing/content coverage (CAT01); no runtime
+catalog migration is implied. `features/questions/domain/componentQuestion.ts`
+uses public canonical subject/parent labels; its presentation editor is shared
+by selected-subject controls and non-3D learning. The only outbound action is an
+explicit fixed-origin external link; clipboard denial is visible. No private
+observation data, provider API, embedded chat or answer ingestion is involved
+(#52). `WorkshopPointerLight` is a bounded decorative HTML overlay with no
+canvas, camera or domain mutation, disabled for reduced motion/coarse input
+(#53). `config/publisher.ts` supplies one provisional city meta declaration at
+the Vite HTML boundary, not visitor geolocation or verified legal identity
+(ORG01). These experience/publisher capabilities do not create new domain
+coverage or approve executable maintenance guidance.
+
+The source-backed, non-executable [owner-check pack](docs/owner-check-review-pack.md)
+is preparation for #44/#45/#47, not runtime rules; #51/#39 remain separate gates.
+[DES01](docs/design-contract.md) records current design/provenance and gaps.
+[QA02/CI01](docs/integration-review.md) records the integration checklist and
+actual observed check-policy limits; it does not assert protection or deployment
+authorization.
+
 **Feature quality wiring:** `eslint.config.js` configures complexity;
 `package.json` exposes lint/unit/build/browser commands;
 `../.github/workflows/verify-30s.yml` runs them for `feat/30s-*` pushes
