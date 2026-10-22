@@ -35,6 +35,10 @@ svg { flex-shrink: 0; }
 .scene-labels { position: absolute; inset: 0; pointer-events: none; }
 .scene-labels .hotspot { pointer-events: auto; }
 .scene-vignette { position: absolute; inset: 0; z-index: -1; pointer-events: none; background: linear-gradient(90deg, #10171666 0%, transparent 32%), linear-gradient(0deg, #101716d9, transparent 25%, transparent 75%, #10171680); }
+.workshop-pointer-light { position: absolute; inset: 0; z-index: -2; pointer-events: none; opacity: 0; background: radial-gradient(ellipse at var(--pointer-light-x, 50%) var(--pointer-light-y, 50%), #efffd910, transparent 55%); }
+@media (prefers-reduced-motion: reduce), (hover: none), (pointer: coarse) {
+  .workshop-pointer-light { display: none; }
+}
 .glass { background: #17211deb; border: 1px solid var(--border); box-shadow: 0 12px 40px #0002; backdrop-filter: blur(16px); }
 .eyebrow, .mono, .brand-caption, .viewport-label, .index-footer, .tour-footer > span, .part-number { font-family: 'Space Grotesk', sans-serif; font-size: 10px; font-weight: 500; letter-spacing: 0.13em; }
 .eyebrow { color: var(--muted); text-transform: uppercase; }
@@ -403,6 +407,10 @@ svg { flex-shrink: 0; }
 .handoff-preview { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11px; line-height: 1.6; background: #0d1312; border: 1px solid var(--border); border-radius: 8px; padding: 12px; max-height: 320px; overflow: auto; }
 .content-features .secondary-button { margin-left: 8px; }
 .replay-intro { display: inline-block; }
+.component-question .question-trigger { width: 100%; margin: 10px 0 0; font-size: 11px; }
+.question-dialog label { display: block; margin: 16px 0 8px; font-size: 13px; }
+.question-dialog textarea { box-sizing: border-box; width: 100%; min-height: 120px; resize: vertical; color: var(--ink); background: var(--surface); border: 1px solid #66775c; border-radius: 7px; padding: 10px; font: inherit; font-size: 13px; line-height: 1.6; outline-offset: 4px; }
+.question-dialog .primary-button { text-decoration: none; }
 .onboarding-dialog { width: min(440px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; padding: 18px 22px 22px; border: 1px solid var(--border); border-radius: 14px; background: #17211d; color: var(--ink); box-shadow: 0 20px 60px #0008; }
 .onboarding-dialog::backdrop { background: #0a0f0ecc; }
 .onboarding-dialog h2 { font: 500 24px 'Space Grotesk', sans-serif; margin: 10px 0; }

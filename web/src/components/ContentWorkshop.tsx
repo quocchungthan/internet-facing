@@ -5,6 +5,7 @@ import { features } from '../config/features';
 import { readSubject, subjectSearch } from '../features/exploration/domain/subject';
 import { createVehicleItems, itemLabel, validateEngineLessonsAgainstItems } from '../features/exploration/domain/items';
 import { vehicleThemeStyle } from '../features/exploration/presentation/vehicleTheme';
+import { ComponentQuestion } from '../features/questions/presentation/ComponentQuestion';
 
 const DetailPanel = lazy(() => import('./DetailPanel').then(module => ({ default: module.DetailPanel })));
 const RepairGuide = lazy(() => import('../features/repair/presentation/RepairGuide').then(module => ({ default: module.RepairGuide })));
@@ -129,6 +130,7 @@ export default function ContentWorkshop() {
               </optgroup>}
             </select>
           </label>
+          {subject.item.id !== 'vehicle' && <ComponentQuestion vehicle={vehicle} tree={tree} itemId={subject.item.id} />}
           <button className="primary-button" data-onboarding="learning" onClick={() => {
             navigate(vehicle.id, part?.id ?? vehicle.parts[0].id); setOpenBook(true);
           }}>Open field book</button>

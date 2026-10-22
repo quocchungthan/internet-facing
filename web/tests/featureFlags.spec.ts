@@ -98,6 +98,10 @@ async function checkLearning(page: Page, flags: FeatureFlags) {
     await page.getByRole('combobox', { name: 'Choose a part' }).selectOption('engine-rod-study');
   }
   let subject = page.getByRole('complementary', { name: 'Connecting rod learning' });
+  await page.getByRole('button', { name: 'Ask ChatGPT about this component' }).click();
+  const question = page.getByRole('dialog', { name: 'Ask about this component' });
+  await expect(question.getByRole('textbox')).toHaveValue(/Connecting rod/);
+  await question.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(subject.getByText('Connects the piston motion to a crank throw;', { exact: false })).toBeVisible();
   await expect(subject.getByText('NASA Glenn - Four-Stroke Engine Operation', { exact: true })).toBeVisible();
   await subject.getByRole('button', { name: /Explore connected subject Piston:/ }).click();

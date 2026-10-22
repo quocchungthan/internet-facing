@@ -3,6 +3,8 @@ import { itemLabel } from '../domain/items';
 import { engineLessons } from '../../../content';
 import { lessonFor } from '../../../domain/engineLessons';
 import type { SubjectActivation } from '../domain/subject';
+import { vehicles } from '../../../content';
+import { ComponentQuestion } from '../../questions/presentation/ComponentQuestion';
 
 type Props = {
   carId: string; tree: ItemTree; item: Item; activation: SubjectActivation; isolated: boolean;
@@ -22,6 +24,8 @@ function ancestry(tree: ItemTree, item: Item): Item[] {
 }
 
 export function SubjectControls({ carId, tree, item, activation, isolated, onFocus, onIsolate, onRestore, onSelect }: Props) {
+  const vehicle = vehicles.find(candidate => candidate.id === carId);
+  if (!vehicle) throw new Error(`Unknown vehicle ${carId}.`);
   const ancestors = ancestry(tree, item);
   const children = tree.items.filter(candidate => candidate.parentId === item.id);
   const lesson = lessonFor(engineLessons, carId, item.id);
@@ -41,6 +45,7 @@ export function SubjectControls({ carId, tree, item, activation, isolated, onFoc
       <button onClick={onRestore}>Show whole car</button>
     </div>
     {!canFocus && <p role="status">{activation.reason}</p>}
+    <ComponentQuestion vehicle={vehicle} tree={tree} itemId={item.id} />
     {ancestors.length > 0 && <div className="subject-children" role="group" aria-label="Subject ancestry">
       {ancestors.map(ancestor => <button key={ancestor.id} onClick={() => onSelect(ancestor.id)}>
         Up to {itemLabel(tree, ancestor)}
