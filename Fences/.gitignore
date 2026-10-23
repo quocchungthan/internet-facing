@@ -1,3 +1,4 @@
 App_Data/
 fences.env
 fences.bootstrap.env
+/frontend/
