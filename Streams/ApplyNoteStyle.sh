@@ -28,6 +28,9 @@ installed_base="$(docker image inspect --format '{{index .Config.Labels "dev.eld
 if [[ "$installed_base" != "$base" ]] &&
   ! docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$current" | grep -Fxq "$base"; then
   echo "AFFiNE version mismatch. This style operation will not upgrade the backend or migrate its database." >&2
+  echo "Supported base: $base" >&2
+  docker image inspect --format 'Deployed digests: {{json .RepoDigests}}' "$current" >&2
+  docker image inspect --format 'Deployed version: {{index .Config.Labels "org.opencontainers.image.version"}}' "$current" >&2
   echo "Validate a skin against the deployed AFFiNE digest before retrying." >&2
   exit 1
 fi
