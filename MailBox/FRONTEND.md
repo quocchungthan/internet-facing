@@ -26,6 +26,10 @@ addresses from the authenticated server session and posts the original form
 contract; it does not receive mailbox passwords. OAuth failure messages remain
 visible in the shared entry. Angular entries use self-script/nonce-style CSP;
 native error pages retain script-src none. No blanket CSP disable or credentialed wildcard CORS.
+Frontend/API releases build and recreate only `web`, with `--no-deps`; they
+must not recreate Maddy or attempt to rebind SMTP/IMAP ports. Native transport
+maintenance remains a separate operation. Post-deploy checks still report
+transport problems rather than claiming the complete mail stack is healthy.
 Session cookies stay Secure/HttpOnly/SameSite=Lax and mailbox passwords stay
 server-side. The static path never serves Python/secrets or swallows API routes.
 
