@@ -693,7 +693,7 @@ jobs:
           echo "TLS certificate ready for $MAIL_HOSTNAME."
           REMOTE
 
-      - name: Build and start services
+      - name: Build and start the web frontend and API
         shell: bash
         env:
           SSH_HOST: ${{ secrets.VPS_HOST }}
@@ -718,7 +718,10 @@ jobs:
               printf 'MAIL_DOMAINS=%s\n' "$domains" >> .env
             fi
           fi
-          docker compose up -d --build
+          docker compose build web
+          docker compose up -d --no-deps web
+          echo "Mail transport was not restarted by the frontend/API deployment."
+          docker ps --filter publish=25 --format '{{.ID}} {{.Names}} {{.Label "com.docker.compose.project"}} {{.Label "com.docker.compose.project.working_dir"}}'
           MAIL_HOSTNAME="$MAIL_HOSTNAME" MAIL_DEPLOY_DIR="$DEPLOY_DIR" bash scripts/configure-caddy-web.sh
           docker compose ps
           REMOTE
