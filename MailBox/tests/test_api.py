@@ -184,6 +184,27 @@ class MailApiTests(unittest.TestCase):
         self.assertEqual(selected['mailboxes'], [])
         self.assertNotIn('test-only-password', str(selected))
 
+    def test_native_chooser_keeps_same_origin_form_posts_and_rejects_opaque_origins(self):
+        address = 'owner@example.invalid'
+        with self.client.session_transaction(base_url=self.base['base_url']) as session:
+            session['manager_accounts'] = [address]
+        with tempfile.TemporaryDirectory() as directory, patch.object(mail, 'FRONTEND_PATH', Path(directory)):
+            Path(directory, 'index.html').write_text('<base href="/"><app-root></app-root>', encoding='utf-8')
+            response = self.client.get('/auth/choose', **self.base)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers['Referrer-Policy'], 'same-origin')
+        data = {'csrf': self.csrf, 'address': address}
+        for origin in ['null', 'https://untrusted.example.invalid']:
+            denied = self.client.post('/auth/select', data=data, headers={'Origin': origin}, **self.base)
+            self.assertEqual(denied.status_code, 403)
+        origin = {'Origin': self.base['base_url']}
+        invalid = self.client.post('/auth/select', data={'address': address}, headers=origin, **self.base)
+        self.assertEqual(invalid.status_code, 400)
+        with patch.object(mail, 'load_json_map', return_value={address: 'test-only-password'}), patch.object(mail, 'mailbox'):
+            selected = self.client.post('/auth/select', data=data, headers=origin, **self.base)
+        self.assertEqual(selected.status_code, 302)
+        self.assertEqual(self.client.get('/api/mail/session', **self.base).json['email'], address)
+
 
 if __name__ == '__main__':
     unittest.main()
