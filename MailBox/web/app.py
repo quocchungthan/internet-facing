@@ -133,7 +133,8 @@ def headers(response):
             "object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['X-Frame-Options'] = 'DENY'
-    response.headers['Referrer-Policy'] = 'no-referrer'
+    # no-referrer makes native form POST origins opaque, even on this site.
+    response.headers['Referrer-Policy'] = 'same-origin'
     response.headers['Cache-Control'] = 'no-store'
     return response
 
