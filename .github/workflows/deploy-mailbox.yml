@@ -743,12 +743,20 @@ jobs:
           echo "$states"
 
           failed=0
-          for svc in maddy web; do
+          for svc in web; do
             if ! grep -Eq "^$svc (running|Up)" <<<"$states"; then
               echo "::error::Service '$svc' is not running after deploy."
               failed=1
             fi
           done
+          if ! grep -Eq '^maddy (running|Up)' <<<"$states"; then
+            echo "::notice::The local Maddy Compose service is not running. Checking the API's configured native IMAP/SMTP upstream instead; frontend releases do not own its lifecycle."
+          fi
+          if ! ssh -i ~/.ssh/id_deploy -p "$port" -o BatchMode=yes -o ConnectTimeout=15 \
+            "$SSH_USER@$SSH_HOST" "cd '$DEPLOY_DIR' && docker compose exec -T web python check_upstream.py"; then
+            echo "::error::The configured IMAP/SMTP upstream failed its TLS/protocol health check."
+            failed=1
+          fi
 
           public_curl_stderr="$(mktemp)"
           public_curl_exit=0
