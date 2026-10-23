@@ -14,6 +14,7 @@ using Microsoft.AspNetCore.HttpOverrides;
 using OpenIddict.Abstractions;
 using OpenIddict.Server;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.Configure<IdentityAppOptions>(builder.Configuration.GetSection("IdentityApp"));
@@ -219,7 +220,15 @@ if (!app.Environment.IsDevelopment())
 
 app.UseForwardedHeaders();
 app.UseHttpsRedirection();
-app.UseStaticFiles();
+var frontendPath = Path.Combine(app.Environment.ContentRootPath, "frontend");
+if (Directory.Exists(frontendPath))
+{
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = new PhysicalFileProvider(frontendPath),
+        RequestPath = ""
+    });
+}
 app.UseRouting();
 app.UseCors("IdentityCors");
 app.UseRateLimiter();

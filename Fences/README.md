@@ -1,6 +1,35 @@
 # Fences
 
-Fences is the central GitHub identity and workspace launcher for the Shuneo services.
+Fences is the central GitHub identity and service launcher for the Shuneo services.
+Its presentation is the verified SingleUI `app-identity` static bundle; Fences
+continues to own every API, cookie, GitHub/OIDC flow and authorization decision.
+The old Razor homepage/layout, native stylesheet and duplicated icons are removed.
+
+## Frontend artifact
+
+Set `SINGLE_UI_RUN_ID` and full `SINGLE_UI_REVISION` together to a successful
+main-branch **SingleUI apps and skins** run in `quocchungthan/EMFc-experiments`.
+The `hostkey-server` environment (or repository) needs `SINGLE_UI_TOKEN` with
+producer Contents:read and Actions:read. **Deploy Fences** checks out that exact
+importer, validates the run/revision/file hashes, stages `identity` in
+`Fences/frontend`, runs Fences tests, then builds/deploys through the existing
+candidate/rollback process. Artifacts expire after 90 days; retain a verified
+operator copy. Never put artifact credentials in the browser or source tree.
+
+For local use, install Node 22 and authenticate `gh`, then invoke the pinned
+producer's `SingleUI/deployment/artifacts/import-app.mjs identity` with an empty
+absolute `Fences/frontend` destination. Publishing refuses a missing entry or
+manifest. Angular development remains in SingleUI without Docker.
+The bundle calls same-origin APIs, not a hardcoded production identity host.
+`returnUrl` and legacy `callbackUrl` reach `/auth/login`; only the existing
+backend policy approves the destination. Signed-in `/` without an explicit
+target retains its configured main-site redirect, while `/apps` stays protected.
+No catch-all SPA route swallows `/api`, `/auth`, `/connect` or discovery paths.
+The Angular GitHub repository panel remains read-only; backend mutation/token
+endpoints are preserved but are not newly exposed through the public UI.
+Fixtures do not establish a live GitHub/OIDC login. Verify real session,
+service links and downstream SSO before promotion. Roll back the previous
+frontend/backend image pair without removing SQLite, keys or certificate volumes.
 
 ## Routes
 
@@ -100,7 +129,10 @@ IdentityApp__DataProtectionKeysPath=/var/lib/fences/keys
 
 The SQLite file and Data Protection key directory are persistent runtime state and must be mounted from durable VPS storage. The MVP uses `EnsureCreated` rather than EF migrations; back up the SQLite file before schema/package upgrades and introduce an explicit migration process before schema changes.
 
-The Dockerfile expects the Docker build context to be `internet-facing`, publishes `Fences.dll`, and serves HTTP on port 80 behind the reverse proxy. It links Farm's canonical shared CSS tokens and base styles into the Fences publish output without maintaining a second copy.
+The Dockerfile expects the Docker build context to be `internet-facing`, publishes
+`Fences.dll` with the staged frontend, and serves HTTP on port 80 behind the
+reverse proxy. Fonts/theme are embedded in the bundle; no Farm CSS or remote
+font dependency is copied.
 
 ## Local run
 
