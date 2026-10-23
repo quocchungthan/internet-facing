@@ -3,6 +3,8 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt && useradd --uid 10001 --create-home web
 COPY . .
+RUN test -f frontend/index.html && test -f frontend/bundle-manifest.json || \
+    { echo "Import the verified SingleUI app-mail artifact into MailBox/web/frontend before building." >&2; exit 1; }
 # static/shared/*.css and static/favicon.ico are generated from Farm/wwwroot; they are
 # not tracked in git, so a fresh clone must stage them before the image is built.
 RUN for asset in static/shared/variables.css static/shared/base.css static/favicon.ico; do \

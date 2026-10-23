@@ -6,6 +6,7 @@ on:
       - 'sub/mail'
     paths:
       - '.github/workflows/deploy-mailbox.yml'
+      - 'MailBox/**'
 
   workflow_dispatch:
     inputs:
@@ -31,6 +32,15 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  mail-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r MailBox/web/requirements.txt
+      - run: python -m unittest discover -s MailBox/tests -p test_api.py
   preflight:
     name: Preflight checks
     runs-on: ubuntu-latest
@@ -493,7 +503,7 @@ jobs:
 
   deploy:
     name: Deploy to VPS
-    needs: preflight
+    needs: [preflight, mail-contracts]
     if: ${{ !inputs.dry_run && needs.preflight.outputs.ssh_ready == 'true' }}
     runs-on: ubuntu-latest
     environment:
@@ -591,6 +601,25 @@ jobs:
           ls -l MailBox/web/static/shared/variables.css \
                 MailBox/web/static/shared/base.css \
                 MailBox/web/static/favicon.ico
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/checkout@v4
+        with:
+          repository: quocchungthan/EMFc-experiments
+          ref: ${{ vars.SINGLE_UI_REVISION }}
+          token: ${{ secrets.SINGLE_UI_TOKEN }}
+          path: single-ui-source
+      - name: Import verified Mail frontend
+        env:
+          GH_TOKEN: ${{ secrets.SINGLE_UI_TOKEN }}
+          SINGLE_UI_RUN_ID: ${{ vars.SINGLE_UI_RUN_ID }}
+          SINGLE_UI_REVISION: ${{ vars.SINGLE_UI_REVISION }}
+        run: |
+          set -euo pipefail
+          [[ "$SINGLE_UI_REVISION" =~ ^[a-f0-9]{40}$ ]] || { echo "::error::Set SINGLE_UI_REVISION"; exit 1; }
+          node single-ui-source/SingleUI/deployment/artifacts/import-app.mjs mail MailBox/web/frontend
 
       - name: Upload MailBox source (excludes .env, secrets, runtime, backups)
         shell: bash
