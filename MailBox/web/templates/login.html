@@ -1,5 +1,0 @@
-{% extends 'base.html' %}{% block content %}
-<section class="login-card"><div class="eyebrow">CHÀO MỪNG TRỞ LẠI</div><h1>Thư của bạn.<br>Không gian của bạn.</h1><p class="muted">Đăng nhập bằng SSO để quản lý email trên {{ domain }}.</p>
-{% if oauth_configured %}<a class="button full" href="{{ url_for('auth_github') }}">Đăng nhập bằng SSO →</a>{% else %}<p class="notice error">Đăng nhập SSO chưa được cấu hình. Liên hệ quản trị viên.</p>{% endif %}
-<p class="hint">Quyền quản lý hộp thư được cấp theo tài khoản SSO.</p></section>
-{% endblock %}

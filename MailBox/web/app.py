@@ -17,7 +17,7 @@ from email.utils import formatdate, make_msgid
 from html.parser import HTMLParser
 from pathlib import Path
 
-from flask import Flask, abort, flash, g, redirect, render_template, request, session, url_for, send_from_directory
+from flask import Flask, abort, flash, g, get_flashed_messages, redirect, render_template, request, session, url_for, send_from_directory
 from werkzeug.exceptions import HTTPException
 
 app = Flask(__name__)
@@ -145,7 +145,7 @@ def health():
 
 @app.get('/login')
 def login():
-    return render_template('login.html', domain=DOMAIN, oauth_configured=oauth_configured())
+    return frontend()
 
 
 @app.get('/auth/github')
@@ -212,7 +212,7 @@ def choose_mailbox():
     managed = session.get('manager_accounts') or []
     if not managed:
         return redirect(url_for('login'))
-    return render_template('choose.html', domain=DOMAIN, accounts=managed)
+    return frontend()
 
 
 @app.post('/auth/select')
@@ -391,7 +391,9 @@ def requested_folder():
 def api_session():
     user = current_user()
     return {'domain': DOMAIN, 'email': user['email'] if user else None,
-            'csrf': csrf(), 'oauthConfigured': oauth_configured()}
+            'csrf': csrf(), 'oauthConfigured': oauth_configured(),
+            'mailboxes': session.get('manager_accounts') or [],
+            'authErrors': get_flashed_messages()}
 
 
 @app.get('/api/mail/messages')
