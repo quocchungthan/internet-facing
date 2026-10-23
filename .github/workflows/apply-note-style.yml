@@ -1,0 +1,83 @@
+name: Apply Note Style
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-note-production
+  cancel-in-progress: false
+
+jobs:
+  style:
+    runs-on: ubuntu-latest
+    environment: hostkey-server
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require note branch and artifact configuration
+        env:
+          TOKEN: ${{ secrets.SINGLE_UI_TOKEN }}
+          RUN: ${{ vars.SINGLE_UI_RUN_ID }}
+          REVISION: ${{ vars.SINGLE_UI_REVISION }}
+          DEPLOY_DIR: ${{ vars.AFFINE_DEPLOY_DIR }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = sub/note
+          [[ -n "$TOKEN" && "$RUN" =~ ^[1-9][0-9]*$ && "$REVISION" =~ ^[a-f0-9]{40}$ ]] ||
+            { echo "::error::Configure SINGLE_UI_TOKEN (producer Contents:read and Actions:read) and pin SINGLE_UI_RUN_ID/SINGLE_UI_REVISION"; exit 1; }
+          [[ "$DEPLOY_DIR" =~ ^/[a-zA-Z0-9_./-]+$ && "$DEPLOY_DIR" != / ]] ||
+            { echo "::error::AFFINE_DEPLOY_DIR must name the existing deployment directory"; exit 1; }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/checkout@v4
+        with:
+          repository: quocchungthan/EMFc-experiments
+          ref: ${{ vars.SINGLE_UI_REVISION }}
+          token: ${{ secrets.SINGLE_UI_TOKEN }}
+          path: single-ui-source
+      - name: Import verified CSS artifact
+        env:
+          GH_TOKEN: ${{ secrets.SINGLE_UI_TOKEN }}
+          SINGLE_UI_RUN_ID: ${{ vars.SINGLE_UI_RUN_ID }}
+          SINGLE_UI_REVISION: ${{ vars.SINGLE_UI_REVISION }}
+        run: |
+          node --input-type=module -e "import {downloadUi} from './single-ui-source/SingleUI/deployment/artifacts/import-app.mjs'; await downloadUi('single-ui-style');"
+          echo "SINGLE_UI_CSS_SHA=$(node -p "require('./single-ui-style/manifest.json').files['affine.css'].sha256")" >> "$GITHUB_ENV"
+          bash -n Streams/ApplyNoteStyle.sh
+          node --test Streams/tests/apply-note-style.test.mjs
+      - name: Build CSS-only derived image
+        env:
+          REVISION: ${{ vars.SINGLE_UI_REVISION }}
+        run: |
+          set -euo pipefail
+          base="$(cat single-ui-style/affine-image.txt)"
+          docker build -f single-ui-style/Dockerfile.affine \
+            --label "dev.eldervibe.single-ui.affine-base=$base" \
+            --label "dev.eldervibe.single-ui.revision=$REVISION" \
+            -t "eldervibe-affine-ui:$REVISION" single-ui-style
+          docker save "eldervibe-affine-ui:$REVISION" | gzip > affine-ui.tar.gz
+      - name: Apply skin to existing native deployment
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          DEPLOY_DIR: ${{ vars.AFFINE_DEPLOY_DIR }}
+          REVISION: ${{ vars.SINGLE_UI_REVISION }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.ssh"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+          eval "$(ssh-agent -s)"
+          ssh-add - <<< "$VPS_SSH_KEY"
+          remote="/tmp/affine-ui-$GITHUB_RUN_ID"
+          tar -czf - single-ui-style affine-ui.tar.gz Streams/ApplyNoteStyle.sh | \
+            ssh -p "$VPS_PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes "$VPS_USER@$VPS_HOST" \
+            "mkdir -p '$remote' && tar -xzf - -C '$remote'"
+          ssh -p "$VPS_PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes "$VPS_USER@$VPS_HOST" \
+            "AFFINE_DEPLOY_DIR='$DEPLOY_DIR' SINGLE_UI_STYLE_DIR='$remote/single-ui-style' SINGLE_UI_REVISION='$REVISION' SINGLE_UI_CSS_SHA='$SINGLE_UI_CSS_SHA' SINGLE_UI_IMAGE_ARCHIVE='$remote/affine-ui.tar.gz' bash '$remote/Streams/ApplyNoteStyle.sh'"
