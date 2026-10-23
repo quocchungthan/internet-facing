@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Text.Json;
 using Fences.Controllers;
 using Fences.Models;
 using Fences.Services;
@@ -6,6 +7,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Options;
@@ -15,6 +17,39 @@ namespace Fences.Tests;
 
 public sealed class FrontendTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Session_ExposesConfiguredBrandForBothAuthenticationStates(bool authenticated)
+    {
+        var collection = new ServiceCollection();
+        collection.AddLogging();
+        collection.AddOptions<IdentityAppOptions>().Bind(new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["BrandName"] = "Elder & Vibe <Identity>" })
+            .Build());
+        collection.AddAuthentication("test").AddCookie("test");
+        using var services = collection.BuildServiceProvider();
+        var options = services.GetRequiredService<IOptionsMonitor<IdentityAppOptions>>();
+        var controller = new SessionController(new AppCatalog(options), options)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext
+                {
+                    RequestServices = services,
+                    User = new ClaimsPrincipal(authenticated
+                        ? new ClaimsIdentity([new Claim(ClaimTypes.Name, "Fixture")], "test")
+                        : new ClaimsIdentity())
+                }
+            }
+        };
+        var response = Assert.IsType<OkObjectResult>(await controller.GetSession());
+        var session = JsonSerializer.SerializeToElement(response.Value);
+        Assert.Equal(authenticated, session.GetProperty("isAuthenticated").GetBoolean());
+        Assert.Equal("Elder & Vibe <Identity>", session.GetProperty("brandName").GetString());
+        Assert.Equal("no-store", controller.Response.Headers.CacheControl);
+    }
+
     [Fact]
     public void MissingBundle_ReturnsExplicitUnavailable()
     {
