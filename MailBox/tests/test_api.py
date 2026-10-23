@@ -38,7 +38,7 @@ class MailApiTests(unittest.TestCase):
     def test_session_and_auth_errors_are_json_without_credentials(self):
         response = self.client.get('/api/mail/session', **self.base)
         self.assertIsNone(response.json['email'])
-        self.assertEqual(set(response.json), {'email', 'domain', 'csrf', 'oauthConfigured'})
+        self.assertEqual(set(response.json), {'email', 'domain', 'csrf', 'oauthConfigured', 'mailboxes', 'authErrors'})
         for path in ['/api/mail/messages', '/api/mail/messages/1']:
             response = self.client.get(path, **self.base)
             self.assertEqual(response.status_code, 401)
@@ -123,11 +123,11 @@ class MailApiTests(unittest.TestCase):
         self.assertFalse(mail.sessions)
         self.assertIsNone(self.client.get('/api/mail/session', **self.base).json['email'])
 
-    def test_frontend_paths_nonce_policy_and_native_auth_policy(self):
+    def test_frontend_paths_and_auth_entries_share_nonce_policy(self):
         with tempfile.TemporaryDirectory() as directory, patch.object(mail, 'FRONTEND_PATH', Path(directory)):
             Path(directory, 'index.html').write_text('<base href="/"><app-root></app-root>', encoding='utf-8')
             Path(directory, 'main.js').write_text('export {};', encoding='utf-8')
-            for path in ['/', '/compose', '/message/42?folder=sent']:
+            for path in ['/', '/compose', '/message/42?folder=sent', '/login']:
                 response = self.client.get(path, **self.base)
                 self.assertEqual(response.status_code, 200)
                 self.assertIn('ngCspNonce=', response.get_data(as_text=True))
@@ -137,11 +137,34 @@ class MailApiTests(unittest.TestCase):
                 self.assertEqual(asset.status_code, 200)
             self.assertEqual(self.client.get('/api/missing', **self.base).status_code, 404)
             self.assertEqual(self.client.get('/app.py', **self.base).status_code, 404)
-            native = self.client.get('/login', **self.base)
-            self.assertEqual(native.status_code, 200)
-            self.assertIn("script-src 'none'", native.headers['Content-Security-Policy'])
+            self.assertEqual(self.client.get('/auth/choose', **self.base).status_code, 302)
+            with self.client.session_transaction(base_url=self.base['base_url']) as session:
+                session['manager_accounts'] = ['owner@example.invalid', 'other@example.invalid']
+            choose = self.client.get('/auth/choose', **self.base)
+            self.assertEqual(choose.status_code, 200)
+            self.assertIn('ngCspNonce=', choose.get_data(as_text=True))
             Path(directory, 'index.html').unlink()
             self.assertEqual(self.client.get('/', **self.base).status_code, 503)
+
+    def test_chooser_exposes_only_authorized_addresses_and_preserves_server_selection(self):
+        accounts = ['owner@example.invalid', 'other@example.invalid']
+        with self.client.session_transaction(base_url=self.base['base_url']) as session:
+            session['manager_accounts'] = accounts
+            session['_flashes'] = [('error', 'An explicit authentication failure')]
+        details = self.client.get('/api/mail/session', **self.base).json
+        self.assertEqual(details['mailboxes'], accounts)
+        self.assertEqual(details['authErrors'], ['An explicit authentication failure'])
+        self.assertEqual(self.client.get('/api/mail/session', **self.base).json['authErrors'], [])
+        self.assertEqual(self.post('/auth/select', address='unauthorized@example.invalid').status_code, 403)
+        self.assertEqual(self.client.post('/auth/select', data={'address': accounts[0]}, **self.base).status_code, 400)
+        with patch.object(mail, 'load_json_map', return_value={accounts[0]: 'test-only-password'}), patch.object(mail, 'mailbox'):
+            response = self.post('/auth/select', address=accounts[0])
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.headers['Location'], '/')
+        selected = self.client.get('/api/mail/session', **self.base).json
+        self.assertEqual(selected['email'], accounts[0])
+        self.assertEqual(selected['mailboxes'], [])
+        self.assertNotIn('test-only-password', str(selected))
 
 
 if __name__ == '__main__':
