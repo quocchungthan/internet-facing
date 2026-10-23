@@ -1,9 +1,12 @@
 name: Deploy Fences
 
 on:
-  # push:
-  #   branches:
-  #     - 'sub/identity'
+  push:
+    branches: ['sub/identity']
+    paths:
+      - 'Fences/**'
+      - 'Fences.Tests/**'
+      - '.github/workflows/deploy-fences.yml'
   workflow_dispatch:
 
 permissions:
@@ -20,6 +23,40 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Require identity branch
+        run: test "$GITHUB_REF_NAME" = sub/identity
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.x'
+      - name: Validate artifact configuration
+        env:
+          SINGLE_UI_TOKEN: ${{ secrets.SINGLE_UI_TOKEN }}
+          SINGLE_UI_RUN_ID: ${{ vars.SINGLE_UI_RUN_ID }}
+          SINGLE_UI_REVISION: ${{ vars.SINGLE_UI_REVISION }}
+        run: |
+          set -euo pipefail
+          [[ -n "$SINGLE_UI_TOKEN" ]] || { echo "::error::Configure SINGLE_UI_TOKEN with producer Contents:read and Actions:read"; exit 1; }
+          [[ "$SINGLE_UI_RUN_ID" =~ ^[1-9][0-9]*$ && "$SINGLE_UI_REVISION" =~ ^[a-f0-9]{40}$ ]] ||
+            { echo "::error::Pin SINGLE_UI_RUN_ID and SINGLE_UI_REVISION"; exit 1; }
+      - uses: actions/checkout@v4
+        with:
+          repository: quocchungthan/EMFc-experiments
+          ref: ${{ vars.SINGLE_UI_REVISION }}
+          token: ${{ secrets.SINGLE_UI_TOKEN }}
+          path: single-ui-source
+      - name: Import verified Identity frontend
+        env:
+          GH_TOKEN: ${{ secrets.SINGLE_UI_TOKEN }}
+          SINGLE_UI_RUN_ID: ${{ vars.SINGLE_UI_RUN_ID }}
+          SINGLE_UI_REVISION: ${{ vars.SINGLE_UI_REVISION }}
+        run: node single-ui-source/SingleUI/deployment/artifacts/import-app.mjs identity Fences/frontend
+      - name: Test Fences contracts
+        run: dotnet test Fences.Tests/Fences.Tests.csproj --configuration Release
 
       - name: Validate Fences scripts
         run: |

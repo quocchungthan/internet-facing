@@ -11,10 +11,6 @@ COPY Fences/Fences.csproj Fences/
 RUN dotnet restore Fences/Fences.csproj
 
 COPY Fences/ Fences/
-COPY Farm/wwwroot/css/shared/ Farm/wwwroot/css/shared/
-COPY Farm/wwwroot/favicon.ico Farm/wwwroot/favicon.ico
-COPY Farm/wwwroot/icons.svg Farm/wwwroot/icons.svg
-COPY Farm/wwwroot/favicon.svg Farm/wwwroot/favicon.svg
 RUN dotnet publish Fences/Fences.csproj -c Release -o /app/publish --no-restore
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final

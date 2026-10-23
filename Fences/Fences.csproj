@@ -13,11 +13,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="..\Farm\wwwroot\css\shared\variables.css" Link="wwwroot\css\shared\variables.css" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Always" />
-    <Content Include="..\Farm\wwwroot\css\shared\base.css" Link="wwwroot\css\shared\base.css" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Always" />
-    <Content Include="..\Farm\wwwroot\css\shared\tokens.css" Link="wwwroot\css\shared\tokens.css" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Always" />
-    <Content Include="..\Farm\wwwroot\css\shared\identity.css" Link="wwwroot\css\shared\identity.css" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Always" />
-    <Content Include="..\Farm\wwwroot\favicon.ico" Link="wwwroot\favicon.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Always" />
-    <Content Include="..\Farm\wwwroot\icons.svg" Link="wwwroot\icons.svg" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Always" />
+    <Content Remove="frontend\**\*" />
+    <None Remove="frontend\**\*" />
+    <Content Include="frontend\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Always" />
   </ItemGroup>
+  <Target Name="RequireFrontendBundle" BeforeTargets="ComputeFilesToPublish">
+    <Error Condition="!Exists('frontend/index.html') Or !Exists('frontend/bundle-manifest.json')"
+           Text="Import the verified SingleUI app-identity artifact into Fences/frontend before publishing." />
+  </Target>
 </Project>
