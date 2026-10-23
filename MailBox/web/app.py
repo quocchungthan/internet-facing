@@ -17,7 +17,8 @@ from email.utils import formatdate, make_msgid
 from html.parser import HTMLParser
 from pathlib import Path
 
-from flask import Flask, abort, flash, redirect, render_template, request, session, url_for
+from flask import Flask, abort, flash, g, redirect, render_template, request, session, url_for, send_from_directory
+from werkzeug.exceptions import HTTPException
 
 app = Flask(__name__)
 app.config.update(
@@ -43,6 +44,7 @@ OAUTH_CLIENT_SECRET = os.environ.get('OAUTH_CLIENT_SECRET', '')
 OAUTH_REDIRECT_URL = os.environ.get('OAUTH_REDIRECT_URL', f'https://{HOST}/auth/github/callback')
 MANAGED_ACCOUNTS_PATH = Path('secrets/managed_accounts.json')
 ACCOUNTS_PATH = Path('secrets/accounts.json')
+FRONTEND_PATH = Path(__file__).resolve().parent / 'frontend'
 
 
 def oauth_configured():
@@ -106,17 +108,29 @@ app.jinja_env.globals.update(csrf=csrf, domain=DOMAIN)
 @app.before_request
 def protect():
     if request.method == 'POST':
+        if request.headers.get('Origin') not in {None, f'https://{HOST}'}:
+            abort(403, 'Untrusted request origin.')
         expected = session.get('csrf', '')
         supplied = request.form.get('csrf', '')
         if not expected or not secrets.compare_digest(expected, supplied):
             abort(400, 'Phiên biểu mẫu hết hạn. Hãy tải lại trang.')
-    if request.endpoint not in {'login', 'static', 'health', 'auth_github', 'auth_github_callback', 'choose_mailbox', 'auth_select'} and not current_user():
+    public = {'login', 'static', 'health', 'auth_github', 'auth_github_callback',
+              'choose_mailbox', 'auth_select', 'frontend', 'frontend_asset', 'api_session'}
+    if request.endpoint not in public and not current_user():
+        if request.path.startswith('/api/'):
+            abort(401, 'Authentication required.')
         return redirect(url_for('login'))
 
 
 @app.after_request
 def headers(response):
     response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'none'; style-src 'self'; img-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+    if getattr(g, 'frontend_nonce', None):
+        response.headers['Content-Security-Policy'] = (
+            "default-src 'self'; script-src 'self'; "
+            f"style-src 'self' 'nonce-{g.frontend_nonce}'; "
+            "font-src 'self' data:; img-src 'self' data:; connect-src 'self'; "
+            "object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['X-Frame-Options'] = 'DENY'
     response.headers['Referrer-Policy'] = 'no-referrer'
@@ -235,7 +249,7 @@ def select_mailbox(address):
     session.pop('manager_accounts', None)
     session['sid'] = sid
     session.permanent = True
-    return redirect(url_for('inbox'))
+    return redirect('/')
 
 
 @app.post('/logout')
@@ -246,13 +260,7 @@ def logout():
     return redirect(url_for('login'))
 
 
-@app.get('/')
-def inbox():
-    user = current_user()
-    folder = request.args.get('folder', 'inbox')
-    if folder not in FOLDERS:
-        abort(400)
-    page = max(1, request.args.get('page', 1, type=int))
+def list_messages(user, folder, page):
     messages = []
     with mailbox(user['email'], user['password']) as client:
         if folder == 'sent':
@@ -265,10 +273,10 @@ def inbox():
             if not item:
                 continue
             msg = BytesParser(policy=policy.default).parsebytes(item[1])
-            messages.append({'uid': uid.decode(), 'subject': str(msg.get('Subject', '(Không có tiêu đề)')),
+            messages.append({'uid': int(uid), 'subject': str(msg.get('Subject', '(Không có tiêu đề)')),
                              'sender': str(msg.get('From', '')), 'to': str(msg.get('To', '')),
                              'date': str(msg.get('Date', '')), 'unread': b'\\Seen' not in item[0]})
-    return render_template('inbox.html', user=user, messages=messages, folder=folder, page=page, more=page * 20 < len(ids))
+    return {'messages': messages, 'more': page * 20 < len(ids)}
 
 
 class PlainHTML(HTMLParser):
@@ -307,12 +315,7 @@ def message_text(msg):
     return text
 
 
-@app.get('/message/<int:uid>')
-def read_message(uid):
-    user = current_user()
-    folder = request.args.get('folder', 'inbox')
-    if folder not in FOLDERS or uid < 1:
-        abort(400)
+def read_mail(user, folder, uid):
     with mailbox(user['email'], user['password']) as client:
         checked(client.select(FOLDERS[folder], readonly=True))
         # Fetch size before downloading to bound memory usage for incoming mail.
@@ -322,67 +325,135 @@ def read_message(uid):
         if not match:
             abort(404)
         if int(match[1]) > 10 * 1024 * 1024:
-            flash('Thư lớn hơn 10 MB. Hãy mở bằng ứng dụng IMAP trên máy tính.', 'error')
-            return redirect(url_for('inbox', folder=folder))
-        data = checked(client.uid('fetch', str(uid), '(BODY.PEEK[])'))
+            abort(413, 'Message exceeds 10 MiB. Use an IMAP client.')
+        data = checked(client.uid('fetch', str(uid), '(FLAGS BODY.PEEK[])'))
         item = next((x for x in data if isinstance(x, tuple)), None)
         if not item:
             abort(404)
         msg = BytesParser(policy=policy.default).parsebytes(item[1])
     attachments = [str(p.get_filename()) for p in msg.walk() if p.get_filename()]
-    return render_template('message.html', user=user, folder=folder, msg=msg, body=message_text(msg), attachments=attachments)
+    return {'uid': uid, 'subject': str(msg.get('Subject', '(Không có tiêu đề)')),
+            'sender': str(msg.get('From', '')), 'to': str(msg.get('To', '')),
+            'date': str(msg.get('Date', '')), 'unread': b'\\Seen' not in item[0],
+            'body': message_text(msg), 'attachments': attachments}
 
 
-@app.route('/compose', methods=['GET', 'POST'])
-def compose():
-    user = current_user()
-    if request.method == 'POST':
-        recipient = request.form.get('to', '').strip()
-        subject = request.form.get('subject', '')
-        body = request.form.get('body', '')
-        if not ADDRESS.fullmatch(recipient) or len(recipient) > 254 or '\r' in subject or '\n' in subject or len(subject) > 200 or len(body) > 100000:
-            flash('Nhập một email người nhận hợp lệ; tiêu đề tối đa 200 và nội dung tối đa 100.000 ký tự.', 'error')
-            return render_template('compose.html', user=user), 400
-        with lock:
-            now = time.time()
-            user['sends'] = [t for t in user['sends'] if now - t < 60]
-            if len(user['sends']) >= 5:
-                flash('Tối đa 5 lần gửi mỗi phút cho phiên này.', 'error')
-                return render_template('compose.html', user=user), 429
-            user['sends'].append(now)
-        msg = EmailMessage()
-        msg['From'] = user['email']
-        msg['To'] = recipient
-        msg['Subject'] = subject
-        msg['Date'] = formatdate(localtime=False)
-        msg['Message-ID'] = make_msgid(domain=DOMAIN)
-        msg.set_content(body)
-        # Ensure Sent is available before sending, but do not append until accepted.
+def send_mail(user):
+    recipient = request.form.get('to', '').strip()
+    subject = request.form.get('subject', '')
+    body = request.form.get('body', '')
+    if not ADDRESS.fullmatch(recipient) or len(recipient) > 254 or '\r' in subject or '\n' in subject or len(subject) > 200 or len(body) > 100000:
+        abort(400, 'Use one valid recipient, a subject up to 200 characters and body up to 100000 characters.')
+    with lock:
+        now = time.time()
+        user['sends'] = [t for t in user['sends'] if now - t < 60]
+        if len(user['sends']) >= 5:
+            abort(429, 'Maximum five sends per minute per session.')
+        user['sends'].append(now)
+    msg = EmailMessage()
+    msg['From'] = user['email']
+    msg['To'] = recipient
+    msg['Subject'] = subject
+    msg['Date'] = formatdate(localtime=False)
+    msg['Message-ID'] = make_msgid(domain=DOMAIN)
+    msg.set_content(body)
+    # Ensure Sent is available before sending, but do not append until accepted.
+    with mailbox(user['email'], user['password']) as client:
+        client.create('Sent')
+        checked(client.select('Sent'))
+    try:
+        with smtplib.SMTP(HOST, 587, timeout=20) as smtp:
+            smtp.ehlo()
+            smtp.starttls(context=tls_context())
+            smtp.ehlo()
+            smtp.login(user['email'], user['password'])
+            smtp.send_message(msg)
+    except (smtplib.SMTPException, OSError):
+        app.logger.warning('SMTP acceptance uncertain; do not retry automatically.')
+        abort(502, 'Send outcome uncertain. Check the mailbox before resending.')
+    try:
         with mailbox(user['email'], user['password']) as client:
-            client.create('Sent')
-            checked(client.select('Sent'))
-        try:
-            with smtplib.SMTP(HOST, 587, timeout=20) as smtp:
-                smtp.ehlo()
-                smtp.starttls(context=tls_context())
-                smtp.ehlo()
-                smtp.login(user['email'], user['password'])
-                smtp.send_message(msg)
-        except (smtplib.SMTPException, OSError):
-            flash('Không xác nhận được việc gửi. Kiểm tra log/hộp thư trước khi gửi lại để tránh trùng thư.', 'error')
-            return render_template('compose.html', user=user), 502
-        try:
-            with mailbox(user['email'], user['password']) as client:
-                checked(client.append('Sent', '\\Seen', imaplib.Time2Internaldate(time.time()), msg.as_bytes(policy=policy.SMTP)))
-            flash('Maddy đã nhận thư để chuyển đi. Điều này chưa xác nhận thư vào Inbox của người nhận.', 'success')
-        except (imaplib.IMAP4.error, OSError):
-            flash('Maddy đã nhận thư, nhưng lưu bản sao vào Đã gửi thất bại. Không gửi lại thư này.', 'error')
-        return redirect(url_for('inbox', folder='sent'))
-    return render_template('compose.html', user=user)
+            checked(client.append('Sent', '\\Seen', imaplib.Time2Internaldate(time.time()), msg.as_bytes(policy=policy.SMTP)))
+        return {'accepted': True, 'saved': True}
+    except (imaplib.IMAP4.error, OSError):
+        app.logger.warning('SMTP accepted but Sent-copy persistence failed.')
+        return {'accepted': True, 'saved': False}
+
+
+def requested_folder():
+    folder = request.args.get('folder', 'inbox')
+    if folder not in FOLDERS:
+        abort(400, 'Folder must be inbox or sent.')
+    return folder
+
+
+@app.get('/api/mail/session')
+def api_session():
+    user = current_user()
+    return {'domain': DOMAIN, 'email': user['email'] if user else None,
+            'csrf': csrf(), 'oauthConfigured': oauth_configured()}
+
+
+@app.get('/api/mail/messages')
+def api_messages():
+    raw_page = request.args.get('page', '1')
+    if not re.fullmatch(r'[1-9][0-9]{0,8}', raw_page):
+        abort(400, 'Page must be a positive integer.')
+    return list_messages(current_user(), requested_folder(), int(raw_page))
+
+
+@app.get('/api/mail/messages/<int:uid>')
+def api_message(uid):
+    if uid < 1:
+        abort(400, 'UID must be positive.')
+    return read_mail(current_user(), requested_folder(), uid)
+
+
+@app.post('/api/mail/compose')
+def api_compose():
+    return send_mail(current_user())
+
+
+@app.post('/api/mail/logout')
+def api_logout():
+    with lock:
+        sessions.pop(session.get('sid'), None)
+    session.clear()
+    return {'signedOut': True}
+
+
+@app.get('/')
+@app.get('/compose')
+@app.get('/message/<int:uid>')
+def frontend(uid=None):
+    entry = FRONTEND_PATH / 'index.html'
+    if not entry.is_file():
+        abort(503, 'Mail frontend is not installed. Import the pinned app-mail artifact.')
+    g.frontend_nonce = secrets.token_urlsafe(32)
+    return entry.read_text(encoding='utf-8').replace(
+        '<app-root', f'<app-root ngCspNonce="{g.frontend_nonce}"', 1)
+
+
+@app.get('/<path:filename>')
+def frontend_asset(filename):
+    if filename.split('/')[0] in {'api', 'auth', 'admin', 'secrets'}:
+        abort(404)
+    if filename == 'bundle-manifest.json' or filename.endswith(('.js', '.css', '.svg', '.png', '.ico', '.woff2')):
+        return send_from_directory(FRONTEND_PATH, filename)
+    abort(404)
+
+
+@app.errorhandler(HTTPException)
+def http_error(error):
+    if request.path.startswith('/api/') or request.endpoint in {'frontend', 'frontend_asset'}:
+        return {'error': error.name, 'detail': error.description}, error.code
+    return error
 
 
 @app.errorhandler(imaplib.IMAP4.error)
 @app.errorhandler(OSError)
 def mail_error(error):
     app.logger.warning('Mail connection failed: %s', type(error).__name__)
+    if request.path.startswith('/api/'):
+        return {'error': 'mail_unavailable', 'detail': 'Mail service unavailable.'}, 503
     return render_template('error.html', user=current_user()), 503
