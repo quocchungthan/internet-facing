@@ -21,8 +21,10 @@ database.
 
 Docker may record a multi-platform index while the artifact pins its exact
 platform manifest. In that case the guard pulls the immutable pinned reference
-without starting it and compares canonical image IDs. Only identical native
-image bytes pass; genuinely different versions are still refused.
+without starting it and compares hashes of the complete filesystem-layer list,
+runtime image configuration, OS and architecture. Containerd's index/manifest
+IDs themselves are not equivalent across references. Only identical native
+contents and configuration pass; genuinely different versions are still refused.
 
 Only the `affine` service is recreated, with its existing volumes/environment.
 The script does not run migrations, rebuild application bundles, change CSP,
