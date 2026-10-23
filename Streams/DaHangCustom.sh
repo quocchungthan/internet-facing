@@ -24,7 +24,11 @@ cp -R "$AFFINE_SOURCE_DIR/." "$AFFINE_DEPLOY_DIR/"
 sed -i -E "s#- '3010:3010'#- '127.0.0.1:${AFFINE_UPSTREAM_PORT}:3010'#" "$AFFINE_DEPLOY_DIR/compose.yml"
 
 cd "$AFFINE_DEPLOY_DIR"
-$DOCKER_COMPOSE_BIN -f compose.yml up -d
+if [[ -f single-ui.compose.yml ]]; then
+	$DOCKER_COMPOSE_BIN -f compose.yml -f single-ui.compose.yml up -d
+else
+	$DOCKER_COMPOSE_BIN -f compose.yml up -d
+fi
 
 fragment="$CADDY_SITES_DIR/$AFFINE_DOMAIN.caddy"
 fragment_tmp="$CADDY_SITES_DIR/.$AFFINE_DOMAIN.caddy.$$"
