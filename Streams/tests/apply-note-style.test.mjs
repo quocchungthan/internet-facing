@@ -37,8 +37,10 @@ case "$1 $2" in
     elif [[ "$*" == *affine-base* ]]; then
       if [[ "\${!#}" == sha256:native-image ]]; then echo '<no value>'; else echo "$EXPECTED_BASE"; fi
     elif [[ "$*" == *revision* ]]; then echo "$EXPECTED_REVISION"
-    elif [[ "$*" == *'.Id'* ]]; then
-      if [[ "$SCENARIO" == version-mismatch ]]; then echo sha256:different-image; else echo sha256:native-image; fi
+    elif [[ "$*" == *'.RootFS'* ]]; then
+      if [[ "$SCENARIO" == version-mismatch && "\${!#}" == sha256:native-image ]]; then
+        echo different-layers-and-configuration
+      else echo identical-native-layers-and-configuration; fi
     fi ;;
   "pull $EXPECTED_BASE") ;;
   "load --input") ;;

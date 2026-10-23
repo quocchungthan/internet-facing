@@ -27,10 +27,12 @@ current="$(docker inspect --format '{{.Image}}' "$container")"
 installed_base="$(docker image inspect --format '{{index .Config.Labels "dev.eldervibe.single-ui.affine-base"}}' "$current")"
 if [[ "$installed_base" != "$base" ]] &&
   ! docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$current" | grep -Fxq "$base"; then
-  # A native tag may retain its multi-platform index rather than the pinned platform manifest.
+  # Containerd can expose index/manifest IDs for identical native image contents.
   docker pull "$base" >/dev/null
-  expected_image="$(docker image inspect --format '{{.Id}}' "$base")"
-  if [[ "$current" != "$expected_image" ]]; then
+  fingerprint='{{json .RootFS}} {{json .Config}} {{.Os}} {{.Architecture}}'
+  current_state="$(docker image inspect --format "$fingerprint" "$current" | sha256sum)"
+  expected_state="$(docker image inspect --format "$fingerprint" "$base" | sha256sum)"
+  if [[ "$current_state" != "$expected_state" ]]; then
     echo "AFFiNE version mismatch. This style operation will not upgrade the backend or migrate its database." >&2
     echo "Supported base: $base" >&2
     docker image inspect --format 'Deployed digests: {{json .RepoDigests}}' "$current" >&2
