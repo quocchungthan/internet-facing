@@ -15,7 +15,7 @@
 </head>
 <body>
 <header>
-  <a class="brand" href="{{ url_for('inbox') }}">
+  <a class="brand" href="/">
     <span class="logo">
       <svg style="width: 20px; height: 20px;" viewBox="0 0 24 24" fill="none" stroke="currentColor"><use href="{{ url_for('static', filename='icons.svg') }}#mail-icon"></use></svg>
     </span>
@@ -27,10 +27,10 @@
 <div class="layout">
 {% if user %}
 <aside>
-  <a class="button compose" href="{{ url_for('compose') }}">＋ Soạn thư</a>
+  <a class="button compose" href="/compose">＋ Soạn thư</a>
   <nav>
-    <a class="{{ 'active' if folder == 'inbox' }}" href="{{ url_for('inbox') }}">Hộp thư đến <span>↙</span></a>
-    <a class="{{ 'active' if folder == 'sent' }}" href="{{ url_for('inbox', folder='sent') }}">Đã gửi <span>↗</span></a>
+    <a href="/">Hộp thư đến <span>↙</span></a>
+    <a href="/?folder=sent">Đã gửi <span>↗</span></a>
   </nav>
   <div class="account">
     <span class="avatar">{{ user.email[0]|upper }}</span>

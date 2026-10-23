@@ -5,3 +5,4 @@ backups/
 dist/
 __pycache__/
 .venv/
+web/frontend/
