@@ -63,6 +63,30 @@ public sealed class PortfolioApiFixture : WebApplicationFactory<Program>
             db.ProfileSkills.Add(new ProfileSkill { ProfileId = 1, SkillId = id });
             db.ProjectSkills.Add(new ProjectSkill { ProjectId = 1, SkillId = id });
         }
+        db.GigProblems.AddRange(
+            new GigProblem
+            {
+                Id = 20, Title = "Later gig", Slug = "later-gig", Category = "Test",
+                Summary = "Later summary", Problem = "Later problem", Outcome = "Later outcome",
+                SolvedOn = new DateOnly(2026, 2, 1), DisplayOrder = 2
+            },
+            new GigProblem
+            {
+                Id = 10, Title = "Featured gig", Slug = "featured-gig", Category = "Test",
+                Summary = "Featured summary", Problem = "Featured problem", Outcome = "Featured outcome",
+                SolvedOn = new DateOnly(2026, 1, 1), DisplayOrder = 1
+            },
+            new GigProblem
+            {
+                Id = 15, Title = "Tied gig", Slug = "tied-gig", Category = "Test",
+                Summary = "Tied summary", DisplayOrder = 1
+            });
+        db.GigSteps.AddRange(
+            new GigStep { Id = 2, ProblemId = 10, StepNumber = 2, Title = "Second step" },
+            new GigStep { Id = 1, ProblemId = 10, StepNumber = 1, Title = "First step" });
+        db.GigProblemSkills.AddRange(
+            new GigProblemSkill { ProblemId = 10, SkillId = 3 },
+            new GigProblemSkill { ProblemId = 10, SkillId = 1 });
         db.ProfileProjects.Add(new ProfileProject { ProfileId = 2, ProjectId = 1 });
         db.ProfileSkills.Add(new ProfileSkill { ProfileId = 2, SkillId = 1 });
         db.ProjectSkills.Add(new ProjectSkill { ProjectId = 2, SkillId = 1 });
@@ -208,6 +232,51 @@ public class PortfolioApiTests(PortfolioApiFixture fixture) : IClassFixture<Port
         Assert.Equal(JsonValueKind.Null, row.GetProperty("endDate").ValueKind);
         Assert.True(row.GetProperty("isFeatured").GetBoolean());
         Assert.Equal(1, row.GetProperty("displayOrder").GetInt32());
+    }
+
+    [Fact]
+    public async Task Gigs_AreOrderedAndIncludeOrderedStepsAndSkills()
+    {
+        using var client = fixture.NewClient();
+        var rows = await client.GetFromJsonAsync<JsonElement>("/api/portfolio/gigs");
+
+        Assert.Equal(3, rows.GetArrayLength());
+        Assert.Equal("featured-gig", rows[0].GetProperty("slug").GetString());
+        Assert.Equal(10, rows[0].GetProperty("id").GetInt32());
+        Assert.Equal("tied-gig", rows[1].GetProperty("slug").GetString());
+        Assert.Equal(15, rows[1].GetProperty("id").GetInt32());
+        Assert.Equal("later-gig", rows[2].GetProperty("slug").GetString());
+
+        var steps = rows[0].GetProperty("steps");
+        Assert.Equal(2, steps.GetArrayLength());
+        Assert.Equal("First step", steps[0].GetProperty("title").GetString());
+        Assert.Equal("Second step", steps[1].GetProperty("title").GetString());
+
+        var skills = rows[0].GetProperty("skills");
+        Assert.Equal(2, skills.GetArrayLength());
+        Assert.Equal("Skill 1", skills[0].GetProperty("name").GetString());
+        Assert.Equal("Skill 3", skills[1].GetProperty("name").GetString());
+    }
+
+    [Fact]
+    public async Task GigDetail_IncludesSchemaFieldsAndNestedData_AndMissingGigReturns404()
+    {
+        using var client = fixture.NewClient();
+        var response = await client.GetAsync("/api/portfolio/gigs/10");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(response.Headers.Contains("X-RateLimit-Limit"));
+        var gig = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("Featured gig", gig.GetProperty("title").GetString());
+        Assert.Equal("Featured summary", gig.GetProperty("summary").GetString());
+        Assert.Equal("Featured problem", gig.GetProperty("problem").GetString());
+        Assert.Equal("Featured outcome", gig.GetProperty("outcome").GetString());
+        Assert.Equal("2026-01-01", gig.GetProperty("solvedOn").GetString());
+        Assert.False(gig.TryGetProperty("bodyMarkdown", out _));
+        Assert.Equal("First step", gig.GetProperty("steps")[0].GetProperty("title").GetString());
+        Assert.Equal("Skill 1", gig.GetProperty("skills")[0].GetProperty("name").GetString());
+        Assert.Equal(HttpStatusCode.NotFound,
+            (await client.GetAsync("/api/portfolio/gigs/9999")).StatusCode);
     }
 
     [Fact]

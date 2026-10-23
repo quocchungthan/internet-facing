@@ -91,3 +91,33 @@ public sealed record ProjectSkillResponse
     public int ProjectId { get; init; }
     public int SkillId { get; init; }
 }
+
+public sealed record GigResponse
+{
+    public int Id { get; init; }
+    public required string Title { get; init; }
+    public required string Slug { get; init; }
+    public required string Category { get; init; }
+    public required string Summary { get; init; }
+    public string? Problem { get; init; }
+    public string? Outcome { get; init; }
+    public DateOnly? SolvedOn { get; init; }
+    public int DisplayOrder { get; init; }
+    public IReadOnlyList<GigStepResponse> Steps { get; init; } = [];
+    public IReadOnlyList<GigSkillResponse> Skills { get; init; } = [];
+}
+
+public sealed record GigStepResponse
+{
+    public int Id { get; init; }
+    public int StepNumber { get; init; }
+    public required string Title { get; init; }
+    public string? Description { get; init; }
+}
+
+public sealed record GigSkillResponse
+{
+    public int Id { get; init; }
+    public required string Name { get; init; }
+    public required string Category { get; init; }
+}

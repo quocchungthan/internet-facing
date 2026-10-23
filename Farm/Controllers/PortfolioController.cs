@@ -37,6 +37,34 @@ public class PortfolioController(PortfolioDbContext db, IClientTracingService tr
             DisplayOrder = p.DisplayOrder });
     private IQueryable<ProjectSkillResponse> ProjectSkills => db.ProjectSkills.AsNoTracking()
         .Select(p => new ProjectSkillResponse { ProjectId = p.ProjectId, SkillId = p.SkillId });
+    private IQueryable<GigResponse> Gigs => db.GigProblems.AsNoTracking()
+        .Select(g => new GigResponse
+        {
+            Id = g.Id,
+            Title = g.Title,
+            Slug = g.Slug,
+            Category = g.Category,
+            Summary = g.Summary,
+            Problem = g.Problem,
+            Outcome = g.Outcome,
+            SolvedOn = g.SolvedOn,
+            DisplayOrder = g.DisplayOrder,
+            Steps = g.Steps.OrderBy(s => s.StepNumber).ThenBy(s => s.Id)
+                .Select(s => new GigStepResponse
+                {
+                    Id = s.Id,
+                    StepNumber = s.StepNumber,
+                    Title = s.Title,
+                    Description = s.Description
+                }).ToList(),
+            Skills = g.Skills.OrderBy(s => s.SkillId)
+                .Select(s => new GigSkillResponse
+                {
+                    Id = s.Skill.Id,
+                    Name = s.Skill.Name,
+                    Category = s.Skill.Category
+                }).ToList()
+        });
 
     [HttpGet("profiles")]
     public Task<IActionResult> GetProfiles([FromQuery] PortfolioPage pagination, CancellationToken token) =>
@@ -53,6 +81,14 @@ public class PortfolioController(PortfolioDbContext db, IClientTracingService tr
     [HttpGet("projects/{id:int}")]
     public Task<IActionResult> GetProject([Range(1, int.MaxValue)] int id, CancellationToken token) =>
         OneAsync(Projects.Where(p => p.Id == id), token);
+
+    [HttpGet("gigs")]
+    public Task<IActionResult> GetGigs([FromQuery] PortfolioPage pagination, CancellationToken token) =>
+        ListAsync(Gigs.OrderBy(g => g.DisplayOrder).ThenBy(g => g.Id), pagination, token);
+
+    [HttpGet("gigs/{id:int}")]
+    public Task<IActionResult> GetGig([Range(1, int.MaxValue)] int id, CancellationToken token) =>
+        OneAsync(Gigs.Where(g => g.Id == id), token);
 
     [HttpGet("skills")]
     public Task<IActionResult> GetSkills([FromQuery] PortfolioPage pagination, CancellationToken token) =>
