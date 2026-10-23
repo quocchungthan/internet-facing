@@ -18,17 +18,20 @@ the pinned SHA, then run its `SingleUI/deployment/artifacts/import-app.mjs` with
 arguments `mail` and the absolute empty `MailBox/web/frontend` destination.
 Develop the Angular UI separately without Docker in SingleUI.
 
-Existing frontend URLs `/`, `/?folder=sent&page=N`, `/compose` and
-`/message/UID?folder=...` serve Angular. `/auth/github`, callback, chooser and
-selection stay server-owned with the existing managed-account authorization.
-Only the Angular entry receives the self-script/nonce-style CSP; native auth
-retains script-src none. No blanket CSP disable or credentialed wildcard CORS.
+Existing frontend URLs `/`, `/?folder=sent&page=N`, `/compose`,
+`/message/UID?folder=...`, `/login` and `/auth/choose` serve Angular.
+`/auth/github`, callback and `/auth/select` remain server-owned with the existing
+managed-account authorization and session-bound CSRF. The chooser displays only
+addresses from the authenticated server session and posts the original form
+contract; it does not receive mailbox passwords. OAuth failure messages remain
+visible in the shared entry. Angular entries use self-script/nonce-style CSP;
+native error pages retain script-src none. No blanket CSP disable or credentialed wildcard CORS.
 Session cookies stay Secure/HttpOnly/SameSite=Lax and mailbox passwords stay
 server-side. The static path never serves Python/secrets or swallows API routes.
 
 | Method | Route | Result |
 | --- | --- | --- |
-| GET | `/api/mail/session` | `{domain,email,csrf,oauthConfigured}`; null email means signed out |
+| GET | `/api/mail/session` | `{domain,email,csrf,oauthConfigured,mailboxes,authErrors}`; choices come only from authorized server session |
 | GET | `/api/mail/messages?folder=inbox&page=1` | `{messages,more}`, 20 messages/page, inbox/sent only |
 | GET | `/api/mail/messages/UID?folder=inbox` | Summary plus plain text `body` and attachment filenames; 10 MiB limit |
 | POST | `/api/mail/compose` | Form `{csrf,to,subject,body}`; `{accepted:true,saved:boolean}` |
