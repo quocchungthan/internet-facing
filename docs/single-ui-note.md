@@ -19,6 +19,11 @@ match the artifact's base digest. A mismatch requires validating the adapter
 against the actual deployed version, not silently upgrading AFFiNE or its
 database.
 
+Docker may record a multi-platform index while the artifact pins its exact
+platform manifest. In that case the guard pulls the immutable pinned reference
+without starting it and compares canonical image IDs. Only identical native
+image bytes pass; genuinely different versions are still refused.
+
 Only the `affine` service is recreated, with its existing volumes/environment.
 The script does not run migrations, rebuild application bundles, change CSP,
 rewrite proxy HTML, change authentication or restart the database. It verifies

@@ -13,7 +13,7 @@ const bash = process.platform === 'win32'
 const base = `ghcr.io/toeverything/affine@sha256:${'a'.repeat(64)}`;
 const revision = 'b'.repeat(40);
 
-for (const scenario of ['valid', 'version-mismatch', 'readiness-failure']) {
+for (const scenario of ['valid', 'index-digest', 'version-mismatch', 'readiness-failure']) {
   test(`native AFFiNE image-only installer: ${scenario}`, async () => {
     const directory = await mkdtemp(join(tmpdir(), 'note-style-test-'));
     try {
@@ -33,10 +33,14 @@ case "$1 $2" in
   "inspect --format") echo sha256:native-image ;;
   "image inspect")
     if [[ "$*" == *RepoDigests* ]]; then
-      if [[ "$SCENARIO" == version-mismatch ]]; then echo incompatible-base; else echo "$EXPECTED_BASE"; fi
+      if [[ "$SCENARIO" == version-mismatch || "$SCENARIO" == index-digest ]]; then echo native-index-digest; else echo "$EXPECTED_BASE"; fi
     elif [[ "$*" == *affine-base* ]]; then
       if [[ "\${!#}" == sha256:native-image ]]; then echo '<no value>'; else echo "$EXPECTED_BASE"; fi
-    elif [[ "$*" == *revision* ]]; then echo "$EXPECTED_REVISION"; fi ;;
+    elif [[ "$*" == *revision* ]]; then echo "$EXPECTED_REVISION"
+    elif [[ "$*" == *'.Id'* ]]; then
+      if [[ "$SCENARIO" == version-mismatch ]]; then echo sha256:different-image; else echo sha256:native-image; fi
+    fi ;;
+  "pull $EXPECTED_BASE") ;;
   "load --input") ;;
   *) echo "Unexpected Docker command: $*" >&2; exit 2 ;;
 esac
@@ -59,14 +63,14 @@ if [[ "$SCENARIO" == readiness-failure ]]; then echo wrong-stylesheet; else cat 
           FIXTURE_CSS: unix(join(directory, 'affine.css')), CALL_LOG: unix(join(directory, 'calls.log')) },
       });
       assert.ifError(result.error);
-      if (scenario === 'valid') assert.equal(result.status, 0, result.stderr);
       const calls = await readFile(join(directory, 'calls.log'), 'utf8');
       assert.doesNotMatch(calls, /up -d(?:\r?\n|$)|run .*migration|down|volume/);
-      if (scenario === 'valid') {
+      if (scenario === 'valid' || scenario === 'index-digest') {
         assert.equal(result.status, 0, result.stderr);
         assert.match(result.stdout, /Verified AFFiNE stylesheet/);
         assert.match(calls, /up -d --no-deps affine/);
         assert.match(await readFile(join(deployment, 'single-ui.compose.yml'), 'utf8'), /affine_migration:/);
+        if (scenario === 'index-digest') assert.match(calls, /pull ghcr.io/);
       } else if (scenario === 'version-mismatch') {
         assert.notEqual(result.status, 0);
         assert.match(result.stderr, /version mismatch/);
