@@ -128,9 +128,6 @@ export SERVICE_CONTAINER=eldervibe-farm
 export SERVICE_IMAGE="$FARM_IMAGE"
 export SERVICE_ENV_FILE="$FARM_ENV_FILE"
 export SERVICE_CANDIDATE_PORT=8181
-export SERVICE_STATIC_CONTAINER_PATH=/app/wwwroot/hanging-post
-export SERVICE_STATIC_ROOT=/var/lib/caddy/farm/hanging-post
-export SERVICE_STATIC_PUBLIC_PREFIX=/hanging-post
 # Farm owns the domain; Farm.Mind adds its /mcp and /api/memory routes by dropping a file in this directory.
 export SERVICE_IMPORT_ROUTES_DIR="$FARM_ROUTES_DIR"
 export SERVICE_VOLUME="$FARM_KEYS_VOLUME:/keys"
