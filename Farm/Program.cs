@@ -2,6 +2,7 @@ using Farm.Auth;
 using Farm.Data;
 using Farm.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -152,6 +153,14 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+var frontendDirectory = Path.Combine(app.Environment.ContentRootPath, "frontend");
+if (Directory.Exists(frontendDirectory))
+{
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = new PhysicalFileProvider(frontendDirectory)
+    });
+}
 app.UseCors();
 app.UseRouting();
 

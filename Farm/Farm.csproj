@@ -19,4 +19,16 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.4" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Remove="frontend\**\*" />
+    <None Remove="frontend\**\*" />
+    <Content Include="frontend\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Remove="wwwroot\hanging-post\**\*" />
+  </ItemGroup>
+
+  <Target Name="RequireFrontendBundle" BeforeTargets="ComputeFilesToPublish">
+    <Error Condition="!Exists('frontend/index.html') Or !Exists('frontend/bundle-manifest.json')"
+           Text="Import the verified SingleUI app-farm artifact into Farm/frontend before publishing." />
+  </Target>
+
 </Project>

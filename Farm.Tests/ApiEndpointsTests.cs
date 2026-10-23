@@ -136,12 +136,16 @@ public class ApiEndpointsTests : IClassFixture<WebApplicationFactory<Program>>
     [InlineData("/winchester")]
     [InlineData("/tracker")]
     [InlineData("/brick")]
+    [InlineData("/bricks")]
+    [InlineData("/connect")]
+    [InlineData("/Home/Index")]
     public async Task DirectRouteAccess_Returns_Success(string route)
     {
         var client = _factory.CreateClient();
         var response = await client.GetAsync(route);
         response.EnsureSuccessStatusCode();
         var content = await response.Content.ReadAsStringAsync();
-        Assert.Contains("<div id=\"root\"></div>", content);
+        Assert.Contains("<app-root", content);
+        Assert.DoesNotContain("hanging-post.js", content);
     }
 }

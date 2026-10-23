@@ -4,23 +4,34 @@ using Farm.Models;
 
 namespace Farm.Controllers;
 
-public class HomeController : Controller
+public class HomeController(IWebHostEnvironment environment) : Controller
 {
+    private IActionResult Frontend()
+    {
+        var entry = Path.Combine(environment.ContentRootPath, "frontend", "index.html");
+        if (!System.IO.File.Exists(entry))
+        {
+            return StatusCode(503, new { error = "Farm frontend is not installed. Import the pinned app-farm artifact." });
+        }
+        Response.Headers.CacheControl = "no-store";
+        return PhysicalFile(entry, "text/html; charset=utf-8");
+    }
+
     public IActionResult Index()
     {
-        return View();
+        return Frontend();
     }
 
     [HttpGet("winchester")]
     public IActionResult Winchester()
     {
-        return View("Index");
+        return Frontend();
     }
 
     [HttpGet("connect")]
     public IActionResult Connect()
     {
-        return View("Index");
+        return Frontend();
     }
 
     [HttpGet("tracker")]
@@ -28,7 +39,7 @@ public class HomeController : Controller
     [HttpGet("bricks")]
     public IActionResult Tracker()
     {
-        return View("Index");
+        return Frontend();
     }
 
     public IActionResult Privacy()

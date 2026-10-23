@@ -46,17 +46,21 @@ jobs:
       - name: Restore .NET dependencies
         run: dotnet restore PiggyFarm.slnx
 
-      - name: Build Microsoft frontend
-        working-directory: Farm.Microsoft
+      - uses: actions/checkout@v4
+        with:
+          repository: quocchungthan/EMFc-experiments
+          ref: ${{ vars.SINGLE_UI_REVISION }}
+          token: ${{ secrets.SINGLE_UI_TOKEN }}
+          path: single-ui-source
+      - name: Import verified Farm frontend
+        env:
+          GH_TOKEN: ${{ secrets.SINGLE_UI_TOKEN }}
+          SINGLE_UI_RUN_ID: ${{ vars.SINGLE_UI_RUN_ID }}
+          SINGLE_UI_REVISION: ${{ vars.SINGLE_UI_REVISION }}
         run: |
-          npm install
-          npm run build
-
-      - name: Build HangingPost frontend
-        working-directory: Farm.HangingPost
-        run: |
-          npm install
-          npm run build
+          set -euo pipefail
+          [[ "$SINGLE_UI_REVISION" =~ ^[a-f0-9]{40}$ ]] || { echo "::error::Set SINGLE_UI_REVISION"; exit 1; }
+          node single-ui-source/SingleUI/deployment/artifacts/import-app.mjs farm Farm/frontend
 
       - name: Test solution
         run: dotnet test PiggyFarm.slnx --configuration Release --no-restore
