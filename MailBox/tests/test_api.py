@@ -15,9 +15,27 @@ spec = importlib.util.spec_from_file_location('mail_app', Path(__file__).parents
 mail = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = mail
 spec.loader.exec_module(mail)
+health_spec = importlib.util.spec_from_file_location('mail_upstream', Path(__file__).parents[1] / 'web' / 'check_upstream.py')
+health = importlib.util.module_from_spec(health_spec)
+health_spec.loader.exec_module(health)
 
 
 class MailApiTests(unittest.TestCase):
+    def test_upstream_health_uses_configured_tls_without_login_or_sending(self):
+        context = object()
+        with patch.object(health.imaplib, 'IMAP4_SSL') as imap, patch.object(health.smtplib, 'SMTP') as smtp:
+            imap.return_value.__enter__.return_value.noop.return_value = ('OK', [])
+            smtp.return_value.__enter__.return_value.ehlo.return_value = (250, b'OK')
+            health.check_upstream('configured.example.invalid', context)
+            imap.assert_called_once_with('configured.example.invalid', 993, ssl_context=context, timeout=10)
+            smtp.return_value.__enter__.return_value.starttls.assert_called_once_with(context=context)
+            imap.return_value.__enter__.return_value.login.assert_not_called()
+            smtp.return_value.__enter__.return_value.login.assert_not_called()
+            smtp.return_value.__enter__.return_value.send_message.assert_not_called()
+            smtp.return_value.__enter__.return_value.ehlo.return_value = (550, b'Failure')
+            with self.assertRaises(RuntimeError):
+                health.check_upstream('configured.example.invalid', context)
+
     def setUp(self):
         mail.app.config['TESTING'] = True
         mail.sessions.clear()

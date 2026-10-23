@@ -28,8 +28,12 @@ visible in the shared entry. Angular entries use self-script/nonce-style CSP;
 native error pages retain script-src none. No blanket CSP disable or credentialed wildcard CORS.
 Frontend/API releases build and recreate only `web`, with `--no-deps`; they
 must not recreate Maddy or attempt to rebind SMTP/IMAP ports. Native transport
-maintenance remains a separate operation. Post-deploy checks still report
-transport problems rather than claiming the complete mail stack is healthy.
+maintenance remains a separate operation. Post-deploy checks require `web` and
+probe the API's configured IMAP and SMTP upstreams with its existing TLS trust,
+without credentials or sending mail. This supports an already-running native
+transport outside this Compose project. A stopped local Maddy service is
+reported explicitly; unreachable/untrusted upstreams still fail deployment.
+Protocol reachability is not mailbox-login or delivery verification.
 Session cookies stay Secure/HttpOnly/SameSite=Lax and mailbox passwords stay
 server-side. The static path never serves Python/secrets or swallows API routes.
 
