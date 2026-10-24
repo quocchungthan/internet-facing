@@ -1,6 +1,6 @@
 # eldervibe.dev
 
-This repository is a .NET solution for deploying open-source services and plugins. Branches named `sub/<subdomain>` are deployed as subdomains and rebase from `main` when shared changes are needed.
+**This repository is a .NET solution for deploying open-source services and plugins. We dont re-invent the wheels, we attach to them**. Branches named `sub/<subdomain>` are deployed as subdomains and rebase from `main` when shared changes are needed.
 
 ## Projects
 
