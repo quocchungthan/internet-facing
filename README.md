@@ -17,6 +17,7 @@
 - [ ] Claude CLI
 - [ ] Seafile
 - [ ] 3D model files.
+- [ ] 3D Studio from this forked [repo](https://github.com/quocchungthan/everything#creative-tools)
 
 ## Projects
 
