@@ -11,9 +11,9 @@ public sealed class PortfolioWriterTests
     private static readonly CancellationToken Token = CancellationToken.None;
 
     private static SourceDocument Doc(string id, ProfileRow? profile = null, ProjectRow? project = null, GigRow? gig = null,
-        IEnumerable<SkillRow>? skills = null) => new()
+        IEnumerable<SkillRow>? skills = null, string? kind = null) => new()
     {
-        Id = id, UpdatedAtUtc = DateTimeOffset.UnixEpoch, Metadata = [], Bookmarks = [],
+        Id = id, Kind = kind, UpdatedAtUtc = DateTimeOffset.UnixEpoch, Metadata = [], Bookmarks = [],
         Profiles = profile is null ? [] : [profile], Projects = project is null ? [] : [project],
         Gigs = gig is null ? [] : [gig], Skills = skills?.ToList() ?? []
     };
@@ -28,6 +28,65 @@ public sealed class PortfolioWriterTests
         await using var db = new PortfolioDbContext(options);
         await db.Database.EnsureCreatedAsync();
         return (connection, options);
+    }
+
+    [Fact]
+    public async Task KindChangesSoftDeleteRowsOfTheOldKindAndRestoreThemWhenTheKindReturns()
+    {
+        var (connection, options) = await OpenAsync();
+        await using var _ = connection;
+        var project = new ProjectRow { SourceDocId = "page", Title = "Site", Slug = "site", Summary = "s", Skills = ["C#"] };
+        var gig = new GigRow { SourceDocId = "page", Title = "Fix", Slug = "fix", Category = "Data", Summary = "s",
+            Skills = ["C#"], Steps = [new() { StepNumber = 1, Title = "a" }] };
+        var other = new ProjectRow { SourceDocId = "other", Title = "Other", Slug = "other", Summary = "s" };
+        async Task Write(params SourceDocument[] documents)
+        {
+            await using var db = new PortfolioDbContext(options);
+            await PortfolioWriter.WriteAsync(db, documents, Token);
+        }
+
+        await Write(Doc("p1", Profile(), kind: "Profile"), Doc("page", project: project, kind: "Project"),
+            Doc("other", project: other, kind: "Project"));
+        await Write(Doc("page", gig: gig, kind: "Gig"));
+        await using (var read = new PortfolioDbContext(options))
+        {
+            Assert.Equal("other", (await read.Projects.SingleAsync()).Slug);
+            var retired = await read.Projects.IgnoreQueryFilters().SingleAsync(p => p.SourceDocId == "page");
+            Assert.NotNull(retired.DeletedAt);
+            Assert.Equal(["other"], await read.ProfileProjects.Select(p => p.Project.Slug).ToListAsync());
+            Assert.Empty(await read.ProjectSkills.ToListAsync());
+            Assert.Equal("fix", (await read.GigProblems.SingleAsync()).Slug);
+        }
+
+        await Write(Doc("page", kind: ""));
+        await using (var read = new PortfolioDbContext(options))
+        {
+            Assert.Empty(await read.GigProblems.ToListAsync());
+            Assert.Empty(await read.GigSteps.ToListAsync());
+            Assert.NotNull((await read.GigProblems.IgnoreQueryFilters().SingleAsync()).DeletedAt);
+        }
+
+        await Write(Doc("page", project: project, kind: "Project"));
+        await using (var read = new PortfolioDbContext(options))
+        {
+            var restored = await read.Projects.Include(p => p.ProjectSkills).SingleAsync(p => p.SourceDocId == "page");
+            Assert.Null(restored.DeletedAt);
+            Assert.Single(restored.ProjectSkills);
+            Assert.Equal(2, await read.ProfileProjects.CountAsync());
+            Assert.Equal(2, await read.Projects.CountAsync());
+            Assert.Empty(await read.GigProblems.ToListAsync());
+        }
+    }
+
+    [Fact]
+    public async Task ClearedKindIsReconciledWithoutRequiringAProfile()
+    {
+        var (connection, options) = await OpenAsync();
+        await using var _ = connection;
+        await using (var db = new PortfolioDbContext(options))
+            await PortfolioWriter.WriteAsync(db, [Doc("untagged", kind: "")], Token);
+        await using var read = new PortfolioDbContext(options);
+        Assert.Empty(await read.Profiles.IgnoreQueryFilters().ToListAsync());
     }
 
     [Fact]

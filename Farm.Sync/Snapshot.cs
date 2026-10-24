@@ -152,6 +152,9 @@ public sealed record SourceDocument
     [JsonPropertyName("id")] public required string Id { get; init; }
     [JsonPropertyName("updatedAtUtc")] public required DateTimeOffset UpdatedAtUtc { get; init; }
     [JsonPropertyName("contentHash")] public string? ContentHash { get; init; }
+    // AFFiNE page Kind for collection pages ("" when the Kind was cleared); null for configured non-page documents.
+    [JsonPropertyName("kind"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Kind { get; init; }
     [JsonPropertyName("metadata")] public required List<MetadataRow> Metadata { get; init; }
     [JsonPropertyName("bookmarks")] public required List<BookmarkRow> Bookmarks { get; init; }
     [JsonPropertyName("profiles")] public List<ProfileRow> Profiles { get; init; } = [];
@@ -164,6 +167,9 @@ public sealed record SourceDocument
 
     public bool HasPortfolioRows =>
         Profiles.Count + Projects.Count + Experiences.Count + Skills.Count + SocialLinks.Count + Gigs.Count > 0;
+
+    public static readonly IReadOnlySet<string> Kinds = new HashSet<string>(StringComparer.Ordinal)
+        { "Profile", "Project", "Experience", "Gig", "Skills", "SocialLinks", "Tools" };
 }
 
 public sealed record MetadataRow
@@ -291,6 +297,25 @@ internal static class PortfolioValidation
 {
     public static void Validate(SourceDocument document, HashSet<string> sourceDocIds, HashSet<string> slugs)
     {
+        if (document.Kind is { } kind)
+        {
+            if (kind != "" && !SourceDocument.Kinds.Contains(kind))
+                throw new InvalidDataException($"Document {document.Id} has an unknown Kind {kind}.");
+            // Retiring rows of other Kinds is keyed by the page id, so a page may only carry rows of its own Kind.
+            var counts = new Dictionary<string, int>
+            {
+                ["Profile"] = document.Profiles.Count, ["Project"] = document.Projects.Count,
+                ["Experience"] = document.Experiences.Count, ["Gig"] = document.Gigs.Count,
+                ["Skills"] = document.Skills.Count, ["SocialLinks"] = document.SocialLinks.Count,
+                ["Tools"] = document.Tools.Count,
+            };
+            if (counts.Any(pair => pair.Key != kind && pair.Value > 0) || document.Metadata.Count + document.Bookmarks.Count > 0)
+                throw new InvalidDataException($"Document {document.Id} contains rows that do not match its Kind \"{kind}\".");
+            var sources = document.Profiles.Select(r => r.SourceDocId).Concat(document.Projects.Select(r => r.SourceDocId))
+                .Concat(document.Experiences.Select(r => r.SourceDocId)).Concat(document.Gigs.Select(r => r.SourceDocId));
+            if (sources.Any(id => id != document.Id))
+                throw new InvalidDataException($"Document {document.Id} rows must use the page id as SourceDocId.");
+        }
         void Source(string id)
         {
             if (string.IsNullOrWhiteSpace(id) || id.Length > 64 || !sourceDocIds.Add(id))

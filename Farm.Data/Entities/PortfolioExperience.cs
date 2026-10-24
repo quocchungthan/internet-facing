@@ -4,6 +4,8 @@ public class PortfolioExperience
 {
     public int Id { get; set; }
     public string? SourceDocId { get; set; }
+    // Set when the source AFFiNE page no longer has this entity's Kind; hidden by the query filter.
+    public DateTimeOffset? DeletedAt { get; set; }
     public int ProfileId { get; set; }
     public string Company { get; set; } = string.Empty;
     public string JobTitle { get; set; } = string.Empty;

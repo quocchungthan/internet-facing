@@ -233,6 +233,21 @@ public sealed class SyncTests
     }
 
     [Fact]
+    public void PageKindMustBeKnownAndMatchItsRows()
+    {
+        var project = new ProjectRow { SourceDocId = "page", Title = "Site", Slug = "site", Summary = "s" };
+        SnapshotOf(Document("page", Timestamp) with { Kind = "" }).Validate();
+        SnapshotOf(Document("page", Timestamp) with { Kind = "Project", Projects = [project] }).Validate();
+        Assert.Throws<InvalidDataException>(() => SnapshotOf(Document("page", Timestamp) with { Kind = "Nope" }).Validate());
+        Assert.Throws<InvalidDataException>(() =>
+            SnapshotOf(Document("page", Timestamp) with { Kind = "Gig", Projects = [project] }).Validate());
+        Assert.Throws<InvalidDataException>(() =>
+            SnapshotOf(Document("page", Timestamp) with { Kind = "", Projects = [project] }).Validate());
+        Assert.Throws<InvalidDataException>(() => SnapshotOf(Document("other", Timestamp) with
+            { Kind = "Project", Projects = [project] }).Validate());
+    }
+
+    [Fact]
     public void ValidationRejectsUnsafeTimestamps()
     {
         Assert.Throws<InvalidDataException>(() => SnapshotOf(Document("one", Timestamp.AddDays(2))).Validate());

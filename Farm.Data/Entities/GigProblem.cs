@@ -4,6 +4,8 @@ public class GigProblem
 {
     public int Id { get; set; }
     public string? SourceDocId { get; set; }
+    // Set when the source AFFiNE page no longer has this entity's Kind; hidden by the query filter.
+    public DateTimeOffset? DeletedAt { get; set; }
     public string Title { get; set; } = string.Empty;
     public string Slug { get; set; } = string.Empty;
     public string Category { get; set; } = string.Empty;
