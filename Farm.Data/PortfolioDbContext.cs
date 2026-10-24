@@ -27,6 +27,7 @@ public class PortfolioDbContext(DbContextOptions<PortfolioDbContext> options) : 
             entity.HasKey(p => p.Id);
             entity.Property(p => p.SourceDocId).HasMaxLength(64);
             entity.HasIndex(p => p.SourceDocId).IsUnique();
+            entity.HasQueryFilter(p => p.DeletedAt == null);
             entity.Property(p => p.DisplayName).HasMaxLength(160).IsRequired();
             entity.Property(p => p.Headline).HasMaxLength(240).IsRequired();
             entity.Property(p => p.Bio).HasMaxLength(4000);
@@ -51,13 +52,14 @@ public class PortfolioDbContext(DbContextOptions<PortfolioDbContext> options) : 
             entity.HasKey(p => p.Id);
             entity.Property(p => p.SourceDocId).HasMaxLength(64);
             entity.HasIndex(p => p.SourceDocId).IsUnique();
+            entity.HasQueryFilter(p => p.DeletedAt == null);
             entity.Property(p => p.Title).HasMaxLength(200).IsRequired();
             entity.Property(p => p.Slug).HasMaxLength(220).IsRequired();
             entity.Property(p => p.Summary).HasMaxLength(500).IsRequired();
             entity.Property(p => p.Description).HasMaxLength(8000);
             entity.Property(p => p.DemoUrl).HasMaxLength(2048);
             entity.Property(p => p.SourceUrl).HasMaxLength(2048);
-            entity.HasIndex(p => p.Slug).IsUnique();
+            entity.HasIndex(p => p.Slug).IsUnique().HasFilter("\"DeletedAt\" IS NULL");
             entity.HasMany(p => p.ProjectSkills).WithOne(p => p.Project)
                 .HasForeignKey(p => p.ProjectId).OnDelete(DeleteBehavior.Cascade);
         });
@@ -93,6 +95,7 @@ public class PortfolioDbContext(DbContextOptions<PortfolioDbContext> options) : 
             entity.HasKey(p => p.Id);
             entity.Property(p => p.SourceDocId).HasMaxLength(64);
             entity.HasIndex(p => p.SourceDocId).IsUnique();
+            entity.HasQueryFilter(p => p.DeletedAt == null);
             entity.Property(p => p.Company).HasMaxLength(200).IsRequired();
             entity.Property(p => p.JobTitle).HasMaxLength(160).IsRequired();
             entity.Property(p => p.Description).HasMaxLength(4000);
@@ -148,6 +151,7 @@ public class PortfolioDbContext(DbContextOptions<PortfolioDbContext> options) : 
             entity.HasKey(p => p.Id);
             entity.Property(p => p.SourceDocId).HasMaxLength(64);
             entity.HasIndex(p => p.SourceDocId).IsUnique();
+            entity.HasQueryFilter(p => p.DeletedAt == null);
             entity.Property(p => p.Title).HasMaxLength(200).IsRequired();
             entity.Property(p => p.Slug).HasMaxLength(220).IsRequired();
             entity.Property(p => p.Category).HasMaxLength(80).IsRequired();
@@ -156,7 +160,7 @@ public class PortfolioDbContext(DbContextOptions<PortfolioDbContext> options) : 
             entity.Property(p => p.Problem).HasMaxLength(8000);
             entity.Property(p => p.Outcome).HasMaxLength(4000);
             entity.Property(p => p.SolvedOn).HasColumnType("date");
-            entity.HasIndex(p => p.Slug).IsUnique();
+            entity.HasIndex(p => p.Slug).IsUnique().HasFilter("\"DeletedAt\" IS NULL");
             entity.HasMany(p => p.Steps).WithOne(p => p.Problem)
                 .HasForeignKey(p => p.ProblemId).OnDelete(DeleteBehavior.Cascade);
             entity.HasMany(p => p.Skills).WithOne(p => p.Problem)

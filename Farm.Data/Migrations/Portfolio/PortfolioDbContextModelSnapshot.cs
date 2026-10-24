@@ -38,6 +38,9 @@ namespace Farm.Data.Migrations.Portfolio
                         .HasMaxLength(80)
                         .HasColumnType("character varying(80)");
 
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<int>("DisplayOrder")
                         .HasColumnType("integer");
 
@@ -74,7 +77,8 @@ namespace Farm.Data.Migrations.Portfolio
                     b.HasKey("Id");
 
                     b.HasIndex("Slug")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
 
                     b.HasIndex("SourceDocId")
                         .IsUnique();
@@ -146,6 +150,9 @@ namespace Farm.Data.Migrations.Portfolio
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasMaxLength(4000)
@@ -221,6 +228,9 @@ namespace Farm.Data.Migrations.Portfolio
                         .HasMaxLength(320)
                         .HasColumnType("character varying(320)");
 
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("DisplayName")
                         .IsRequired()
                         .HasMaxLength(160)
@@ -263,6 +273,9 @@ namespace Farm.Data.Migrations.Portfolio
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("DemoUrl")
                         .HasMaxLength(2048)
                         .HasColumnType("character varying(2048)");
@@ -297,7 +310,8 @@ namespace Farm.Data.Migrations.Portfolio
                     b.HasKey("Id");
 
                     b.HasIndex("Slug")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
 
                     b.HasIndex("SourceDocId")
                         .IsUnique();

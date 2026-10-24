@@ -124,7 +124,7 @@ public class PortfolioModelTests
     {
         using var db = CreateContext();
         Assert.False(db.Database.HasPendingModelChanges());
-        Assert.Equal(3, db.Database.GetMigrations().Count());
+        Assert.Equal(4, db.Database.GetMigrations().Count());
         var script = db.GetService<IMigrator>().GenerateScript();
         Assert.Contains("__PortfolioMigrationsHistory", script);
         Assert.DoesNotContain("INSERT INTO \"Portfolio", script);

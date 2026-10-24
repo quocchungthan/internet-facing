@@ -34,5 +34,11 @@ public sealed class DatabaseWriter(Func<AuraFarming> createContext, Func<Portfol
             await using var portfolio = createPortfolio();
             await PortfolioWriter.WriteAsync(portfolio, documents, cancellationToken);
         }
+        else if (createPortfolio is not null && documents.Any(d => d.Kind is not null))
+        {
+            // Pages without portfolio rows (cleared or changed Kind) may still retire rows they produced earlier.
+            await using var portfolio = createPortfolio();
+            await PortfolioWriter.WriteAsync(portfolio, documents, cancellationToken);
+        }
     }
 }

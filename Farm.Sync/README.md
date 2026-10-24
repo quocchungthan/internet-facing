@@ -114,8 +114,14 @@ prose people edit**:
 | `Skills` / `SocialLinks` | none | a database block (rows = skills / links) |
 
 Rows are upserted by AFFiNE page id (`SourceDocId`); an existing row with no
-`SourceDocId` is adopted by `Slug`. Join rows and gig steps mirror the page; entity
-rows are never deleted.
+`SourceDocId` is adopted by `Slug`. Join rows and gig steps mirror the page.
+
+Entity rows follow the page's current `Kind`: when a page's `Kind` changes (e.g.
+`Project` → `Gig`) or is cleared, rows it produced under another Kind are
+soft-deleted (`DeletedAt` set, hidden by EF query filters, slugs freed) and their
+join rows/steps removed. Changing the Kind back restores the same row. Pages with
+an unknown Kind or invalid content are skipped and keep their last good rows;
+trashed pages are not deleted.
 
 Gig bodies are stored in full in `GigProblems.BodyMarkdown` (PostgreSQL `text`,
 without a length limit). Prose before a heading, arbitrary/repeated headings,

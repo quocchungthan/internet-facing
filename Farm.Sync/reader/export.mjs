@@ -106,8 +106,9 @@ try {
     }
   }
   const titleOf = pageId => pages.find(page => page.id === pageId)?.title;
-  // One broken page must not stop the others: skip and report it. The worker never deletes rows, so the last
-  // good version of a skipped page stays on the site until the page is fixed.
+  // One broken page must not stop the others: skip and report it, so the last good version of a skipped page
+  // stays on the site until the page is fixed. Every emitted page carries its Kind; the worker soft-deletes rows a
+  // page produced under a different Kind, and a page whose Kind was cleared is emitted as an empty Kind.
   for (const pageId of pageIds) {
     const meta = pages.find(page => page.id === pageId);
     if (!meta || meta.trash) continue;
@@ -115,15 +116,23 @@ try {
     let ydoc;
     try {
       const properties = decodeDocument(records(propertiesId))[pageId] ?? {};
-      kind = propertyReader({ [pageId]: properties }, decoded.get(definitionsId), pageId, '').read('Kind');
-      if (kind == null || kind === '') continue;
-      if (!KINDS.includes(kind)) throw new Error(`unknown Kind "${kind}"; expected one of ${KINDS.join(', ')}`);
+      kind = propertyReader({ [pageId]: properties }, decoded.get(definitionsId), pageId, '').read('Kind') ?? '';
+      if (typeof kind === 'string' && !kind.trim()) kind = '';
+      if (kind !== '' && !KINDS.includes(kind)) throw new Error(`unknown Kind "${kind}"; expected one of ${KINDS.join(', ')}`);
       const pageUpdated = updated([pageId, propertiesId, definitionsId]);
+      if (kind === '') {
+        documents.push({
+          id: pageId, kind, updatedAtUtc: pageUpdated, metadata: [], bookmarks: [], tools: [],
+          contentHash: contentHash({ kind }),
+        });
+        continue;
+      }
       if (kind === 'Tools') {
         const docObj = decodeDocument(records(pageId));
         const tools = mapTools(docObj, null, meta, active === 'true');
         documents.push({
           id: pageId,
+          kind,
           updatedAtUtc: pageUpdated,
           metadata: [],
           bookmarks: [],
@@ -142,7 +151,7 @@ try {
       else if (kind === 'Skills') rowsOf.skills = mapSkills(ydoc, titleOf);
       else rowsOf.socialLinks = mapSocialLinks(ydoc, titleOf);
       documents.push({
-        id: pageId, updatedAtUtc: pageUpdated, metadata: [], bookmarks: [], tools: [], ...rowsOf,
+        id: pageId, kind, updatedAtUtc: pageUpdated, metadata: [], bookmarks: [], tools: [], ...rowsOf,
         contentHash: contentHash({ kind, ...rowsOf }),
       });
     } catch (error) {
