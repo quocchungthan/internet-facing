@@ -235,7 +235,7 @@ if [[ -d "$FARM_STATIC_ROOT" ]] || container_exists "$FARM_CONTAINER" || contain
 	farm_keys="$(docker volume inspect -f '{{.Mountpoint}}' eldervibe-farm-keys 2>/dev/null || true)"
 	[[ -n "$farm_keys" ]] && copy_path farm-keys farm optional "$farm_keys"
 	if container_exists "$FARM_DB_CONTAINER"; then
-		dump_to farm-postgres farm "$FARM_DB_CONTAINER" dumps/farm-postgres.sql 'Farm PostgreSQL database dump complete' -- \
+		dump_to farm-postgres farm "$FARM_DB_CONTAINER" dumps/farm-postgres.sql 'PostgreSQL database dump complete' -- \
 			'set -- "${POSTGRES_PASSWORD:-}"; PGPASSWORD="$1" exec pg_dump -p '"$FARM_PG_PORT"' -U "${POSTGRES_USER:-postgres}" -d "${POSTGRES_DB:-aurafarming}" --clean --if-exists'
 	fi
 else
