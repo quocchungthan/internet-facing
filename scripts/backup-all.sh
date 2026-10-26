@@ -37,6 +37,15 @@ warn() { printf '::warning::%s\n' "$*" >&2; }
 die() { printf '::error::%s\n' "$*" >&2; exit 1; }
 have() { command -v "$1" >/dev/null 2>&1; }
 
+# The workflow supplies two NUL-delimited connection strings in a private temp file.
+if [[ $# -gt 0 ]]; then
+	exec 3< "$1"
+	IFS= read -r -d '' PARA_CAR_DATABASE <&3 || die "Cannot read PARA_CAR_DATABASE from credential file."
+	IFS= read -r -d '' PARA_ACTIONS_DATABASE <&3 || die "Cannot read PARA_ACTIONS_DATABASE from credential file."
+	exec 3<&-
+fi
+postgres_helper="$(dirname -- "${BASH_SOURCE[0]}")/backup-postgres.py"
+
 if ! have sqlite3; then
 	if have apt-get; then
 		export DEBIAN_FRONTEND=noninteractive
@@ -213,6 +222,27 @@ dump_to() {
 	fi
 }
 
+# Uses the supplied Npgsql connection string, without writing credentials into the archive.
+dump_para_postgres() {
+	local id=$1 secret=$2 zpath=$3 out="$staging/$3"
+	if [[ -z "${!secret:-}" ]]; then
+		record "$id" para failed "$secret" - "connection secret is missing"
+		return 0
+	fi
+	if [[ "$docker_ok" != true ]] || ! have python3 || [[ ! -f "$postgres_helper" ]]; then
+		record "$id" para failed "$secret" - "Docker, python3 and backup-postgres.py are required"
+		return 0
+	fi
+	log "dump para/$id using $secret"
+	if printf '%s' "${!secret}" | python3 "$postgres_helper" "$out" &&
+		[[ -s "$out" ]] && tail -n 5 "$out" | grep -q -- 'PostgreSQL database dump complete'; then
+		record "$id" para included "$secret" "$zpath" "logical PostgreSQL dump"
+	else
+		rm -f -- "$out"
+		record "$id" para failed "$secret" - "dump command failed or incomplete"
+	fi
+}
+
 caddy_home="$(getent passwd caddy 2>/dev/null | cut -d: -f6 || true)"
 caddy_home="${caddy_home:-/var/lib/caddy}"
 
@@ -333,6 +363,10 @@ else
 	record note note missing "$note_dir" - "AFFiNE not deployed"
 fi
 
+# ---- PARA (Car knowledge and Quick Actions) ----------------------------------
+dump_para_postgres para-car-postgres PARA_CAR_DATABASE dumps/para-car-postgres.sql
+dump_para_postgres para-actions-postgres PARA_ACTIONS_DATABASE dumps/para-actions-postgres.sql
+
 # ---- Metadata (no secrets: names, images and states only) ---------------------
 if [[ "$docker_ok" == true ]]; then
 	docker ps -a --format '{{.Names}}\t{{.Image}}\t{{.State}}' > "$staging/meta/containers.tsv" 2>/dev/null || true
@@ -372,7 +406,7 @@ restore_cmd() { # <zip path> <original path>
 	printf 'It contains private keys and passwords: keep it root-only and encrypt it before it leaves the VPS.\n\n'
 	printf '## Layout\n\n'
 	printf -- '- `files/<absolute path>`: copies of VPS paths, e.g. `files/etc/caddy/Caddyfile` came from `/etc/caddy/Caddyfile`.\n'
-	printf -- '- `dumps/`: logical database dumps (Seafile MariaDB, AFFiNE Postgres).\n'
+	printf -- '- `dumps/`: logical database dumps (Seafile MariaDB, Farm, AFFiNE and PARA Postgres).\n'
 	printf -- '- `meta/containers.tsv`: container names, images and states at backup time.\n'
 	printf -- '- `MANIFEST.tsv`: the table below in machine-readable form.\n\n'
 	printf '## Unpack\n\n```bash\nsudo -i\nmkdir -p /root/restore && cd /root/restore\nunzip -X /var/backups/eldervibe/eldervibe-backup-%s.zip   # -X restores uid/gid; for .tar.gz use: tar --numeric-owner -xzpf <file>\n```\n\n' "$timestamp"
@@ -447,6 +481,13 @@ restore_cmd() { # <zip path> <original path>
 	printf 'docker compose -f compose.yml up -d\n'
 	printf '# The affine_sync read-only role is not in the dump: recreate it with Farm.Sync/reader/provision-source-role.sql and the password from sync.env.\n'
 	printf '[ -e compose.sync.yml ] && docker compose -f compose.yml -f compose.sync.yml up -d affine-sync\n```\n\n'
+	printf '### PARA (Car knowledge and Quick Actions)\n\n'
+	printf 'Stop the PARA services before restoring. Provision the destination databases and original owner roles first.\n'
+	printf 'For each dump below, set `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD` and, if needed, `PGSSLMODE` from the matching GitHub secret on the VPS. Do not paste credentials into shell commands or logs.\n'
+	printf 'These dumps use `--clean --if-exists`: restoration replaces backed-up objects. Restore into a new database first to validate, and take a fresh backup before overwriting live data.\n\n'
+	printf '```bash\n# From PARA_CAR_DATABASE:\ndocker run --rm -i --network host -e PGHOST -e PGPORT -e PGDATABASE -e PGUSER -e PGPASSWORD -e PGSSLMODE postgres:18-alpine psql --no-password -v ON_ERROR_STOP=1 < dumps/para-car-postgres.sql\n'
+	printf '# From PARA_ACTIONS_DATABASE (configure its separate connection first):\ndocker run --rm -i --network host -e PGHOST -e PGPORT -e PGDATABASE -e PGUSER -e PGPASSWORD -e PGSSLMODE postgres:18-alpine psql --no-password -v ON_ERROR_STOP=1 < dumps/para-actions-postgres.sql\n```\n\n'
+	printf 'Restart PARA services only after validating both restored databases. The connection strings themselves are not stored in this archive.\n\n'
 	printf '### banhve\n\n`sub/banhve` has no service of its own on the VPS; any `banhve` Caddy fragment is restored with the Caddy item.\n'
 } > "$staging/RESTORE.md"
 chmod 600 "$staging/RESTORE.md" "$manifest"

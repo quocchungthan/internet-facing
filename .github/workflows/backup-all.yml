@@ -25,7 +25,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Validate backup script
-        run: bash -n scripts/backup-all.sh
+        run: |
+          bash -n scripts/backup-all.sh
+          python3 -m unittest discover -s scripts -p 'test_backup_postgres.py'
 
       - name: Configure SSH
         env:
@@ -57,8 +59,14 @@ jobs:
           FENCES_DEPLOY_DIR: ${{ vars.FENCES_DEPLOY_DIR }}
           FARM_PG_PORT: ${{ vars.FARM_PG_PORT }}
           BACKUP_GIT_SHA: ${{ github.sha }}
+          PARA_CAR_DATABASE: ${{ secrets.PARA_CAR_DATABASE }}
+          PARA_ACTIONS_DATABASE: ${{ secrets.PARA_ACTIONS_DATABASE }}
         run: |
           set -euo pipefail
+          set +x
+          for name in PARA_CAR_DATABASE PARA_ACTIONS_DATABASE; do
+            [[ -n "${!name:-}" ]] || { echo "::error::Missing secret $name"; exit 1; }
+          done
           port="${VPS_PORT:-22}"
           ssh_opts=(-i "$HOME/.ssh/id_deploy" -p "$port" -o BatchMode=yes -o StrictHostKeyChecking=yes -o ServerAliveInterval=30)
 
@@ -82,13 +90,23 @@ jobs:
             remote_env+=" $name=$value"
           done
 
-          remote_script="$(ssh "${ssh_opts[@]}" "$VPS_USER@$VPS_HOST" 'umask 077; mktemp /tmp/backup-all.XXXXXX')"
-          [[ "$remote_script" =~ ^/tmp/backup-all\.[A-Za-z0-9]{6}$ ]] || { echo "::error::Unexpected remote temp path."; exit 1; }
-          ssh "${ssh_opts[@]}" "$VPS_USER@$VPS_HOST" "cat > '$remote_script'" < scripts/backup-all.sh
+          remote_dir="$(ssh "${ssh_opts[@]}" "$VPS_USER@$VPS_HOST" 'umask 077; mktemp -d /tmp/backup-all.XXXXXX')"
+          [[ "$remote_dir" =~ ^/tmp/backup-all\.[A-Za-z0-9]{6}$ ]] || { echo "::error::Unexpected remote temp path."; exit 1; }
+          cleanup_remote() {
+            ssh "${ssh_opts[@]}" "$VPS_USER@$VPS_HOST" \
+              "rm -f -- '$remote_dir/backup-all.sh' '$remote_dir/backup-postgres.py' '$remote_dir/databases'; rmdir -- '$remote_dir'" \
+              >/dev/null || echo "::warning::Could not remove private backup files from the VPS; clean up $remote_dir."
+          }
+          trap cleanup_remote EXIT
+          ssh "${ssh_opts[@]}" "$VPS_USER@$VPS_HOST" "umask 077; cat > '$remote_dir/backup-all.sh'" < scripts/backup-all.sh
+          ssh "${ssh_opts[@]}" "$VPS_USER@$VPS_HOST" "umask 077; cat > '$remote_dir/backup-postgres.py'" < scripts/backup-postgres.py
+          # Send credentials over SSH stdin, never as remote command arguments or shell code.
+          printf '%s\0%s\0' "$PARA_CAR_DATABASE" "$PARA_ACTIONS_DATABASE" |
+            ssh "${ssh_opts[@]}" "$VPS_USER@$VPS_HOST" "umask 077; cat > '$remote_dir/databases'"
 
           set +e
           ssh "${ssh_opts[@]}" "$VPS_USER@$VPS_HOST" \
-            "if [ \"\$(id -u)\" -eq 0 ]; then env $remote_env bash '$remote_script'; else sudo -n env $remote_env bash '$remote_script'; fi; rc=\$?; rm -f '$remote_script'; exit \$rc" \
+            "if [ \"\$(id -u)\" -eq 0 ]; then env $remote_env bash '$remote_dir/backup-all.sh' '$remote_dir/databases'; else sudo -n env $remote_env bash '$remote_dir/backup-all.sh' '$remote_dir/databases'; fi" \
             > backup_result.txt
           rc=$?
           set -e
