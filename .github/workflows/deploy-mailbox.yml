@@ -40,7 +40,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install -r MailBox/web/requirements.txt
-      - run: python -m unittest discover -s MailBox/tests -p test_api.py
+      - run: python -m unittest discover -s MailBox/tests -p 'test_*.py'
   preflight:
     name: Preflight checks
     runs-on: ubuntu-latest
@@ -620,6 +620,15 @@ jobs:
           set -euo pipefail
           [[ "$SINGLE_UI_REVISION" =~ ^[a-f0-9]{40}$ ]] || { echo "::error::Set SINGLE_UI_REVISION"; exit 1; }
           node single-ui-source/SingleUI/deployment/artifacts/import-app.mjs mail MailBox/web/frontend
+
+      - name: Render local mail domains as separate Maddy arguments
+        env:
+          BASE_DOMAIN: ${{ needs.preflight.outputs.base_domain }}
+          ADDITIONAL_DOMAINS: ${{ needs.preflight.outputs.additional_domains }}
+        run: |
+          set -euo pipefail
+          read -r -a additional_domains <<< "$ADDITIONAL_DOMAINS"
+          python3 MailBox/scripts/configure_domains.py "$BASE_DOMAIN" "${additional_domains[@]}"
 
       - name: Upload MailBox source (excludes .env, secrets, runtime, backups)
         shell: bash

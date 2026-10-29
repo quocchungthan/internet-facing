@@ -79,7 +79,30 @@ Script tạo `.env`, thư mục dữ liệu và `secrets/accounts.json` với ha
 
 Trên Linux, chạy `init` bằng root: `secrets/` được giữ quyền `0750`, hai file JSON quyền `0640`, chỉ root và group `10001` của container `web` đọc được. Trên bản cài đã tạo trước đây với quyền `0700`/`0600`, cập nhật group/quyền của riêng `secrets/`, `secrets/accounts.json` và `secrets/managed_accounts.json` trước khi đăng nhập; không mở quyền đọc cho mọi người.
 
-`MAIL_DOMAINS` là danh sách domain local, phân tách bằng khoảng trắng. `MAIL_DOMAIN` vẫn là domain chính. Khi dùng GitHub Actions, đặt repository variable `MAILBOX_ADDITIONAL_DOMAINS` thành `shuneo.com` hoặc danh sách phân tách bằng dấu phẩy; workflow sẽ lưu danh sách này vào `.env` trước khi khởi động Maddy.
+`MAIL_DOMAINS` là danh sách domain local, phân tách bằng khoảng trắng. `MAIL_DOMAIN` vẫn là domain chính. Khi dùng GitHub Actions, đặt repository variable `MAILBOX_ADDITIONAL_DOMAINS` thành `shuneo.com` hoặc danh sách phân tách bằng dấu phẩy.
+
+Maddy 0.9.5 expands `{env:MADDY_DOMAINS}` into **one argument**, even when the value
+contains several space-separated domains. This causes both `Non-local sender` on
+submission and `Relay denied` for valid incoming recipients. `init` and the deploy
+workflow now render separate domain arguments into `maddy/maddy.conf`. For an
+existing installation, render the complete domain list explicitly:
+
+```bash
+python3 scripts/configure_domains.py eldervibe.dev shuneo.com
+docker compose exec -T maddy maddy verify-config
+docker compose restart maddy
+```
+
+Frontend deployments still do not restart mail transport. After changing domains
+or Maddy configuration, an operator must restart Maddy to load it. An rsync upload
+can replace the bind-mounted file while the running container retains the old
+inode. A TLS/NOOP health check alone does not verify routing: test authenticated
+SMTP submission, IMAP receipt, and rejection of unauthenticated external relay.
+
+Verification on 2026-10-29: authenticated test messages were delivered and read
+over IMAP in both directions between the two domains; external relay and sender
+impersonation remained blocked. The [web smoke-test screenshot](mail-routing-web-smoke.png)
+confirms the HTTPS login page still renders; it is not evidence of mail delivery.
 
 ### Đăng nhập quản trị bằng GitHub (Fences)
 
