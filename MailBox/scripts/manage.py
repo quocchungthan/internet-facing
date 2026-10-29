@@ -14,6 +14,8 @@ import tarfile
 import time
 import zipfile
 
+from configure_domains import configure_domains
+
 ROOT = Path(__file__).resolve().parents[1]
 os.chdir(ROOT)
 
@@ -59,6 +61,7 @@ def init(args):
     domains = [domain, *additional_domains]
     if len(set(domains)) != len(domains):
         sys.exit('Duplicate domain supplied.')
+    configure_domains(ROOT / 'maddy' / 'maddy.conf', domains)
     config = {'MAIL_DOMAIN': domain, 'MAIL_DOMAINS': ' '.join(domains), 'MAIL_HOSTNAME': host, 'SECRET_KEY': secrets.token_hex(32)}
     if args.local:
         config.update(BIND_IP='127.0.0.1', SMTP_PORT='2525', SUBMISSION_PORT='1587', IMAP_PORT='1993', HTTP_PORT='8080', HTTPS_PORT='8443', SSL_CERT_FILE='/extra-ca/test-ca.pem', LOCAL_TEST='1')
