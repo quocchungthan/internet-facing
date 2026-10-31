@@ -4,6 +4,11 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Farm.Auth;
 using Farm.Mind.Data;
+using Farm.Mind.Notes;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.Extensions.Options;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -28,27 +33,46 @@ public class MindAuthTests : IClassFixture<WebApplicationFactory<Program>>
 
     public MindAuthTests(WebApplicationFactory<Program> factory) => _factory = factory;
 
-    private HttpClient CreateClient(bool configured = true) => _factory.WithWebHostBuilder(builder =>
+    private HttpClient CreateClient(bool configured = true, string? browserSubject = null, NoteHandler? noteHandler = null)
     {
-        builder.UseSetting("FarmAuth:Authority", configured ? Issuer : "");
-        builder.UseSetting("FarmAuth:ClientId", configured ? "farm" : "");
-        builder.UseSetting("FarmAuth:PublicBaseUrl", "https://eldervibe.dev");
-        builder.ConfigureServices(services =>
+        var factory = _factory.WithWebHostBuilder(builder =>
         {
-            services.RemoveAll<DbContextOptions<MindDbContext>>();
-            services.RemoveAll<IDbContextOptionsConfiguration<MindDbContext>>();
-            services.AddDbContext<MindDbContext>(options => options.UseInMemoryDatabase(_databaseName));
-            // Use a local signing key instead of fetching discovery metadata from the issuer.
-            services.PostConfigure<JwtBearerOptions>(FarmAuthSchemes.Bearer, options =>
+            builder.UseSetting("FarmAuth:Authority", configured ? Issuer : "");
+            builder.UseSetting("FarmAuth:ClientId", configured ? "farm" : "");
+            builder.UseSetting("FarmAuth:PublicBaseUrl", "https://eldervibe.dev");
+            builder.ConfigureServices(services =>
             {
-                options.Authority = null;
-                options.MetadataAddress = null!;
-                options.Configuration = new OpenIdConnectConfiguration { Issuer = Issuer, SigningKeys = { SigningKey } };
-                options.TokenValidationParameters.ValidIssuer = Issuer;
-                options.TokenValidationParameters.IssuerSigningKey = SigningKey;
+                services.RemoveAll<DbContextOptions<MindDbContext>>();
+                services.RemoveAll<IDbContextOptionsConfiguration<MindDbContext>>();
+                services.AddDbContext<MindDbContext>(options => options.UseInMemoryDatabase(_databaseName));
+                if (noteHandler is not null)
+                    services.AddHttpClient<NotePortal>().ConfigurePrimaryHttpMessageHandler(() => noteHandler);
+                // Use a local signing key instead of fetching discovery metadata from the issuer.
+                services.PostConfigure<JwtBearerOptions>(FarmAuthSchemes.Bearer, options =>
+                {
+                    options.Authority = null;
+                    options.MetadataAddress = null!;
+                    options.Configuration = new OpenIdConnectConfiguration { Issuer = Issuer, SigningKeys = { SigningKey } };
+                    options.TokenValidationParameters.ValidIssuer = Issuer;
+                    options.TokenValidationParameters.IssuerSigningKey = SigningKey;
+                });
             });
         });
-    }).CreateClient();
+        var client = factory.CreateClient();
+        if (browserSubject is not null)
+        {
+            var options = factory.Services.GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>().Get(FarmAuthSchemes.Cookie);
+            var principal = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", browserSubject)], FarmAuthSchemes.Cookie));
+            var ticket = new AuthenticationTicket(principal, new AuthenticationProperties
+            {
+                IssuedUtc = DateTimeOffset.UtcNow,
+                ExpiresUtc = DateTimeOffset.UtcNow.AddMinutes(5)
+            }, FarmAuthSchemes.Cookie);
+            client.DefaultRequestHeaders.Add("Cookie", $"{options.Cookie.Name}={options.TicketDataFormat.Protect(ticket)}");
+            client.DefaultRequestHeaders.Add("Origin", "https://eldervibe.dev");
+        }
+        return client;
+    }
 
     private static string Token(string audience = "https://eldervibe.dev/mcp", string subject = "github:42")
     {
@@ -136,6 +160,51 @@ public class MindAuthTests : IClassFixture<WebApplicationFactory<Program>>
     }
 
     [Fact]
+    public async Task NoteConnection_BrowserDelegates_AgentsReadOnlyTheirAccountAsync()
+    {
+        var handler = new NoteHandler { ReadText = "Alice private note" };
+        var browser = CreateClient(browserSubject: "github:alice", noteHandler: handler);
+        var connected = await browser.PostAsJsonAsync("/api/memory/notes/connections",
+            new ConnectNoteRequest("workspace-1", "My Note", "aff_mcp_v1.test.read-only"));
+        connected.EnsureSuccessStatusCode();
+        Assert.DoesNotContain("aff_mcp_v1", await connected.Content.ReadAsStringAsync());
+
+        var alice = CreateClient(noteHandler: handler);
+        alice.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Token(subject: "github:alice"));
+        var bob = CreateClient(noteHandler: handler);
+        bob.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Token(subject: "github:bob"));
+        Assert.Contains("workspace-1", (await CallToolAsync(alice, "list_note_workspaces", new { })).GetRawText());
+        Assert.DoesNotContain("workspace-1", (await CallToolAsync(bob, "list_note_workspaces", new { })).GetRawText());
+        Assert.Contains("Alice private note", (await CallToolAsync(alice, "read_note", new { workspaceId = "workspace-1", docId = "doc-1" })).GetRawText());
+        var denied = await CallToolAsync(bob, "read_note", new { workspaceId = "workspace-1", docId = "doc-1" });
+        Assert.True(denied.GetProperty("isError").GetBoolean());
+        Assert.DoesNotContain("Alice private note", denied.GetRawText());
+        Assert.Equal(HttpStatusCode.Unauthorized, (await alice.DeleteAsync("/api/memory/notes/connections/workspace-1")).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await browser.DeleteAsync("/api/memory/notes/connections/workspace-1")).StatusCode);
+        Assert.True((await CallToolAsync(alice, "read_note", new { workspaceId = "workspace-1", docId = "doc-1" })).GetProperty("isError").GetBoolean());
+    }
+
+    [Fact]
+    public async Task NoteConnection_AccessKeyOrForeignOrigin_CannotChangeDelegationAsync()
+    {
+        var handler = new NoteHandler();
+        var agent = CreateClient(noteHandler: handler);
+        var options = new DbContextOptionsBuilder<MindDbContext>().UseInMemoryDatabase(_databaseName).Options;
+        var created = await new AccessKeyStore(new MindDbContext(options)).CreateAsync("github:alice", "test");
+        agent.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", created.Secret);
+        agent.DefaultRequestHeaders.Add("Origin", "https://eldervibe.dev");
+        var request = new ConnectNoteRequest("workspace-1", "My Note", "aff_mcp_v1.test.read-only");
+        Assert.Equal(HttpStatusCode.Unauthorized, (await agent.PostAsJsonAsync("/api/memory/notes/connections", request)).StatusCode);
+
+        var browser = CreateClient(browserSubject: "github:alice", noteHandler: handler);
+        browser.DefaultRequestHeaders.Remove("Origin");
+        Assert.Equal(HttpStatusCode.Forbidden, (await browser.PostAsJsonAsync("/api/memory/notes/connections", request)).StatusCode);
+        browser.DefaultRequestHeaders.Add("Origin", "https://attacker.test");
+        Assert.Equal(HttpStatusCode.Forbidden, (await browser.PostAsJsonAsync("/api/memory/notes/connections", request)).StatusCode);
+        Assert.Equal(0, handler.Calls);
+    }
+
+    [Fact]
     public async Task Mcp_Initialize_SendsGuidanceAsServerInstructions()
     {
         var client = CreateClient();
@@ -144,7 +213,9 @@ public class MindAuthTests : IClassFixture<WebApplicationFactory<Program>>
         {
             Content = JsonContent.Create(new
             {
-                jsonrpc = "2.0", id = 1, method = "initialize",
+                jsonrpc = "2.0",
+                id = 1,
+                method = "initialize",
                 @params = new { protocolVersion = "2025-06-18", capabilities = new { }, clientInfo = new { name = "t", version = "1" } }
             })
         };

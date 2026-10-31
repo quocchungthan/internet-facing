@@ -52,6 +52,60 @@ Every tool acts only on the signed-in user's data (the Fences subject, `github:<
 | `update_memory(id, ...)` | Change only the provided fields. |
 | `forget_memory(id)` | Permanently delete. |
 | `list_workspaces`, `link_workspace(name, affineWorkspaceId?)` | Named workspaces, optionally tied to an AFFiNE workspace. |
+| `list_note_workspaces` | Note workspaces explicitly connected to this account; never returns credentials. |
+| `search_notes(workspaceId, query, limit?)` | Search readable persisted Note documents (1-20 hits). |
+| `read_note(workspaceId, docId, offset?, length?)` | Read Markdown, with `nextOffset` for continuation (default 20,000 characters). |
+
+## Read-only Note portal
+
+Mind delegates reads to `https://note.eldervibe.dev/api/workspaces/{workspaceId}/mcp`, using AFFiNE's
+native `doc_search` and `read_document`. AFFiNE rechecks the credential, workspace membership and document
+permissions on every request. No Note create/update/delete tools or arbitrary upstream calls are exposed.
+Existing memory write tools are unchanged. Search excludes attachments; reads are limited to an 8 MiB
+upstream response and can be paged by character offset.
+
+**One-time authorization is required:** AFFiNE does not accept Mind's Fences bearer token, and sharing a
+sign-in provider does not grant workspace access. While signed in to Note, create a **read-only workspace
+MCP credential** in its workspace settings. Connect it to your signed-in Farm account through the browser-only
+REST API below. This explicitly delegates that Note account's access to your Mind account, including clients
+using your Mind access keys. Do not send credentials to an agent or save them as memories. There is no
+connection form in the Farm UI yet.
+
+From the browser developer console on `https://eldervibe.dev` while signed in (the prompt keeps the credential
+out of the command text/history):
+
+```javascript
+const token = prompt("Read-only Note workspace MCP credential");
+if (token) {
+  const response = await fetch("/api/memory/notes/connections", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      workspaceId: prompt("AFFiNE workspace id (from its URL)"),
+      name: prompt("Display name"),
+      token
+    })
+  });
+  console.log(response.status, await response.json());
+}
+```
+
+`GET /api/memory/notes/connections` lists connection metadata (session or Mind bearer).
+`DELETE /api/memory/notes/connections/{workspaceId}` disconnects a workspace (browser session only).
+POST and DELETE require the same-origin browser `Origin` header; bearer tokens and Mind access keys cannot
+manage connections. Credentials are encrypted using the persistent Farm data-protection key ring and scoped
+to both the Fences subject and workspace id. Connecting a memory workspace via `link_workspace` grants no
+Note access. Revoke the credential in Note to immediately disable reads; disconnecting Mind removes its stored
+credential but does not revoke it in Note. Expired credentials must be replaced by reconnecting.
+
+Requires an AFFiNE release providing the workspace MCP credential API and both native read tools
+(contracts verified at the repository's pinned AFFiNE revision `868acf8505eb349223e367ef75070d24eb04f7ad`).
+Incompatible Note servers fail closed. No AFFiNE database access, shared service account, or automatic
+email/subject matching is used.
+
+AFFiNE gates its workspace MCP endpoint behind `copilot.enabled`, even for read-only tools. If Note returns
+`403 ACTION_FORBIDDEN: Copilot is disabled.`, its administrator must enable that setting before connections work.
+This change does not modify Note's server configuration or enable any AI providers.
 
 ## Access keys
 

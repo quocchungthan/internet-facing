@@ -166,6 +166,30 @@ namespace Farm.Mind.Data.Migrations
 
                     b.ToTable("Memories", "mind");
                 });
+
+            modelBuilder.Entity("Farm.Mind.Notes.NoteConnection", b =>
+                {
+                    b.Property<string>("Subject")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("WorkspaceId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("ProtectedToken")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Subject", "WorkspaceId");
+
+                    b.ToTable("NoteConnections", "mind");
+                });
 #pragma warning restore 612, 618
         }
     }

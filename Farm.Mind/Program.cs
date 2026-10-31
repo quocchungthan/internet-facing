@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Farm.Auth;
 using Farm.Mind.Data;
 using Farm.Mind.Mcp;
+using Farm.Mind.Notes;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -29,9 +30,12 @@ builder.Services.AddScoped<McpUsageStore>();
 builder.Services.AddScoped<AccessKeyStore>();
 builder.Services.AddScoped<Farm.Auth.IAccessKeyValidator>(sp => sp.GetRequiredService<AccessKeyStore>());
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddHttpClient<NotePortal>()
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { UseCookies = false, AllowAutoRedirect = false });
 builder.Services.AddMcpServer(options => options.ServerInstructions = MindGuidance.Text)
     .WithHttpTransport(http => http.Stateless = true)
-    .WithTools<MindTools>();
+    .WithTools<MindTools>()
+    .WithTools<NoteTools>();
 
 var app = builder.Build();
 
@@ -93,6 +97,30 @@ keys.MapPost("", async (AccessKeyStore store, ClaimsPrincipal user, CreateKeyReq
 });
 keys.MapDelete("/{id:guid}", async (Guid id, AccessKeyStore store, ClaimsPrincipal user, CancellationToken ct) =>
     await store.RevokeAsync(Subject(user), id, ct) ? Results.NoContent() : Results.NotFound());
+
+memory.MapGet("/notes/connections", async (NotePortal notes, ClaimsPrincipal user, CancellationToken ct) =>
+    Results.Ok(await notes.ListAsync(Subject(user), ct)));
+
+// Delegation is controlled by the browser account, not by agents or personal access keys.
+var noteConnections = app.MapGroup("/api/memory/notes/connections")
+    .RequireAuthorization(policy => policy.AddAuthenticationSchemes(FarmAuthSchemes.Cookie).RequireAuthenticatedUser())
+    .AddEndpointFilter(async (context, next) =>
+    {
+        var expected = new Uri(context.HttpContext.RequestServices.GetRequiredService<FarmAuthOptions>().PublicBaseUrl)
+            .GetLeftPart(UriPartial.Authority);
+        if (!string.Equals(context.HttpContext.Request.Headers.Origin, expected, StringComparison.Ordinal))
+            return Results.StatusCode(StatusCodes.Status403Forbidden);
+        context.HttpContext.Response.Headers.CacheControl = "no-store";
+        return await next(context);
+    });
+noteConnections.MapPost("", async (NotePortal notes, ClaimsPrincipal user, ConnectNoteRequest request, CancellationToken ct) =>
+{
+    try { return Results.Ok(await notes.ConnectAsync(Subject(user), request, ct)); }
+    catch (ArgumentException e) { return Results.BadRequest(new { error = e.Message }); }
+    catch (NotePortalException e) { return Results.BadRequest(new { error = e.Message }); }
+});
+noteConnections.MapDelete("/{workspaceId}", async (string workspaceId, NotePortal notes, ClaimsPrincipal user, CancellationToken ct) =>
+    await notes.DisconnectAsync(Subject(user), workspaceId, ct) ? Results.NoContent() : Results.NotFound());
 
 app.Run();
 

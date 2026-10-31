@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using NpgsqlTypes;
+using Farm.Mind.Notes;
 
 namespace Farm.Mind.Data;
 
@@ -55,10 +56,19 @@ public class MindDbContext(DbContextOptions<MindDbContext> options) : DbContext(
     public DbSet<LinkedWorkspace> Workspaces => Set<LinkedWorkspace>();
     public DbSet<AccessKey> AccessKeys => Set<AccessKey>();
     public DbSet<McpUsageDaily> McpUsage => Set<McpUsageDaily>();
+    public DbSet<NoteConnection> NoteConnections => Set<NoteConnection>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
+
+        modelBuilder.Entity<NoteConnection>(connection =>
+        {
+            connection.HasKey(c => new { c.Subject, c.WorkspaceId });
+            connection.Property(c => c.Subject).HasMaxLength(200);
+            connection.Property(c => c.WorkspaceId).HasMaxLength(128);
+            connection.Property(c => c.Name).HasMaxLength(200);
+        });
 
         modelBuilder.Entity<Memory>(memory =>
         {
