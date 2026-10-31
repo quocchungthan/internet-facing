@@ -1,3 +1,9 @@
+FROM node:22-bookworm-slim AS note-reader
+WORKDIR /reader
+COPY Farm.Mind/Notes/reader/package*.json ./
+RUN npm ci --omit=dev
+COPY Farm.Mind/Notes/reader/decode.mjs ./
+
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
@@ -15,4 +21,6 @@ ENV ASPNETCORE_URLS=http://+:80
 EXPOSE 80
 
 COPY --from=build /app/publish/ ./
+COPY --from=note-reader /usr/local/bin/node /usr/local/bin/node
+COPY --from=note-reader /reader/ ./Notes/reader/
 ENTRYPOINT ["dotnet", "Farm.Mind.dll"]

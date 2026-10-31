@@ -29,6 +29,18 @@ jobs:
   build:
     runs-on: ubuntu-latest
     environment: hostkey-server
+    services:
+      note-test-postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: isolated-note-test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
       - name: Check out source
@@ -43,6 +55,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22.x
+
+      - name: Install Note document decoder dependency
+        run: npm --prefix Farm.Mind/Notes/reader ci
 
       - name: Restore .NET dependencies
         run: dotnet restore PiggyFarm.slnx
@@ -64,7 +79,12 @@ jobs:
           node single-ui-source/SingleUI/deployment/artifacts/import-app.mjs farm Farm/frontend
 
       - name: Test solution
+        env:
+          MIND_NOTE_TEST_CONNECTION: Host=localhost;Port=5432;Database=postgres;Username=postgres;Password=isolated-note-test
         run: dotnet test PiggyFarm.slnx --configuration Release --no-restore
+
+      - name: Test Note document decoder
+        run: npm --prefix Farm.Mind/Notes/reader test
 
       - name: Publish Farm web application
         run: dotnet publish Farm/Farm.csproj --configuration Release --no-restore --output artifacts/farm-web /p:UseAppHost=false

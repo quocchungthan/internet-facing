@@ -66,6 +66,9 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the environment}
       FarmAuth__PublicBaseUrl: http://localhost:${MIND_HOST_PORT:-8081}
+      AffineNotes__ConnectionString: ${AFFINE_NOTE_CONNECTION_STRING:-}
+      AffineNotes__OidcClientId: ${AFFINE_NOTE_OIDC_CLIENT_ID:-}
+      AffineNotes__GitHubClientId: ${AFFINE_NOTE_GITHUB_CLIENT_ID:-}
     extra_hosts:
       - "fences.localhost:host-gateway"
     ports:

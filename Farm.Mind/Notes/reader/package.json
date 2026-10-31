@@ -1,0 +1,11 @@
+{
+  "name": "farm-mind-note-reader",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test decode.test.mjs"
+  },
+  "dependencies": {
+    "yjs": "13.6.27"
+  }
+}

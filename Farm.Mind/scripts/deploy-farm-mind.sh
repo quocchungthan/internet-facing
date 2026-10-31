@@ -58,5 +58,11 @@ export SERVICE_ROUTES_DIR="$FARM_ROUTES_DIR"
 export SERVICE_ROUTE_PATHS="/mcp /mcp/* /api/memory /api/memory/* /.well-known/oauth-protected-resource /.well-known/oauth-protected-resource/*"
 export SERVICE_VOLUME="$FARM_KEYS_VOLUME:/keys"
 export SERVICE_EXTRA_ARGS="--network $FARM_NETWORK"
+# Optional, separately provisioned Note reader settings survive Mind deployments.
+NOTE_READER_ENV_FILE="$FARM_ENV_DIR/note-reader.env"
+if as_root test -s "$NOTE_READER_ENV_FILE"; then
+    as_root chmod 0600 "$NOTE_READER_ENV_FILE"
+    export SERVICE_EXTRA_ARGS="$SERVICE_EXTRA_ARGS --env-file $NOTE_READER_ENV_FILE"
+fi
 
 exec bash "$DEPLOY_COMMON_SCRIPT"

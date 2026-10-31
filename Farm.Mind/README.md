@@ -52,60 +52,70 @@ Every tool acts only on the signed-in user's data (the Fences subject, `github:<
 | `update_memory(id, ...)` | Change only the provided fields. |
 | `forget_memory(id)` | Permanently delete. |
 | `list_workspaces`, `link_workspace(name, affineWorkspaceId?)` | Named workspaces, optionally tied to an AFFiNE workspace. |
-| `list_note_workspaces` | Note workspaces explicitly connected to this account; never returns credentials. |
-| `search_notes(workspaceId, query, limit?)` | Search readable persisted Note documents (1-20 hits). |
+| `list_note_workspaces` | Note workspaces where the MCP identity has active membership. |
+| `search_notes(workspaceId, query, limit?, offset?)` | Search live document titles (1-20 hits); empty query lists notes. |
 | `read_note(workspaceId, docId, offset?, length?)` | Read Markdown, with `nextOffset` for continuation (default 20,000 characters). |
 
 ## Read-only Note portal
 
-Mind delegates reads to `https://note.eldervibe.dev/api/workspaces/{workspaceId}/mcp`, using AFFiNE's
-native `doc_search` and `read_document`. AFFiNE rechecks the credential, workspace membership and document
-permissions on every request. No Note create/update/delete tools or arbitrary upstream calls are exposed.
-Existing memory write tools are unchanged. Search excludes attachments; reads are limited to an 8 MiB
-upstream response and can be paged by character offset.
+Mind reads **AFFiNE's PostgreSQL database directly**, with a dedicated SELECT-only role. It does not call
+Note's HTTP/MCP endpoint, need `copilot.enabled`, use an AI index, or require users to create workspace
+credentials. Existing memory write tools are unchanged; no Note writes are exposed.
 
-**One-time authorization is required:** AFFiNE does not accept Mind's Fences bearer token, and sharing a
-sign-in provider does not grant workspace access. While signed in to Note, create a **read-only workspace
-MCP credential** in its workspace settings. Connect it to your signed-in Farm account through the browser-only
-REST API below. This explicitly delegates that Note account's access to your Mind account, including clients
-using your Mind access keys. Do not send credentials to an agent or save them as memories. There is no
-connection form in the Farm UI yet.
+The validated MCP subject maps to `user_connected_accounts` using AFFiNE's exact provider namespace:
+SHA-256 of the provider issuer, newline, and **Note's** OAuth client id (first 16 bytes, lowercase hex).
+OIDC subjects must match exactly. Optionally, `github:<id>` can match Note's GitHub provider account id
+and configured namespace (or its legacy null namespace). No email, display-name or arbitrary subject-to-user
+mapping is accepted. Missing, disabled, unregistered or ambiguous accounts fail closed; sign in to Note
+with the same provider identity first. A Mind access key uses its owner's subject in the same way.
 
-From the browser developer console on `https://eldervibe.dev` while signed in (the prompt keeps the credential
-out of the command text/history):
+Each operation starts a repeatable-read, **read-only** transaction and requires active `member`, `admin`
+or `owner` membership. Removed or pending members cannot read. Document reads/searches additionally
+check explicit user grants and member-default policies; owners inherit read access. Admin inheritance
+depends on a commercial license, which this reader does not verify: admins use explicit/default grants
+instead, conservatively denying documents available solely through licensed admin inheritance.
+External/public-only shares are not enumerated. Unknown role values fail closed. `link_workspace` grants no access.
 
-```javascript
-const token = prompt("Read-only Note workspace MCP credential");
-if (token) {
-  const response = await fetch("/api/memory/notes/connections", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      workspaceId: prompt("AFFiNE workspace id (from its URL)"),
-      name: prompt("Display name"),
-      token
-    })
-  });
-  console.log(response.status, await response.json());
-}
-```
+The workspace root's current `meta.pages` supplies ids and titles, including pages missing from
+`workspace_pages`. Trashed, blocked and unregistered documents are excluded. **Search is title-only**;
+empty query lists readable notes, with `nextOffset` for pagination. `read_note` merges the stored Yjs snapshot
+and all pending updates in memory, without compacting or modifying AFFiNE. A bounded Node/Yjs decoder renders
+Page text, headings, lists, code and dividers as Markdown. Canvas elements, databases, attachments and unknown
+blocks are marked in `unsupportedBlocks`, not silently treated as a complete document export.
 
-`GET /api/memory/notes/connections` lists connection metadata (session or Mind bearer).
-`DELETE /api/memory/notes/connections/{workspaceId}` disconnects a workspace (browser session only).
-POST and DELETE require the same-origin browser `Origin` header; bearer tokens and Mind access keys cannot
-manage connections. Credentials are encrypted using the persistent Farm data-protection key ring and scoped
-to both the Fences subject and workspace id. Connecting a memory workspace via `link_workspace` grants no
-Note access. Revoke the credential in Note to immediately disable reads; disconnecting Mind removes its stored
-credential but does not revoke it in Note. Expired credentials must be replaced by reconnecting.
+Limits: 16 MiB stored data and 10,000 updates per document/root, 10,000 root page entries, 1,000,000 rendered
+characters, 15-second decoding/query timeouts, and 100,000 characters per read response. Check `nextOffset`
+and `unsupportedBlocks` when consuming results. Corrupt/incomplete Yjs data fails closed.
 
-Requires an AFFiNE release providing the workspace MCP credential API and both native read tools
-(contracts verified at the repository's pinned AFFiNE revision `868acf8505eb349223e367ef75070d24eb04f7ad`).
-Incompatible Note servers fail closed. No AFFiNE database access, shared service account, or automatic
-email/subject matching is used.
+Database contracts were verified against pinned AFFiNE revision
+`868acf8505eb349223e367ef75070d24eb04f7ad` and its `affine_core` 0.0.4 read policy.
+Schema changes require rechecking identity and permission semantics before enabling the reader on a new release.
 
-AFFiNE gates its workspace MCP endpoint behind `copilot.enabled`, even for read-only tools. If Note returns
-`403 ACTION_FORBIDDEN: Copilot is disabled.`, its administrator must enable that setting before connections work.
-This change does not modify Note's server configuration or enable any AI providers.
+### Server setup
+
+Run `Notes/provision-reader.sql` as the AFFiNE database administrator to create `affine_mind_reader`.
+It grants only the required columns, excluding passwords, session tokens and OAuth credentials. Set:
+
+| Setting | Meaning |
+|---|---|
+| `AffineNotes__ConnectionString` | Npgsql connection string to the **AFFiNE** database, using `affine_mind_reader`. Keep the password in server secret configuration, not git. |
+| `AffineNotes__OidcClientId` | Note's client id at the same Fences issuer configured by `FarmAuth__Authority`. |
+| `AffineNotes__GitHubClientId` | Optional Note GitHub OAuth client id, if Note uses GitHub directly instead of Fences OIDC. |
+
+At least one Note provider client id is required. Do not use Farm's OAuth client id in its place.
+For VPS deployments, put these settings in root-owned `/etc/farm/note-reader.env` with mode `0600`;
+the Mind deploy wrapper loads that separate file without overwriting it. Ensure Note's PostgreSQL
+container is reachable from `farm-network` (for example, attach it to that private Docker network).
+Do not expose the AFFiNE database publicly. Local Compose accepts `AFFINE_NOTE_CONNECTION_STRING`,
+`AFFINE_NOTE_OIDC_CLIENT_ID` and `AFFINE_NOTE_GITHUB_CLIENT_ID`.
+
+The Docker image includes Node and the pinned Yjs dependency. For local `dotnet run`, install Node,
+then run `npm --prefix Farm.Mind/Notes/reader ci`. Missing database settings produce a safe tool error;
+memory tools and health checks still work.
+
+The previous `/api/memory/notes/connections` credential-management API is removed. A forward Mind migration
+drops its obsolete encrypted-credential table, preserving migration history. Previously issued Note
+credentials are no longer used and can be revoked in Note.
 
 ## Access keys
 
@@ -144,4 +154,7 @@ docker compose up -d --build                        # Mind on http://localhost:8
 curl http://localhost:8081/healthz
 ```
 
-Tests: `dotnet test Farm.Mind.Tests`.
+Tests: `dotnet test Farm.Mind.Tests` and `npm --prefix Farm.Mind/Notes/reader test`.
+For real database integration tests, set `MIND_NOTE_TEST_CONNECTION` to an isolated PostgreSQL administrator
+connection; tests create/drop their own database and restricted reader role. Without it, those tests are
+explicitly skipped. CI provisions the test PostgreSQL service and installs the decoder dependency.
