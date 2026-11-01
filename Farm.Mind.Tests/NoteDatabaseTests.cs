@@ -25,7 +25,7 @@ public class NoteDatabaseFactAttribute : FactAttribute
 public class NoteDatabaseTests(NoteDatabaseFixture fixture) : IClassFixture<NoteDatabaseFixture>
 {
     [NoteDatabaseFact]
-    public async Task Identity_ExactProviderNamespace_DisabledAndAmbiguousAccountsFailClosedAsync()
+    public async Task Identity_ExactFencesOidcNamespace_DisabledAndAmbiguousAccountsFailClosedAsync()
     {
         var portal = fixture.Portal();
         Assert.Single(await portal.ListAsync("github:1", default));
@@ -33,8 +33,8 @@ public class NoteDatabaseTests(NoteDatabaseFixture fixture) : IClassFixture<Note
         await Assert.ThrowsAsync<NotePortalException>(() => portal.ListAsync("github:unknown", default));
         await Assert.ThrowsAsync<NotePortalException>(() => portal.ListAsync("github:disabled", default));
         await Assert.ThrowsAsync<NotePortalException>(() => portal.ListAsync("github:wrong-issuer", default));
-        await Assert.ThrowsAsync<NotePortalException>(() => fixture.Portal(github: true).ListAsync("github:ambiguous", default));
-        Assert.Single(await fixture.Portal(github: true).ListAsync("github:legacy", default));
+        await Assert.ThrowsAsync<NotePortalException>(() => portal.ListAsync("github:ambiguous", default));
+        await Assert.ThrowsAsync<NotePortalException>(() => portal.ListAsync("github:legacy", default));
     }
 
     [NoteDatabaseFact]
@@ -57,7 +57,7 @@ public class NoteDatabaseTests(NoteDatabaseFixture fixture) : IClassFixture<Note
     [NoteDatabaseFact]
     public async Task DocumentPolicy_ExplicitNoneFallsBack_OwnerInherits_AdminCannotBypassPolicyAsync()
     {
-        var owner = await fixture.Portal(github: true).SearchAsync("github:legacy", "workspace-1", "", 20, 0, default);
+        var owner = await fixture.Portal().SearchAsync("github:owner", "workspace-1", "", 20, 0, default);
         Assert.Contains(owner.Notes, p => p.DocId == "doc-3");
         var member = await fixture.Portal().SearchAsync("github:policy", "workspace-1", "", 20, 0, default);
         Assert.Contains(member.Notes, p => p.DocId == "doc-1");
@@ -136,14 +136,13 @@ public class NoteDatabaseFixture : IAsyncLifetime
     public string Snapshot { get; private set; } = "";
     private static string Source => Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../Farm.Mind"));
 
-    public NotePortal Portal(bool github = false)
+    public NotePortal Portal()
     {
         var auth = new FarmAuthOptions { Authority = "https://identity.test" };
         var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["AffineNotes:ConnectionString"] = ReaderConnection,
-            ["AffineNotes:OidcClientId"] = "note",
-            ["AffineNotes:GitHubClientId"] = github ? "note-github" : null
+            ["AffineNotes:OidcClientId"] = "note"
         }).Build();
         return new NotePortal(new NoteDatabase(config, auth), new NoteDecoder(new NoteTestEnvironment { ContentRootPath = Source }));
     }
@@ -183,11 +182,11 @@ public class NoteDatabaseFixture : IAsyncLifetime
             CREATE TABLE workspace_pages(workspace_id text, page_id text, blocked boolean);
             CREATE TABLE snapshots(workspace_id text, guid text, blob bytea, updated_at timestamptz);
             CREATE TABLE updates(workspace_id text, guid text, blob bytea, created_at timestamptz);
-            INSERT INTO users(id) VALUES('alice'),('bob'),('wrong'),('ambiguous-a'),('ambiguous-b'),('legacy'),('revocable'),('policy'),('admin');
+            INSERT INTO users(id) VALUES('alice'),('bob'),('wrong'),('ambiguous-a'),('ambiguous-b'),('legacy'),('owner'),('revocable'),('policy'),('admin');
             INSERT INTO users(id,disabled) VALUES('disabled',true);
             INSERT INTO workspaces VALUES('workspace-1','My Notes');
             INSERT INTO workspace_members VALUES('workspace-1','alice','active','member'),('workspace-1','bob','pending','member'),
-              ('workspace-1','legacy','active','owner'),('workspace-1','revocable','active','owner'),
+              ('workspace-1','owner','active','owner'),('workspace-1','revocable','active','owner'),
               ('workspace-1','policy','active','member'),('workspace-1','admin','active','admin');
             INSERT INTO workspace_access_policies VALUES('workspace-1','reader');
             INSERT INTO doc_access_policies VALUES('workspace-1','doc-2','none'),('workspace-1','doc-3','none');
@@ -210,7 +209,6 @@ public class NoteDatabaseFixture : IAsyncLifetime
             ALTER ROLE {_role} SET default_transaction_read_only=on;
             """);
         var ns = NoteDatabase.Namespace("oidc", "https://identity.test", "note");
-        var githubNs = NoteDatabase.Namespace("github", "https://github.com", "note-github");
         await using (var connection = new NpgsqlConnection(_admin))
         {
             await connection.OpenAsync();
@@ -218,8 +216,9 @@ public class NoteDatabaseFixture : IAsyncLifetime
             {
                 ("alice", "oidc", ns, "github:1"), ("bob", "oidc", ns, "github:2"),
                 ("wrong", "oidc", "other-issuer", "github:wrong-issuer"), ("disabled", "oidc", ns, "github:disabled"),
-                ("ambiguous-a", "oidc", ns, "github:ambiguous"), ("ambiguous-b", "github", githubNs, "ambiguous"),
-                ("legacy", "github", (string?)null, "legacy"), ("revocable", "oidc", ns, "github:revoke"),
+                ("ambiguous-a", "oidc", ns, "github:ambiguous"), ("ambiguous-b", "oidc", ns, "github:ambiguous"),
+                ("legacy", "github", (string?)null, "github:legacy"), ("owner", "oidc", ns, "github:owner"),
+                ("revocable", "oidc", ns, "github:revoke"),
                 ("policy", "oidc", ns, "github:policy"), ("admin", "oidc", ns, "github:admin")
             })
             {

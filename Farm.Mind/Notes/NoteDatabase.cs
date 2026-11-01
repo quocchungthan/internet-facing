@@ -12,10 +12,9 @@ public class NoteDatabase(IConfiguration config, FarmAuthOptions auth)
     {
         var connectionString = config["AffineNotes:ConnectionString"];
         var oidcClient = config["AffineNotes:OidcClientId"];
-        var githubClient = config["AffineNotes:GitHubClientId"];
-        if (string.IsNullOrWhiteSpace(connectionString) || (string.IsNullOrWhiteSpace(oidcClient) && string.IsNullOrWhiteSpace(githubClient)) ||
-            (!string.IsNullOrWhiteSpace(oidcClient) && string.IsNullOrWhiteSpace(auth.Authority)))
-            throw new NotePortalException("Configure the read-only AFFiNE database and its OIDC or GitHub client id on the Mind server.");
+        if (string.IsNullOrWhiteSpace(connectionString) || string.IsNullOrWhiteSpace(oidcClient) ||
+            string.IsNullOrWhiteSpace(auth.Authority))
+            throw new NotePortalException("Configure the read-only AFFiNE database and Note's Fences OIDC client id on the Mind server.");
 
         var connection = new NpgsqlConnection(connectionString);
         try
@@ -28,17 +27,14 @@ public class NoteDatabase(IConfiguration config, FarmAuthOptions auth)
                 SELECT DISTINCT account.user_id
                 FROM public.user_connected_accounts account
                 JOIN public.users u ON u.id = account.user_id
-                WHERE NOT u.disabled AND u.registered AND (
-                  (account.provider = 'oidc' AND account.provider_namespace = @oidc_namespace AND account.provider_account_id = @subject)
-                  OR (account.provider = 'github' AND @github_namespace <> '' AND
-                      (account.provider_namespace = @github_namespace OR account.provider_namespace IS NULL) AND
-                      account.provider_account_id = @github_id))
+                WHERE NOT u.disabled AND u.registered
+                  AND account.provider = 'oidc'
+                  AND account.provider_namespace = @oidc_namespace
+                  AND account.provider_account_id = @subject
                 LIMIT 2
                 """, connection, transaction);
             identity.Parameters.AddWithValue("subject", subject);
-            identity.Parameters.AddWithValue("oidc_namespace", string.IsNullOrWhiteSpace(oidcClient) ? "" : Namespace("oidc", auth.NormalizedAuthority, oidcClient));
-            identity.Parameters.AddWithValue("github_namespace", string.IsNullOrWhiteSpace(githubClient) ? "" : Namespace("github", "https://github.com", githubClient));
-            identity.Parameters.AddWithValue("github_id", subject.StartsWith("github:", StringComparison.Ordinal) ? subject[7..] : "");
+            identity.Parameters.AddWithValue("oidc_namespace", Namespace("oidc", auth.NormalizedAuthority, oidcClient));
             var users = new List<string>();
             await using (var reader = await identity.ExecuteReaderAsync(ct))
                 while (await reader.ReadAsync(ct)) users.Add(reader.GetString(0));

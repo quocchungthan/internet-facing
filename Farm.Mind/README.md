@@ -64,10 +64,11 @@ credentials. Existing memory write tools are unchanged; no Note writes are expos
 
 The validated MCP subject maps to `user_connected_accounts` using AFFiNE's exact provider namespace:
 SHA-256 of the provider issuer, newline, and **Note's** OAuth client id (first 16 bytes, lowercase hex).
-OIDC subjects must match exactly. Optionally, `github:<id>` can match Note's GitHub provider account id
-and configured namespace (or its legacy null namespace). No email, display-name or arbitrary subject-to-user
-mapping is accepted. Missing, disabled, unregistered or ambiguous accounts fail closed; sign in to Note
-with the same provider identity first. A Mind access key uses its owner's subject in the same way.
+Mind's authenticated subject must match exactly, under the same Fences OIDC issuer configured for Mind.
+The Note client id identifies the AFFiNE OAuth account namespace; it is not a second identity provider or
+a client secret. No GitHub fallback, email, display-name or arbitrary subject-to-user mapping is accepted.
+Missing, disabled, unregistered or ambiguous accounts fail closed; sign in to Note with the same identity
+first. A Mind access key uses its owner's subject in the same way.
 
 Each operation starts a repeatable-read, **read-only** transaction and requires active `member`, `admin`
 or `owner` membership. Removed or pending members cannot read. Document reads/searches additionally
@@ -99,15 +100,20 @@ It grants only the required columns, excluding passwords, session tokens and OAu
 | Setting | Meaning |
 |---|---|
 | `AffineNotes__ConnectionString` | Npgsql connection string to the **AFFiNE** database, using `affine_mind_reader`. Keep the password in server secret configuration, not git. |
-| `AffineNotes__OidcClientId` | Note's client id at the same Fences issuer configured by `FarmAuth__Authority`. |
-| `AffineNotes__GitHubClientId` | Optional Note GitHub OAuth client id, if Note uses GitHub directly instead of Fences OIDC. |
+| `AffineNotes__OidcClientId` | Note's OAuth client id at the same Fences issuer configured by `FarmAuth__Authority`. |
 
-At least one Note provider client id is required. Do not use Farm's OAuth client id in its place.
+The Note OAuth client id is required to identify the exact Fences account namespace in AFFiNE. Do not use
+Farm's OAuth client id in its place.
 For VPS deployments, put these settings in root-owned `/etc/farm/note-reader.env` with mode `0600`;
-the Mind deploy wrapper loads that separate file without overwriting it. Ensure Note's PostgreSQL
-container is reachable from `farm-network` (for example, attach it to that private Docker network).
-Do not expose the AFFiNE database publicly. Local Compose accepts `AFFINE_NOTE_CONNECTION_STRING`,
-`AFFINE_NOTE_OIDC_CLIENT_ID` and `AFFINE_NOTE_GITHUB_CLIENT_ID`.
+the Mind deploy wrapper loads that separate file without overwriting it. The AFFiNE compose overlay on
+`sub/note` attaches its PostgreSQL container to `farm-network` with the `eldervibe-affine-postgres`
+network alias; use that hostname in Mind's connection string. Do not expose the AFFiNE database publicly.
+For local development, start the Note stack first, then use
+`docker compose -f deployment/local/compose.yml -f deployment/local/compose.note.yml up -d`; the overlay
+attaches Mind to the local AFFiNE network (`AFFINE_DOCKER_NETWORK`, default `affine_default`). Use
+`Host=affine_postgres` for the database host in the local connection string, avoiding a collision with
+Farm's own `postgres` service name.
+Local Compose accepts `AFFINE_NOTE_CONNECTION_STRING` and `AFFINE_NOTE_OIDC_CLIENT_ID`.
 
 The Docker image includes Node and the pinned Yjs dependency. For local `dotnet run`, install Node,
 then run `npm --prefix Farm.Mind/Notes/reader ci`. Missing database settings produce a safe tool error;
@@ -153,6 +159,9 @@ cd deployment/local && cp local.env.example .env   # set POSTGRES_PASSWORD
 docker compose up -d --build                        # Mind on http://localhost:8081
 curl http://localhost:8081/healthz
 ```
+
+To enable direct Note reads locally, start the AFFiNE stack first and add `-f compose.note.yml` to the
+Compose commands above.
 
 Tests: `dotnet test Farm.Mind.Tests` and `npm --prefix Farm.Mind/Notes/reader test`.
 For real database integration tests, set `MIND_NOTE_TEST_CONNECTION` to an isolated PostgreSQL administrator

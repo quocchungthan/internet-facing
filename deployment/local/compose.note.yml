@@ -1,0 +1,12 @@
+# Optional Mind-to-AFFiNE connectivity. The default stack remains independent of a local Note stack.
+# Run with: docker compose -f deployment/local/compose.yml -f deployment/local/compose.note.yml up -d
+services:
+  mind:
+    networks:
+      - default
+      - affine-source
+
+networks:
+  affine-source:
+    external: true
+    name: ${AFFINE_DOCKER_NETWORK:-affine_default}
