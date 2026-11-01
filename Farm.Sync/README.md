@@ -157,8 +157,10 @@ model and the open design questions.
 ### Production sidecar
 
 The worker joins the AFFiNE compose project, so it reaches AFFiNE's database by the service name
-`postgres`, and starts and restarts with the stack. The Farm database is published on the host and is
-reached by container name over `farm-network`.
+`postgres`, and starts and restarts with the stack. The postgres service also joins `farm-network` with
+the private `eldervibe-affine-postgres` alias so Farm.Mind can reach the same database without joining
+the entire AFFiNE network. The Farm database is published on the host and is reached by container name
+over `farm-network`.
 
 1. On the VPS, in `AFFINE_DEPLOY_DIR`, create `sync.env` from [`deploy/sync.env.example`](deploy/sync.env.example).
 2. Provision the read-only AFFiNE role once with `reader/provision-source-role.sql` (and give it a password).

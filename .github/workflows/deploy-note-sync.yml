@@ -135,7 +135,7 @@ jobs:
             exit 0
           fi
           # Do not let Compose consume the remaining commands from this SSH bash -s script.
-          docker compose -f compose.yml -f compose.sync.yml up -d --wait --wait-timeout 180 affine-sync < /dev/null
+          docker compose -f compose.yml -f compose.sync.yml up -d --wait --wait-timeout 180 postgres affine-sync < /dev/null
           docker compose -f compose.yml -f compose.sync.yml exec -T affine-sync dotnet AffineSync.dll --healthcheck < /dev/null
           docker compose -f compose.yml -f compose.sync.yml exec -T affine-sync dotnet AffineSync.dll --verify-gigs < /dev/null
           docker compose -f compose.yml -f compose.sync.yml ps affine-sync < /dev/null

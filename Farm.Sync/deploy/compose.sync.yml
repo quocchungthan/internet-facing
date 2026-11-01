@@ -6,6 +6,13 @@
 #
 # Configuration lives in sync.env next to this file on the VPS (never in git). See Farm.Sync/README.md.
 services:
+  postgres:
+    networks:
+      default: {}
+      farm-network:
+        aliases:
+          - eldervibe-affine-postgres
+
   affine-sync:
     image: ${AFFINE_SYNC_IMAGE:-eldervibe-affine-sync:latest}
     pull_policy: never
