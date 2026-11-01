@@ -16,7 +16,11 @@
   color: unset !important;
 }
 
-shared-file-view-head {
+.shared-file-view-md-header.d-flex {
+  background: unset !important;
+}
+
+.shared-file-view-head {
   background: unset !important;
 }
 
