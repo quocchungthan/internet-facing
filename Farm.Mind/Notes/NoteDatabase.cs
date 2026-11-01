@@ -35,13 +35,33 @@ public class NoteDatabase(IConfiguration config, FarmAuthOptions auth)
             var transaction = await connection.BeginTransactionAsync(IsolationLevel.RepeatableRead, ct);
             await using (var readOnly = new NpgsqlCommand("SET TRANSACTION READ ONLY; SET LOCAL statement_timeout = '15000';", connection, transaction))
                 await readOnly.ExecuteNonQueryAsync(ct);
-            await using var identity = new NpgsqlCommand("""
+            bool namespaced;
+            await using (var schema = new NpgsqlCommand("""
+                SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_attribute
+                  WHERE attrelid = 'public.user_connected_accounts'::regclass
+                    AND attname = 'provider_namespace' AND NOT attisdropped)
+                """, connection, transaction))
+                namespaced = await schema.ExecuteScalarAsync(ct) is true;
+
+            if (!namespaced)
+            {
+                await using var provider = new NpgsqlCommand("""
+                    SELECT EXISTS(SELECT 1 FROM mind_note_reader.oidc_identity
+                      WHERE rtrim(issuer, '/') = @issuer AND client_id = @client AND claim_id = 'sub')
+                    """, connection, transaction);
+                provider.Parameters.AddWithValue("issuer", auth.NormalizedAuthority);
+                provider.Parameters.AddWithValue("client", oidcClient);
+                if (await provider.ExecuteScalarAsync(ct) is not true)
+                    throw new NotePortalException("Note's single OIDC provider does not match Mind's Fences issuer, Note client ID, and subject claim. Verify FarmAuth__Authority, AffineNotes__OidcClientId, and Note's OIDC configuration.");
+            }
+
+            await using var identity = new NpgsqlCommand($"""
                 SELECT DISTINCT account.user_id
                 FROM public.user_connected_accounts account
                 JOIN public.users u ON u.id = account.user_id
                 WHERE NOT u.disabled AND u.registered
                   AND account.provider = 'oidc'
-                  AND account.provider_namespace = @oidc_namespace
+                  {(namespaced ? "AND account.provider_namespace = @oidc_namespace" : "")}
                   AND account.provider_account_id = @subject
                 LIMIT 2
                 """, connection, transaction);

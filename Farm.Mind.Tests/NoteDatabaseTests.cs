@@ -62,6 +62,145 @@ public class NoteDatabaseTests(NoteDatabaseFixture fixture) : IClassFixture<Note
     }
 
     [NoteDatabaseFact]
+    public async Task ListWorkspaces_MissingReaderGrant_ReportsPermissionFailureAsync()
+    {
+        await fixture.ExecuteAsync($"REVOKE SELECT (name) ON public.workspaces FROM {fixture.ReaderRole}");
+        try
+        {
+            var tools = new NoteTools(fixture.Portal(), new HttpContextAccessor
+            {
+                HttpContext = new DefaultHttpContext
+                {
+                    User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "github:1")], "test"))
+                }
+            });
+
+            var exception = await Assert.ThrowsAsync<ModelContextProtocol.McpException>(() => tools.ListNoteWorkspaces(default));
+
+            Assert.Equal("AFFiNE database reader lacks required permissions (SQLSTATE 42501). Check the schema and column grants in Farm.Mind/Notes/provision-reader.sql.", exception.Message);
+            Assert.Null(exception.InnerException);
+        }
+        finally
+        {
+            await fixture.ExecuteAsync($"GRANT SELECT (name) ON public.workspaces TO {fixture.ReaderRole}");
+        }
+    }
+
+    [NoteDatabaseFact]
+    public async Task ListWorkspaces_MissingTable_ReportsSchemaFailureAsync()
+    {
+        await fixture.ExecuteAsync("ALTER TABLE public.workspace_members RENAME TO unavailable_members");
+        try
+        {
+            var exception = await Assert.ThrowsAsync<NotePortalException>(() => fixture.Portal().ListAsync("github:1", default));
+
+            Assert.Equal("AFFiNE database schema is missing a required table (SQLSTATE 42P01). Verify AffineNotes__ConnectionString targets the AFFiNE database and check its deployed schema version.", exception.Message);
+            Assert.Null(exception.InnerException);
+        }
+        finally
+        {
+            await fixture.ExecuteAsync("ALTER TABLE public.unavailable_members RENAME TO workspace_members");
+        }
+    }
+
+    [NoteDatabaseFact]
+    public async Task ListWorkspaces_MissingColumn_ReportsSchemaFailureAsync()
+    {
+        await fixture.ExecuteAsync("ALTER TABLE public.workspace_members RENAME COLUMN state TO unavailable_state");
+        try
+        {
+            var exception = await Assert.ThrowsAsync<NotePortalException>(() => fixture.Portal().ListAsync("github:1", default));
+
+            Assert.Equal("AFFiNE database schema is missing a required column (SQLSTATE 42703). Check the deployed AFFiNE schema version against the reader's pinned revision in Farm.Mind/README.md.", exception.Message);
+            Assert.Null(exception.InnerException);
+        }
+        finally
+        {
+            await fixture.ExecuteAsync("ALTER TABLE public.workspace_members RENAME COLUMN unavailable_state TO state");
+        }
+    }
+
+    [NoteDatabaseFact]
+    public async Task Identity_SingleOidcProviderSchema_MapsExactSubjectAndPreservesAuthorizationAsync()
+    {
+        await fixture.UseSingleProviderSchemaAsync();
+        try
+        {
+            var portal = fixture.Portal();
+            Assert.Single(await portal.ListAsync("github:1", default));
+            Assert.Empty(await portal.ListAsync("github:2", default));
+            foreach (var subject in new[] { "github:unknown", "github:disabled", "github:ambiguous", "github:legacy" })
+                await Assert.ThrowsAsync<NotePortalException>(() => portal.ListAsync(subject, default));
+            Assert.Equal("# Alpha note\n\nLatest private text",
+                (await portal.ReadAsync("github:1", "workspace-1", "doc-1", 0, 20_000, default)).Markdown);
+            await Assert.ThrowsAsync<NotePortalException>(() => portal.ReadAsync("github:2", "workspace-1", "doc-1", 0, 20_000, default));
+
+            // Rerunning the real provisioning script must preserve credentials and never grant OAuth secrets.
+            await fixture.ProvisionReaderAsync();
+            await using var connection = new NpgsqlConnection(fixture.ReaderConnection);
+            await connection.OpenAsync();
+            foreach (var sql in new[]
+            {
+                "SELECT value FROM public.app_configs",
+                "SELECT access_token FROM public.user_connected_accounts",
+                "DELETE FROM mind_note_reader.oidc_identity"
+            })
+            {
+                await using var command = new NpgsqlCommand(sql, connection);
+                var exception = await Assert.ThrowsAsync<PostgresException>(() => command.ExecuteNonQueryAsync());
+                Assert.Contains(exception.SqlState, new[] { PostgresErrorCodes.InsufficientPrivilege, PostgresErrorCodes.ReadOnlySqlTransaction });
+            }
+        }
+        finally
+        {
+            await fixture.RestoreNamespacedSchemaAsync();
+        }
+    }
+
+    [NoteDatabaseFact]
+    public async Task Identity_SingleOidcProviderMismatch_FailsClosedAsync()
+    {
+        await fixture.UseSingleProviderSchemaAsync();
+        try
+        {
+            foreach (var config in new[]
+            {
+                """{"issuer":"https://other.test","clientId":"note"}""",
+                """{"issuer":"https://identity.test","clientId":"other"}""",
+                """{"issuer":"https://identity.test","clientId":"note","args":{"claim_id":"email"}}""",
+                """{}"""
+            })
+            {
+                await fixture.ExecuteAsync($"UPDATE public.app_configs SET value='{config}'::jsonb");
+                var exception = await Assert.ThrowsAsync<NotePortalException>(() => fixture.Portal().ListAsync("github:1", default));
+                Assert.Equal("Note's single OIDC provider does not match Mind's Fences issuer, Note client ID, and subject claim. Verify FarmAuth__Authority, AffineNotes__OidcClientId, and Note's OIDC configuration.", exception.Message);
+            }
+            await fixture.ExecuteAsync("DELETE FROM public.app_configs");
+            await Assert.ThrowsAsync<NotePortalException>(() => fixture.Portal().ListAsync("github:1", default));
+        }
+        finally
+        {
+            await fixture.RestoreNamespacedSchemaAsync();
+        }
+    }
+
+    [NoteDatabaseFact]
+    public async Task Identity_SingleOidcProviderViewMissing_FailsClosedAsync()
+    {
+        await fixture.UseSingleProviderSchemaAsync();
+        try
+        {
+            await fixture.ExecuteAsync("DROP VIEW mind_note_reader.oidc_identity");
+            var exception = await Assert.ThrowsAsync<NotePortalException>(() => fixture.Portal().ListAsync("github:1", default));
+            Assert.Contains("SQLSTATE 42P01", exception.Message);
+        }
+        finally
+        {
+            await fixture.RestoreNamespacedSchemaAsync();
+        }
+    }
+
+    [NoteDatabaseFact]
     public async Task Identity_ExactFencesOidcNamespace_DisabledAndAmbiguousAccountsFailClosedAsync()
     {
         var portal = fixture.Portal();
@@ -169,6 +308,7 @@ public class NoteDatabaseFixture : IAsyncLifetime
     private readonly string _database = "mind_note_test_" + Guid.NewGuid().ToString("N");
     private readonly string _role = "mind_note_reader_" + Guid.NewGuid().ToString("N");
     private string _admin = "";
+    internal string ReaderRole => _role;
     public string ReaderConnection { get; private set; } = "";
     public string Snapshot { get; private set; } = "";
     private static string Source => Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../Farm.Mind"));
@@ -295,6 +435,63 @@ public class NoteDatabaseFixture : IAsyncLifetime
         await connection.OpenAsync();
         await using var command = new NpgsqlCommand(sql, connection);
         await command.ExecuteNonQueryAsync();
+    }
+
+    public async Task UseSingleProviderSchemaAsync()
+    {
+        await ExecuteAsync($$"""
+            ALTER TABLE public.user_connected_accounts RENAME COLUMN provider_namespace TO saved_namespace;
+            CREATE TABLE public.app_configs(id text PRIMARY KEY, value jsonb);
+            INSERT INTO public.app_configs VALUES('oauth.providers.oidc',
+                '{"issuer":"https://identity.test/","clientId":"note","clientSecret":"isolated-test-only","args":{"claim_id":"sub"} }');
+            REVOKE SELECT (id, disabled, registered) ON public.users FROM {{_role}};
+            REVOKE SELECT (user_id, provider, saved_namespace, provider_account_id) ON public.user_connected_accounts FROM {{_role}};
+            REVOKE SELECT (id, name) ON public.workspaces FROM {{_role}};
+            REVOKE SELECT (workspace_id, user_id, role, state) ON public.workspace_members FROM {{_role}};
+            REVOKE SELECT (workspace_id, member_default_doc_role) ON public.workspace_access_policies FROM {{_role}};
+            REVOKE SELECT (workspace_id, doc_id, member_default_role) ON public.doc_access_policies FROM {{_role}};
+            REVOKE SELECT (workspace_id, doc_id, principal_type, principal_id, role) ON public.doc_grants FROM {{_role}};
+            REVOKE SELECT (workspace_id, page_id, blocked) ON public.workspace_pages FROM {{_role}};
+            REVOKE SELECT (workspace_id, guid, blob, updated_at) ON public.snapshots FROM {{_role}};
+            REVOKE SELECT (workspace_id, guid, blob, created_at) ON public.updates FROM {{_role}};
+            """);
+        await ProvisionReaderAsync();
+    }
+
+    public async Task RestoreNamespacedSchemaAsync()
+    {
+        await ExecuteAsync("""
+            DROP VIEW IF EXISTS mind_note_reader.oidc_identity;
+            DROP SCHEMA mind_note_reader;
+            DROP TABLE public.app_configs;
+            ALTER TABLE public.user_connected_accounts RENAME COLUMN saved_namespace TO provider_namespace;
+            """);
+        await ProvisionReaderAsync();
+    }
+
+    public async Task ProvisionReaderAsync()
+    {
+        var admin = new NpgsqlConnectionStringBuilder(_admin);
+        var start = new ProcessStartInfo("psql")
+        {
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false
+        };
+        foreach (var argument in new[] { "-X", "-h", admin.Host!, "-p", admin.Port.ToString(), "-U", admin.Username!, "-d", admin.Database! })
+            start.ArgumentList.Add(argument);
+        start.Environment["PGPASSWORD"] = admin.Password;
+        using var process = Process.Start(start)!;
+        var output = process.StandardOutput.ReadToEndAsync();
+        var error = process.StandardError.ReadToEndAsync();
+        var script = await File.ReadAllTextAsync(Path.Combine(Source, "Notes/provision-reader.sql"));
+        await process.StandardInput.WriteAsync(script.Replace("affine_mind_reader", _role, StringComparison.Ordinal));
+        process.StandardInput.Close();
+        await process.WaitForExitAsync();
+        await output;
+        var stderr = await error;
+        if (process.ExitCode != 0) throw new InvalidOperationException($"Reader provisioning failed: {stderr}");
     }
 
     public async Task DisposeAsync()

@@ -66,7 +66,15 @@ The validated MCP subject maps to `user_connected_accounts` using AFFiNE's exact
 SHA-256 of the provider issuer, newline, and **Note's** OAuth client id (first 16 bytes, lowercase hex).
 Mind's authenticated subject must match exactly, under the same Fences OIDC issuer configured for Mind.
 The Note client id identifies the AFFiNE OAuth account namespace; it is not a second identity provider or
-a client secret. No GitHub fallback, email, display-name or arbitrary subject-to-user mapping is accepted.
+a client secret. On the deployed AFFiNE 0.27.4 schema without `provider_namespace`, accounts use
+`provider = 'oidc'` and the exact subject. Before matching, Mind requires the single OIDC provider's
+stored issuer and client id to match its settings and the identity claim to be `sub`. The administrator-owned
+`mind_note_reader.oidc_identity` view exposes only those three non-secret fields from `app_configs`;
+the reader cannot access the underlying OAuth configuration or tokens. Missing or mismatched
+configuration fails closed. This path requires Note's database-stored OIDC configuration to be authoritative;
+do not override its issuer/client/identity claim only through deployment configuration or reuse old accounts
+after switching issuers. Namespaced schemas retain the exact namespace check.
+No GitHub fallback, email, display-name or arbitrary subject-to-user mapping is accepted.
 Missing, disabled, unregistered or ambiguous accounts fail closed; sign in to Note with the same identity
 first. A Mind access key uses its owner's subject in the same way.
 
@@ -91,11 +99,17 @@ and `unsupportedBlocks` when consuming results. Corrupt/incomplete Yjs data fail
 Database contracts were verified against pinned AFFiNE revision
 `868acf8505eb349223e367ef75070d24eb04f7ad` and its `affine_core` 0.0.4 read policy.
 Schema changes require rechecking identity and permission semantics before enabling the reader on a new release.
+Query errors report a safe PostgreSQL SQLSTATE: `42501` means missing reader permissions, `42P01` a
+missing table, `42703` a missing column, and `57014` a canceled query. Raw database messages and
+connection details are not exposed. For missing tables or columns, check the target database and
+deployed AFFiNE schema; do not broaden grants to work around incompatible authorization tables.
 
 ### Server setup
 
-Run `Notes/provision-reader.sql` as the AFFiNE database administrator to create `affine_mind_reader`.
-It grants only the required columns, excluding passwords, session tokens and OAuth credentials. Set:
+Run `Notes/provision-reader.sql` as the AFFiNE database administrator to create or repair `affine_mind_reader`.
+Rerunning preserves its password and completes missing grants. It grants only the required columns,
+excluding passwords, session tokens and OAuth credentials; on the non-namespaced schema it also creates
+the restricted OIDC configuration view. The administrator must own that view and its source table. Set:
 
 | Setting | Meaning |
 |---|---|
@@ -166,4 +180,6 @@ Compose commands above.
 Tests: `dotnet test Farm.Mind.Tests` and `npm --prefix Farm.Mind/Notes/reader test`.
 For real database integration tests, set `MIND_NOTE_TEST_CONNECTION` to an isolated PostgreSQL administrator
 connection; tests create/drop their own database and restricted reader role. Without it, those tests are
-explicitly skipped. CI provisions the test PostgreSQL service and installs the decoder dependency.
+explicitly skipped. Install `psql` as well: the single-provider schema tests execute the real provisioning
+script and verify repeat runs preserve credentials. CI provisions the test PostgreSQL service and installs
+the decoder dependency.

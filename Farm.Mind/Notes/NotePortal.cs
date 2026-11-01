@@ -62,7 +62,22 @@ public class NotePortal(NoteDatabase database, NoteDecoder decoder)
             await using var session = await database.OpenAsync(subject, ct);
             return await action(session);
         }
-        catch (NpgsqlException) { throw new NotePortalException("AFFiNE database query failed. Check the reader role's grants and database schema compatibility."); }
+        catch (PostgresException e)
+        {
+            throw new NotePortalException(e.SqlState switch
+            {
+                PostgresErrorCodes.InsufficientPrivilege =>
+                    "AFFiNE database reader lacks required permissions (SQLSTATE 42501). Check the schema and column grants in Farm.Mind/Notes/provision-reader.sql.",
+                PostgresErrorCodes.UndefinedTable =>
+                    "AFFiNE database schema is missing a required table (SQLSTATE 42P01). Verify AffineNotes__ConnectionString targets the AFFiNE database and check its deployed schema version.",
+                PostgresErrorCodes.UndefinedColumn =>
+                    "AFFiNE database schema is missing a required column (SQLSTATE 42703). Check the deployed AFFiNE schema version against the reader's pinned revision in Farm.Mind/README.md.",
+                PostgresErrorCodes.QueryCanceled =>
+                    "AFFiNE database query was canceled (SQLSTATE 57014). Check the reader's statement timeout and database load.",
+                _ => $"AFFiNE database query failed (SQLSTATE {e.SqlState}). Check the reader role's grants and database schema compatibility."
+            });
+        }
+        catch (NpgsqlException) { throw new NotePortalException("AFFiNE database query failed. Check the database connection and network access."); }
         catch (ArgumentException) { throw new NotePortalException("The read-only Note database configuration is invalid."); }
     }
 
