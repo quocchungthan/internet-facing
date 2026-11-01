@@ -11,3 +11,15 @@
 #header {
   background: var(--color-raised) !important;
 }
+
+.shared-file-view-head h2 {
+  color: unset !important;
+}
+
+shared-file-view-head {
+  background: unset !important;
+}
+
+.shared-file-view-body {
+  background: unset !important;
+}
