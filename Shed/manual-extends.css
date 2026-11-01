@@ -1,0 +1,13 @@
+
+.login-panel-logo {
+  background: transparent !important;
+}
+.side-panel-north {
+  background: transparent !important;
+}
+.side-panel-north img[alt="logo"] {
+  background: transparent !important;
+}
+#header {
+  background: var(--color-raised) !important;
+}
