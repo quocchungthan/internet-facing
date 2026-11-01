@@ -24,6 +24,21 @@ public class NoteDatabaseFactAttribute : FactAttribute
 
 public class NoteDatabaseTests(NoteDatabaseFixture fixture) : IClassFixture<NoteDatabaseFixture>
 {
+    [Fact]
+    public async Task Identity_MissingFencesAuthorityNamesTheRequiredSettingAsync()
+    {
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["AffineNotes:ConnectionString"] = "Host=localhost;Database=affine;Username=reader",
+            ["AffineNotes:OidcClientId"] = "note"
+        }).Build();
+        var database = new NoteDatabase(config, new FarmAuthOptions());
+
+        var exception = await Assert.ThrowsAsync<NotePortalException>(() => database.OpenAsync("subject", default));
+
+        Assert.Equal("Missing Mind configuration setting(s): FarmAuth__Authority.", exception.Message);
+    }
+
     [NoteDatabaseFact]
     public async Task Identity_ExactFencesOidcNamespace_DisabledAndAmbiguousAccountsFailClosedAsync()
     {

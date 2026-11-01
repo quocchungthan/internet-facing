@@ -10,11 +10,14 @@ public class NoteDatabase(IConfiguration config, FarmAuthOptions auth)
 {
     public async Task<NoteSession> OpenAsync(string subject, CancellationToken ct)
     {
-        var connectionString = config["AffineNotes:ConnectionString"];
-        var oidcClient = config["AffineNotes:OidcClientId"];
-        if (string.IsNullOrWhiteSpace(connectionString) || string.IsNullOrWhiteSpace(oidcClient) ||
-            string.IsNullOrWhiteSpace(auth.Authority))
-            throw new NotePortalException("Configure the read-only AFFiNE database and Note's Fences OIDC client id on the Mind server.");
+        var connectionString = config["AffineNotes:ConnectionString"] ?? string.Empty;
+        var oidcClient = config["AffineNotes:OidcClientId"] ?? string.Empty;
+        var missingSettings = new List<string>();
+        if (string.IsNullOrWhiteSpace(connectionString)) missingSettings.Add("AffineNotes__ConnectionString");
+        if (string.IsNullOrWhiteSpace(oidcClient)) missingSettings.Add("AffineNotes__OidcClientId");
+        if (string.IsNullOrWhiteSpace(auth.Authority)) missingSettings.Add("FarmAuth__Authority");
+        if (missingSettings.Count > 0)
+            throw new NotePortalException($"Missing Mind configuration setting(s): {string.Join(", ", missingSettings)}.");
 
         var connection = new NpgsqlConnection(connectionString);
         try
