@@ -62,7 +62,7 @@ public class NotePortal(NoteDatabase database, NoteDecoder decoder)
             await using var session = await database.OpenAsync(subject, ct);
             return await action(session);
         }
-        catch (NpgsqlException) { throw new NotePortalException("The read-only Note database is unavailable or its schema is incompatible."); }
+        catch (NpgsqlException) { throw new NotePortalException("AFFiNE database query failed. Check the reader role's grants and database schema compatibility."); }
         catch (ArgumentException) { throw new NotePortalException("The read-only Note database configuration is invalid."); }
     }
 

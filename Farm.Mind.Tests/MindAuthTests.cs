@@ -150,9 +150,7 @@ public class MindAuthTests : IClassFixture<WebApplicationFactory<Program>>
         {
             var result = await CallToolAsync(client, name, arguments);
             Assert.True(result.GetProperty("isError").GetBoolean());
-            Assert.Contains("Missing Mind configuration setting(s)", result.GetRawText());
-            Assert.Contains("AffineNotes__ConnectionString", result.GetRawText());
-            Assert.Contains("AffineNotes__OidcClientId", result.GetRawText());
+            Assert.Contains("AFFiNE database connection is not configured (AffineNotes__ConnectionString)", result.GetRawText());
         }
     }
 

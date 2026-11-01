@@ -24,19 +24,41 @@ public class NoteDatabaseFactAttribute : FactAttribute
 
 public class NoteDatabaseTests(NoteDatabaseFixture fixture) : IClassFixture<NoteDatabaseFixture>
 {
-    [Fact]
-    public async Task Identity_MissingFencesAuthorityNamesTheRequiredSettingAsync()
+    [Theory]
+    [InlineData("", "note", "https://identity.test", "AFFiNE database connection is not configured (AffineNotes__ConnectionString).")]
+    [InlineData("Host=localhost;Database=affine;Username=reader", "", "https://identity.test", "Note's Fences OIDC client ID is not configured (AffineNotes__OidcClientId).")]
+    [InlineData("Host=localhost;Database=affine;Username=reader", "note", "", "Fences issuer is not configured (FarmAuth__Authority).")]
+    public async Task Identity_MissingConfigurationReportsSpecificSettingAsync(
+        string connectionString,
+        string oidcClient,
+        string authority,
+        string expectedMessage)
     {
         var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["AffineNotes:ConnectionString"] = "Host=localhost;Database=affine;Username=reader",
-            ["AffineNotes:OidcClientId"] = "note"
+            ["AffineNotes:ConnectionString"] = connectionString,
+            ["AffineNotes:OidcClientId"] = oidcClient
         }).Build();
-        var database = new NoteDatabase(config, new FarmAuthOptions());
+        var database = new NoteDatabase(config, new FarmAuthOptions { Authority = authority });
 
         var exception = await Assert.ThrowsAsync<NotePortalException>(() => database.OpenAsync("subject", default));
 
-        Assert.Equal("Missing Mind configuration setting(s): FarmAuth__Authority.", exception.Message);
+        Assert.Equal(expectedMessage, exception.Message);
+    }
+
+    [Fact]
+    public async Task Identity_UnreachableDatabaseReportsConnectionFailureAsync()
+    {
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["AffineNotes:ConnectionString"] = "Host=127.0.0.1;Port=1;Database=affine;Username=reader;Timeout=1",
+            ["AffineNotes:OidcClientId"] = "note"
+        }).Build();
+        var database = new NoteDatabase(config, new FarmAuthOptions { Authority = "https://identity.test" });
+
+        var exception = await Assert.ThrowsAsync<NotePortalException>(() => database.OpenAsync("subject", default));
+
+        Assert.Equal("Could not connect to the AFFiNE database. Check its hostname, port, database name, reader credentials, and network access.", exception.Message);
     }
 
     [NoteDatabaseFact]

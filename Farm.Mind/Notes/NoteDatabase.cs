@@ -12,17 +12,26 @@ public class NoteDatabase(IConfiguration config, FarmAuthOptions auth)
     {
         var connectionString = config["AffineNotes:ConnectionString"] ?? string.Empty;
         var oidcClient = config["AffineNotes:OidcClientId"] ?? string.Empty;
-        var missingSettings = new List<string>();
-        if (string.IsNullOrWhiteSpace(connectionString)) missingSettings.Add("AffineNotes__ConnectionString");
-        if (string.IsNullOrWhiteSpace(oidcClient)) missingSettings.Add("AffineNotes__OidcClientId");
-        if (string.IsNullOrWhiteSpace(auth.Authority)) missingSettings.Add("FarmAuth__Authority");
-        if (missingSettings.Count > 0)
-            throw new NotePortalException($"Missing Mind configuration setting(s): {string.Join(", ", missingSettings)}.");
+        if (string.IsNullOrWhiteSpace(connectionString))
+            throw new NotePortalException("AFFiNE database connection is not configured (AffineNotes__ConnectionString).");
+        if (string.IsNullOrWhiteSpace(oidcClient))
+            throw new NotePortalException("Note's Fences OIDC client ID is not configured (AffineNotes__OidcClientId).");
+        if (string.IsNullOrWhiteSpace(auth.Authority))
+            throw new NotePortalException("Fences issuer is not configured (FarmAuth__Authority).");
 
         var connection = new NpgsqlConnection(connectionString);
         try
         {
             await connection.OpenAsync(ct);
+        }
+        catch (NpgsqlException)
+        {
+            await connection.DisposeAsync();
+            throw new NotePortalException("Could not connect to the AFFiNE database. Check its hostname, port, database name, reader credentials, and network access.");
+        }
+
+        try
+        {
             var transaction = await connection.BeginTransactionAsync(IsolationLevel.RepeatableRead, ct);
             await using (var readOnly = new NpgsqlCommand("SET TRANSACTION READ ONLY; SET LOCAL statement_timeout = '15000';", connection, transaction))
                 await readOnly.ExecuteNonQueryAsync(ct);
@@ -42,7 +51,7 @@ public class NoteDatabase(IConfiguration config, FarmAuthOptions auth)
             await using (var reader = await identity.ExecuteReaderAsync(ct))
                 while (await reader.ReadAsync(ct)) users.Add(reader.GetString(0));
             if (users.Count != 1)
-                throw new NotePortalException("Sign in to Note with the same identity first. Missing, disabled or ambiguous Note identities cannot be read.");
+                throw new NotePortalException("No single AFFiNE account matched the authenticated Fences identity. Verify AffineNotes__OidcClientId and sign in to Note with this identity.");
             return new NoteSession(connection, transaction, users[0]);
         }
         catch
