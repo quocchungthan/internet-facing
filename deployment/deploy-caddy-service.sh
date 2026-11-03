@@ -16,12 +16,14 @@ set -Eeuo pipefail
 : "${DOCKER_BIN:=docker}"
 : "${CADDY_LOCK_FILE:=${DEPLOY_LOCK_FILE:-/var/lock/deploy-caddy.lock}}"
 : "${SERVICE_CANDIDATE_PORT:=$((SERVICE_UPSTREAM_PORT + 1))}"
+: "${SERVICE_CONTAINER_PORT:=80}"
 : "${SERVICE_STATIC_CONTAINER_PATH:=}"
 : "${SERVICE_STATIC_ROOT:=}"
 : "${SERVICE_STATIC_PUBLIC_PREFIX:=}"
 : "${CADDY_USER:=caddy}"
 : "${CADDY_GROUP:=caddy}"
 : "${SERVICE_EXTRA_ARGS:=}"
+: "${SERVICE_ADDITIONAL_NETWORK:=}"
 : "${SERVICE_SECRET_DIR:=}"
 # Path-based sharing of one domain between services (all optional; unset keeps the one-service-per-domain behavior):
 #   SERVICE_HEALTH_PATH        path the candidate must answer with 2xx/3xx before traffic moves (default /)
@@ -78,8 +80,8 @@ if [[ -n "$SERVICE_STATIC_CONTAINER_PATH$SERVICE_STATIC_ROOT$SERVICE_STATIC_PUBL
 	exit 2
 fi
 
-if [[ ! "$SERVICE_UPSTREAM_PORT" =~ ^[0-9]+$ || ! "$SERVICE_CANDIDATE_PORT" =~ ^[0-9]+$ ]]; then
-	echo "SERVICE_UPSTREAM_PORT and SERVICE_CANDIDATE_PORT must be numeric" >&2
+if [[ ! "$SERVICE_UPSTREAM_PORT" =~ ^[0-9]+$ || ! "$SERVICE_CANDIDATE_PORT" =~ ^[0-9]+$ || ! "$SERVICE_CONTAINER_PORT" =~ ^[0-9]+$ ]]; then
+	echo "Service ports must be numeric" >&2
 	exit 2
 fi
 
@@ -215,7 +217,7 @@ previous_exists=false
 if docker container inspect "$SERVICE_CONTAINER" >/dev/null 2>&1; then
 	previous_exists=true
 	# A stopped or hand-made container has no published port 80; it is still replaced by the candidate.
-	active_mapping=$(docker port "$SERVICE_CONTAINER" 80 2>/dev/null | head -n 1 || true)
+	active_mapping=$(docker port "$SERVICE_CONTAINER" "$SERVICE_CONTAINER_PORT" 2>/dev/null | head -n 1 || true)
 	active_port="${active_mapping##*:}"
 fi
 
@@ -240,12 +242,19 @@ if [[ -n "$SERVICE_EXTRA_ARGS" ]]; then
 fi
 
 docker run --detach --name "$candidate_container" --restart no \
-	--publish "127.0.0.1:$candidate_port:80" \
+	--publish "127.0.0.1:$candidate_port:$SERVICE_CONTAINER_PORT" \
 	"${docker_volume_args[@]}" \
 	${docker_secret_args+"${docker_secret_args[@]}"} \
 	${docker_extra_args+"${docker_extra_args[@]}"} \
 	--env-file "$SERVICE_ENV_FILE" "$SERVICE_IMAGE" >/dev/null
 candidate_started=true
+if [[ -n "$SERVICE_ADDITIONAL_NETWORK" ]]; then
+	if [[ ! "$SERVICE_ADDITIONAL_NETWORK" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ ]]; then
+		echo 'SERVICE_ADDITIONAL_NETWORK is invalid' >&2
+		exit 2
+	fi
+	docker network connect "$SERVICE_ADDITIONAL_NETWORK" "$candidate_container"
+fi
 
 health_status=
 for attempt in {1..30}; do

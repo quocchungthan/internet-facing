@@ -36,6 +36,7 @@ jobs:
           VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
           GHCR_READ_USER: ${{ github.actor }}
           GHCR_READ_TOKEN: ${{ github.token }}
+          USERS_LITELLM_API_KEY: ${{ secrets.USERS_LITELLM_API_KEY }}
           USERS_LITELLM_NETWORK: ${{ vars.USERS_LITELLM_NETWORK || 'ilovecodex_default' }}
           USERS_LITELLM_URL: ${{ vars.USERS_LITELLM_URL || 'http://litellm:4000' }}
           USERS_LITELLM_CONTAINER: ${{ vars.USERS_LITELLM_CONTAINER || 'litellm-proxy' }}
