@@ -3,19 +3,33 @@ set -Eeuo pipefail
 umask 077
 
 : "${USERS_IMAGE:?USERS_IMAGE must be an immutable GHCR digest}"
-: "${USERS_LITELLM_API_KEY:?USERS_LITELLM_API_KEY is required}"
 : "${DEPLOY_COMMON_SCRIPT:?DEPLOY_COMMON_SCRIPT is required}"
 : "${USERS_LITELLM_NETWORK:=ilovecodex_default}"
 : "${USERS_LITELLM_URL:=http://litellm:4000}"
+: "${USERS_LITELLM_CONTAINER:=litellm-proxy}"
 : "${USERS_POSTGRES_IMAGE:=postgres:17-alpine}"
 
 [[ "$EUID" -eq 0 ]] || { echo 'Users deployment requires root.' >&2; exit 1; }
 [[ "$USERS_IMAGE" =~ ^ghcr\.io/[a-z0-9._/-]+@sha256:[a-f0-9]{64}$ ]] || { echo 'An immutable GHCR image digest is required.' >&2; exit 1; }
 [[ "$USERS_LITELLM_NETWORK" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ ]] || { echo 'Invalid LiteLLM network.' >&2; exit 1; }
+[[ "$USERS_LITELLM_CONTAINER" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ ]] || { echo 'Invalid LiteLLM container.' >&2; exit 1; }
 [[ "$USERS_LITELLM_URL" =~ ^https?://[A-Za-z0-9._:-]+(/[^[:space:]]*)?$ ]] || { echo 'Invalid LiteLLM URL.' >&2; exit 1; }
-[[ "$USERS_LITELLM_API_KEY" != *$'\n'* && "$USERS_LITELLM_API_KEY" != *$'\r'* ]] || { echo 'Invalid LiteLLM key.' >&2; exit 1; }
 docker network inspect "$USERS_LITELLM_NETWORK" >/dev/null
 docker pull "$USERS_IMAGE" >/dev/null
+
+upstream_api_key="${MASTER_LLM_LITE_KEY:-}"
+if [[ -z "$upstream_api_key" ]]; then
+    while IFS= read -r entry; do
+        case "$entry" in
+            MASTER_LLM_LITE_KEY=*) upstream_api_key="${entry#*=}" ;;
+            LITELLM_MASTER_KEY=*) [[ -n "$upstream_api_key" ]] || upstream_api_key="${entry#*=}" ;;
+        esac
+    done < <(docker container inspect "$USERS_LITELLM_CONTAINER" --format '{{range .Config.Env}}{{println .}}{{end}}')
+fi
+[[ -n "$upstream_api_key" && "$upstream_api_key" != *$'\n'* && "$upstream_api_key" != *$'\r'* ]] || {
+    echo 'MASTER_LLM_LITE_KEY is unavailable on the VPS and was not found in the LiteLLM container.' >&2
+    exit 1
+}
 
 config_dir=/etc/opensourcelab
 env_file="$config_dir/users.env"
@@ -59,7 +73,7 @@ trap cleanup EXIT
 {
     printf '%s\n' 'ASPNETCORE_ENVIRONMENT=Production' 'ASPNETCORE_HTTP_PORTS=8080'
     printf 'ConnectionStrings__Database=Host=opensourcelab-postgres;Database=opensourcelab;Username=opensourcelab;Password=%s\n' "$password"
-    printf 'Gateway__ApiKey=%s\n' "$USERS_LITELLM_API_KEY"
+    printf 'Gateway__ApiKey=%s\n' "$upstream_api_key"
     printf 'Gateway__Upstream=%s\n' "$USERS_LITELLM_URL"
     printf '%s\n' 'Gateway__PublicUrl=https://users.eldervibe.dev' 'AllowedHosts=users.eldervibe.dev;localhost;127.0.0.1'
     printf '%s\n' 'Identity__Authority=https://identity.eldervibe.dev' 'Identity__ClientId=opensourcelab'

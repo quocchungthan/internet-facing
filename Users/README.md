@@ -4,7 +4,8 @@ The `sub/users` branch deploys the private OpenSourceLab image by immutable dige
 
 Configure the `hostkey-server` GitHub environment:
 
-- Secrets: `VPS_HOST`, `VPS_PORT`, `VPS_USER` (root), `VPS_SSH_KEY`, `VPS_KNOWN_HOSTS`, and `USERS_LITELLM_API_KEY` (a dedicated LiteLLM key restricted to the offered models). The workflow passes its short-lived `GITHUB_TOKEN` to the VPS for the image pull; grant the `internet-facing` repository read access to the OpenSourceLab GHCR package after the first image is published.
+- Secrets: `VPS_HOST`, `VPS_PORT`, `VPS_USER` (root), `VPS_SSH_KEY`, and `VPS_KNOWN_HOSTS`. The workflow passes its short-lived `GITHUB_TOKEN` to the VPS for the image pull; grant the `internet-facing` repository read access to the OpenSourceLab GHCR package after the first image is published.
+- The upstream LiteLLM credential never passes through GitHub. Deployment reads `MASTER_LLM_LITE_KEY` from the VPS environment, falling back to `MASTER_LLM_LITE_KEY` or `LITELLM_MASTER_KEY` in the running `litellm-proxy` container. Optional variable `USERS_LITELLM_CONTAINER` changes that container name.
 - Variable: `USERS_IMAGE_REPOSITORY`, e.g. `ghcr.io/OWNER/opensourcelab` in lowercase. Optional `USERS_LITELLM_NETWORK` and `USERS_LITELLM_URL` default to `ilovecodex_default` and `http://litellm:4000`.
 
 The LiteLLM network and alias must exist on the deployment host. PostgreSQL gets a separate internal network and persistent named volume; the app joins both networks. The database password is generated once in `/etc/opensourcelab/postgres.password`, and the runtime environment is `/etc/opensourcelab/users.env`; both are root-only. The Data Protection key ring uses `opensourcelab-keys`. Back up these volumes and password file. Never delete or replace the password file while the database exists.
