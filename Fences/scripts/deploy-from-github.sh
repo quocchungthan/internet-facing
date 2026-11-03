@@ -26,19 +26,8 @@ done
     echo 'Issuer and CORS origin must use HTTPS.' >&2; exit 1;
 }
 command -v jq >/dev/null || { echo 'jq is required.' >&2; exit 1; }
-oidc_clients_json="$(printf '%s' "$FENCES_OIDC_CLIENTS_JSON" | jq -ec '
-    select(type == "array" and length > 0)
-    | select(all(.[]; type == "object" and
-        ((keys - ["clientId", "redirectUri", "displayName", "clientSecret", "requirePkce", "postLogoutRedirectUri"]) | length == 0) and
-        (.clientId | type == "string" and test("^[A-Za-z0-9][A-Za-z0-9_-]*$")) and
-        (.redirectUri | type == "string" and startswith("https://")) and
-        ((.displayName // "") | type == "string") and
-        ((.clientSecret // "") | type == "string") and
-        ((.postLogoutRedirectUri // "") | type == "string" and (. == "" or startswith("https://"))) and
-        ((.requirePkce // false) | type == "boolean") and
-        ([.clientId, .redirectUri, (.displayName // ""), (.clientSecret // ""), (.postLogoutRedirectUri // "")] | all(.[]; (contains("\n") or contains("\r")) | not))))
-    | select((map(.clientId) | unique | length) == length)
-')" || { echo 'Invalid FENCES_OIDC_CLIENTS_JSON.' >&2; exit 1; }
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+oidc_clients_json="$(printf '%s' "$FENCES_OIDC_CLIENTS_JSON" | bash "$script_dir/merge-users-client.sh")" || { echo 'Invalid FENCES_OIDC_CLIENTS_JSON or conflicting OpenSourceLab registration.' >&2; exit 1; }
 
 work_dir="$(mktemp -d)"
 remote_dir=""

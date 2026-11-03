@@ -83,6 +83,8 @@ Set OAuth secrets with environment variables rather than committing them:
 
 OIDC uses OpenIddict 7.0.0 with EF Core SQLite persistence. The stable subject is `github:<numeric-github-id>`, so a GitHub rename does not change the OIDC subject. The issuer is `https://identity.eldervibe.dev`.
 
+The deployment reconciler preserves the configured client array and appends the public PKCE client `opensourcelab` with the exact callback `https://users.eldervibe.dev/signin-oidc`. If the array already includes that client, its callback, public type, and PKCE requirement must agree; conflicting values fail before deployment. The `/auth/login` and logout return policy also permits `users.eldervibe.dev`, which appears in the Identity app catalog. Deploy the identity branch before enabling Users sign-in; configuring the repository alone does not change the live service.
+
 `IdentityApp:OidcClients` is an indexed array and registers as many clients as needed at startup; clients that already exist are updated in place from the current configuration on every start. Each client ID must match the consuming service's configured ID exactly. Each client needs a `ClientId`, one or more exact `RedirectUris`, and optional `DisplayName`, `ClientSecret`, `RequirePkce`, and `PostLogoutRedirectUris`; do not add wildcard redirect URIs.
 
 PKCE policy: a client without `ClientSecret` is public and must use PKCE. A client with `ClientSecret` is confidential and PKCE is optional, unless `RequirePkce=true` forces it (used for `note`/AFFiNE). A missing `RequirePkce` means `false`.

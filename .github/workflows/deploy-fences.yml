@@ -60,9 +60,10 @@ jobs:
 
       - name: Validate Fences scripts
         run: |
-          for script in Fences/scripts/deploy-from-github.sh Fences/scripts/provision-oidc-certificates.sh Fences/scripts/update-fences-env.sh Fences/scripts/deploy-fences.sh deployment/deploy-caddy-service.sh; do
+          for script in Fences/scripts/deploy-from-github.sh Fences/scripts/merge-users-client.sh Fences/scripts/test-users-client.sh Fences/scripts/provision-oidc-certificates.sh Fences/scripts/update-fences-env.sh Fences/scripts/deploy-fences.sh deployment/deploy-caddy-service.sh; do
             bash -n "$script" || exit 1
           done
+          bash Fences/scripts/test-users-client.sh
 
       - name: Build Fences image
         run: docker build --pull --tag "shuneo-fences:${{ github.sha }}" --file Fences/Dockerfile .
