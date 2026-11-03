@@ -1,0 +1,44 @@
+name: Deploy Users
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_digest:
+        description: Immutable GHCR image digest, sha256 followed by 64 lowercase hex characters
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: users-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/sub/users'
+    runs-on: ubuntu-latest
+    environment: hostkey-server
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate deployment scripts
+        run: |
+          bash -n Users/scripts/deploy-users.sh Users/scripts/deploy-from-github.sh deployment/deploy-caddy-service.sh
+          bash Users/scripts/test-deploy-caddy.sh
+      - name: Deploy immutable image and configure Caddy
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          GHCR_READ_USER: ${{ github.actor }}
+          GHCR_READ_TOKEN: ${{ github.token }}
+          USERS_LITELLM_NETWORK: ${{ vars.USERS_LITELLM_NETWORK || 'ilovecodex_default' }}
+          USERS_LITELLM_URL: ${{ vars.USERS_LITELLM_URL || 'http://litellm:4000' }}
+          USERS_LITELLM_CONTAINER: ${{ vars.USERS_LITELLM_CONTAINER || 'litellm-proxy' }}
+          USERS_IMAGE_REPOSITORY: ${{ vars.USERS_IMAGE_REPOSITORY }}
+          IMAGE_DIGEST: ${{ inputs.image_digest }}
+        run: bash Users/scripts/deploy-from-github.sh
