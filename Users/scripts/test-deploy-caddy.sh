@@ -28,6 +28,17 @@ cat > "$temporary/bin/systemctl" <<'MOCK'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "$TEST_SYSTEMCTL"
 MOCK
+cat > "$temporary/bin/sudo" <<'MOCK'
+#!/usr/bin/env bash
+while [[ "$#" -gt 0 ]]; do
+    case "$1" in
+        -n|--) shift ;;
+        -l) exit 0 ;;
+        *) break ;;
+    esac
+done
+exec "$@"
+MOCK
 chmod +x "$temporary/bin/"*
 export PATH="$temporary/bin:$PATH" TEST_COMMANDS="$temporary/commands" TEST_CURL="$temporary/curl" TEST_SYSTEMCTL="$temporary/systemctl"
 export SERVICE_NAME=users SERVICE_DOMAIN=users.eldervibe.dev SERVICE_UPSTREAM_PORT=5280 SERVICE_CANDIDATE_PORT=5281
