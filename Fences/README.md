@@ -53,8 +53,11 @@ frontend/backend image pair without removing SQLite, keys or certificate volumes
 ### Dashboard audience analytics
 
 `GET /api/audience?clientId=<registered-app>&days=7|30|90` returns actual,
-app-scoped observed users, daily first-observed growth, returning users and
-first/last observation days. It requires the existing Fences SSO cookie and
+app-scoped observed users. `GET /api/audience/all?days=7|30|90` returns a
+deduplicated view across every client with recorded authorizations, including
+per-client user totals and each user's observed client IDs. Both include daily
+first-observed growth, returning users and first/last observation days. They
+require the existing Fences SSO cookie and
 an owner identity allowed by `IdentityApp:AudienceOwnerSubjects` (an array
 of stable `github:<numeric-id>` subjects, defaulting to the requested owner).
 It returns 401 when signed out and 403 for other identities, with no-store

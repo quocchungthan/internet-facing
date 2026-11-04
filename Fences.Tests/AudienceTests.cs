@@ -15,6 +15,32 @@ namespace Fences.Tests;
 public sealed class AudienceTests
 {
     [Fact]
+    public async Task AllClients_CountsPeopleAndDaysOnceAcrossApplications()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        await using var db = new AudienceDbContext(new DbContextOptionsBuilder<AudienceDbContext>().UseSqlite(connection).Options);
+        await db.Database.EnsureCreatedAsync();
+        var store = new AudienceStore(db);
+        await store.RecordAsync("farm", "github:1", "owner", default);
+        await store.RecordAsync("opensourcelab", "github:1", "owner", default);
+        await store.RecordAsync("opensourcelab", "github:2", "friend", default);
+        db.Visits.Add(new AudienceVisit { ClientId = "farm", Subject = "github:1", Username = "owner", Day = DateTime.UtcNow.AddDays(-10).ToString("yyyy-MM-dd") });
+        await db.SaveChangesAsync();
+
+        var data = JsonSerializer.SerializeToElement(await store.ReadAllAsync(7, default));
+        Assert.Equal(2, data.GetProperty("totalUsers").GetInt32());
+        Assert.Equal(1, data.GetProperty("newUsers").GetInt32());
+        Assert.Equal(1, data.GetProperty("returningUsers").GetInt32());
+        var owner = data.GetProperty("users").EnumerateArray().Single(row => row.GetProperty("subject").GetString() == "github:1");
+        Assert.Equal(2, owner.GetProperty("observedDays").GetInt32());
+        Assert.Equal(new[] { "farm", "opensourcelab" }, owner.GetProperty("clients").EnumerateArray().Select(value => value.GetString()));
+        var apps = data.GetProperty("applications").EnumerateArray().ToDictionary(row => row.GetProperty("clientId").GetString()!, row => row.GetProperty("totalUsers").GetInt32());
+        Assert.Equal(1, apps["farm"]);
+        Assert.Equal(2, apps["opensourcelab"]);
+    }
+
+    [Fact]
     public async Task Observations_DeduplicateDailyAndKeepApplicationsSeparate()
     {
         await using var connection = new SqliteConnection("Data Source=:memory:");
@@ -56,5 +82,8 @@ public sealed class AudienceTests
         var result = await controller.Get("farm", 7);
         var actual = result switch { StatusCodeResult code => code.StatusCode, ObjectResult obj => obj.StatusCode ?? 200, _ => 0 };
         Assert.Equal(status, actual);
+        var allResult = await controller.GetAll(7);
+        var allActual = allResult switch { StatusCodeResult code => code.StatusCode, ObjectResult obj => obj.StatusCode ?? 200, _ => 0 };
+        Assert.Equal(status, allActual);
     }
 }
