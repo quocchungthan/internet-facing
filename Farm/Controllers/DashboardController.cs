@@ -50,7 +50,7 @@ public sealed class DashboardController(IConfiguration configuration, FarmAuthOp
             {
                 source = "fences",
                 url = auth.Enabled
-                    ? $"{auth.NormalizedAuthority}/api/audience?clientId={Uri.EscapeDataString(auth.ClientId!)}&days={days}"
+                    ? $"{auth.NormalizedAuthority}/api/audience/all?days={days}"
                     : null
             };
         }

@@ -21,11 +21,16 @@ public class DashboardTests : IClassFixture<WebApplicationFactory<Program>>
 
     public DashboardTests(WebApplicationFactory<Program> factory) => _factory = factory;
 
-    private HttpClient Client(string? subject = null)
+    private HttpClient Client(string? subject = null, bool configured = false)
     {
         var factory = _factory.WithWebHostBuilder(builder =>
         {
             builder.UseSetting("Dashboard:OwnerSubjects:0", "github:44728650");
+            if (configured)
+            {
+                builder.UseSetting("FarmAuth:Authority", "https://identity.example.test");
+                builder.UseSetting("FarmAuth:ClientId", "farm");
+            }
             builder.ConfigureServices(services => services
                 .AddAuthentication(options => options.DefaultAuthenticateScheme = "DashboardTest")
                 .AddScheme<AuthenticationSchemeOptions, DashboardTestAuth>("DashboardTest", _ => { }));
@@ -86,6 +91,13 @@ public class DashboardTests : IClassFixture<WebApplicationFactory<Program>>
         Assert.Equal("fences", audience.GetProperty("source").GetString());
         Assert.False(audience.TryGetProperty("users", out _));
         Assert.Equal(JsonValueKind.Null, audience.GetProperty("url").ValueKind);
+    }
+
+    [Fact]
+    public async Task Owner_GetsAllClientsAudienceUrl()
+    {
+        var data = await Client("github:44728650", configured: true).GetFromJsonAsync<JsonElement>("/api/dashboard?days=7");
+        Assert.Equal("https://identity.example.test/api/audience/all?days=7", data.GetProperty("audience").GetProperty("url").GetString());
     }
 
     [Fact]

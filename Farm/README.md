@@ -19,9 +19,10 @@ is added to the Dashboard.
 
 `GET /api/dashboard?days=7|30|90` currently returns **explicitly labeled demo
 data**, never actual bills or measured savings. The reference cost and fees
-are fictional. Audience data is not mocked: the owner receives the Fences
-audience endpoint for the configured Farm OIDC client. API failures
-are displayed as errors, not replaced with demo data. Responses are private
+are fictional. Audience data is not mocked: the owner receives aggregate Fences
+audience data across clients with recorded authorizations, with a per-app
+breakdown. API failures are displayed as errors, not replaced with demo data.
+Responses are private
 to the authenticated session and use `Cache-Control: no-store`.
 
 The owner additionally receives read-only user growth and sign-in analytics.
@@ -32,16 +33,23 @@ owner, resolved from the GitHub API. Override with
 grant access, and the API omits the audience payload for every other user.
 There are no account-management controls.
 
-The browser reads the owner-only Fences `/api/audience?clientId=...&days=...`
-endpoint using the existing Fences SSO cookie. Fences independently authorizes
-the owner through `IdentityApp:AudienceOwnerSubjects` (defaulting to the same
+The browser reads the owner-only Fences `/api/audience/all?days=...` endpoint
+using the existing Fences SSO cookie. People are counted once across apps;
+the dashboard also shows distinct users per client and the clients seen for
+each person. Fences independently authorizes the owner through
+`IdentityApp:AudienceOwnerSubjects` (defaulting to the same
 owner subject); keep both owner allowlists consistent. Its credentialed CORS
 policy allows configured origins and origins of explicitly registered OIDC
 redirects. An expired Fences session, missing deployment or blocked cookies
-shows an error, never fictional users. Counts are unique observed users of
-this client, not the entire SSO population. Tracking begins with the new
-Fences deployment; first/last observed authorization days are not original
-registration dates, exact login counts or online status.
+shows an error, never fictional users. Counts cover users observed through
+clients with recorded authorizations, not the entire SSO population. Tracking
+begins with the Fences deployment; first/last observed authorization days are
+not original registration dates, exact login counts or online status.
+
+Deploy the updated Fences service first. Then publish the compatible SingleUI
+`app-farm` bundle and deploy this Farm backend with that bundle pinned. Earlier
+authorizations already recorded by Fences are included; older history is not
+backfilled.
 
 **Live data already available:** the separate MCP bandwidth section reads
 `/api/memory/usage` from Farm.Mind. It covers only instrumented MCP message
