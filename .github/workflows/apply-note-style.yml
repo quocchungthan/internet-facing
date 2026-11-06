@@ -12,6 +12,8 @@ concurrency:
 
 jobs:
   style:
+    # AFFiNE moved to another server; do not restart the legacy stack to apply styles.
+    if: ${{ false }}
     runs-on: ubuntu-latest
     environment: hostkey-server
     steps:

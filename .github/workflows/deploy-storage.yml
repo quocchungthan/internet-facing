@@ -16,6 +16,8 @@ concurrency:
 
 jobs:
   deploy:
+    # Migrated to another server; keep the legacy deployment disabled, including manual runs.
+    if: ${{ false }}
     runs-on: ubuntu-latest
     environment: hostkey-server
 
