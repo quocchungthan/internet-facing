@@ -30,6 +30,8 @@ env:
 
 jobs:
   build:
+    # Note Sync moved to another server; keep the legacy worker build disabled.
+    if: ${{ false }}
     runs-on: ubuntu-latest
     steps:
       - name: Check out source
@@ -65,6 +67,8 @@ jobs:
           if-no-files-found: error
 
   deploy:
+    # Do not recreate the legacy sidecar, including through manual runs.
+    if: ${{ false }}
     needs: build
     runs-on: ubuntu-latest
     environment: hostkey-server
