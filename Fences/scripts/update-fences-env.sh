@@ -221,12 +221,17 @@ if [[ "$restart" == true ]]; then
     command -v docker >/dev/null 2>&1 || { echo "docker is required to restart Fences." >&2; exit 1; }
     image="$(docker inspect --format '{{.Config.Image}}' "$service_container")"
     docker rm --force "$service_container" >/dev/null
-    docker run --detach --name "$service_container" --restart unless-stopped \
-        --publish "127.0.0.1:$service_upstream_port:80" \
-        --volume "$service_volume" \
-        --mount "type=bind,source=$secrets_dir,destination=/run/secrets,readonly" \
-        --env-file "$runtime_env_file" "$image" >/dev/null
-    echo "Restarted $service_container using image $image"
+    # Allow an optional manual override file to be passed in addition to the runtime env file.
+env_file_args=(--env-file "$runtime_env_file")
+if [[ -f /opt/github-sign-in/fences.override.env ]]; then
+    env_file_args+=(--env-file /opt/github-sign-in/fences.override.env)
+fi
+	docker run --detach --name "$service_container" --restart unless-stopped \
+	    --publish "127.0.0.1:$service_upstream_port:80" \
+	    --volume "$service_volume" \
+	    --mount "type=bind,source=$secrets_dir,destination=/run/secrets,readonly" \
+	    "${env_file_args[@]}" "$image" >/dev/null
+	    echo "Restarted $service_container using image $image"
 fi
 
 echo 'Fences runtime reconciliation complete.'

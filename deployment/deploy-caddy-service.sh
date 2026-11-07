@@ -239,12 +239,19 @@ if [[ -n "$SERVICE_EXTRA_ARGS" ]]; then
 	read -ra docker_extra_args <<< "$SERVICE_EXTRA_ARGS"
 fi
 
+# Allow an optional manual override file to be applied after the primary env file.
+# If present, pass both files to Docker so values in the override take precedence.
+env_file_args=(--env-file "$SERVICE_ENV_FILE")
+if [[ -f /opt/github-sign-in/fences.override.env ]]; then
+    env_file_args+=(--env-file /opt/github-sign-in/fences.override.env)
+fi
+
 docker run --detach --name "$candidate_container" --restart no \
-	--publish "127.0.0.1:$candidate_port:80" \
-	"${docker_volume_args[@]}" \
-	${docker_secret_args+"${docker_secret_args[@]}"} \
-	${docker_extra_args+"${docker_extra_args[@]}"} \
-	--env-file "$SERVICE_ENV_FILE" "$SERVICE_IMAGE" >/dev/null
+    --publish "127.0.0.1:$candidate_port:80" \
+    "${docker_volume_args[@]}" \
+    ${docker_secret_args+"${docker_secret_args[@]}"} \
+    ${docker_extra_args+"${docker_extra_args[@]}"} \
+    "${env_file_args[@]}" "$SERVICE_IMAGE" >/dev/null
 candidate_started=true
 
 health_status=
