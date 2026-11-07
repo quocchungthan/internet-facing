@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Backs up every eldervibe service on the VPS into ONE archive with a RESTORE.md at its root.
+# Backs up eldervibe services except Seafile and AFFiNE into ONE archive with a RESTORE.md at its root.
 # Run as root by .github/workflows/backup-all.yml. Progress goes to stderr; stdout carries only BACKUP_* result lines.
-# Excluded on purpose: logs, mail content (Maddy message store/queue), caches, raw DB data dirs (dumped instead).
+# Excluded on purpose: Seafile, AFFiNE, logs, mail content (Maddy message store/queue), caches, raw DB data dirs (dumped instead).
 set -euo pipefail
 set +x
 umask 077
@@ -10,8 +10,6 @@ umask 077
 : "${BACKUP_KEEP:=7}"
 : "${BACKUP_GIT_SHA:=unknown}"
 : "${MAILBOX_DEPLOY_DIR:=/opt/shuneo-mail-mvp}"
-: "${STORAGE_DEPLOY_DIR:=/srv/storage}"
-: "${AFFINE_DEPLOY_DIR:=/opt/affine-note}"
 : "${FARM_PG_PORT:=4554}"
 
 if [[ -n "${FENCES_DEPLOY_DIR:-}" ]]; then
@@ -27,10 +25,6 @@ FARM_CONTAINER=eldervibe-farm
 FARM_DB_CONTAINER=eldervibe-farm-postgres
 FARM_CONFIG_DIR=/etc/farm
 FARM_STATIC_ROOT=/var/lib/caddy/farm/hanging-post
-SEAFILE_CONTAINER=seafile-server
-SEAFILE_DB_CONTAINER=seafile-mysql
-AFFINE_CONTAINER=affine_server
-AFFINE_DB_CONTAINER=affine_postgres
 
 log() { printf '%s\n' "$*" >&2; }
 warn() { printf '::warning::%s\n' "$*" >&2; }
@@ -74,7 +68,7 @@ fi
 [[ "$EUID" -eq 0 ]] || die "backup-all.sh must run as root (VPS_USER=root or passwordless sudo)."
 [[ "$BACKUP_KEEP" =~ ^[1-9][0-9]*$ ]] || die "BACKUP_KEEP must be a positive integer."
 [[ "$FARM_PG_PORT" =~ ^[1-9][0-9]{0,4}$ && "$FARM_PG_PORT" -le 65535 ]] || die "FARM_PG_PORT must be an integer between 1 and 65535."
-for path_var in BACKUP_ROOT MAILBOX_DEPLOY_DIR STORAGE_DEPLOY_DIR AFFINE_DEPLOY_DIR; do
+for path_var in BACKUP_ROOT MAILBOX_DEPLOY_DIR; do
 	[[ "${!path_var}" =~ ^/[A-Za-z0-9._/-]+$ && "${!path_var}" != "/" ]] || die "$path_var must be an absolute path."
 done
 if [[ -n "${FENCES_DEPLOY_DIR:-}" && ( "$FENCES_DEPLOY_DIR/" == "$BACKUP_ROOT/"* || "$BACKUP_ROOT/" == "$FENCES_DEPLOY_DIR/"* ) ]]; then
@@ -106,10 +100,6 @@ if have docker && docker info >/dev/null 2>&1; then
 fi
 container_exists() { [[ "$docker_ok" == true ]] && docker container inspect "$1" >/dev/null 2>&1; }
 container_running() { [[ "$docker_ok" == true && "$(docker inspect -f '{{.State.Running}}' "$1" 2>/dev/null)" == true ]]; }
-mount_source() {
-	[[ "$docker_ok" == true ]] || return 0
-	docker inspect -f "{{range .Mounts}}{{if eq .Destination \"$2\"}}{{.Source}}{{end}}{{end}}" "$1" 2>/dev/null || true
-}
 
 # record <id> <service> <status: included|missing|failed|absent> <source> <zip path or -> <note>
 record() {
@@ -330,39 +320,6 @@ else
 	record mail mail missing "$mail_dir" - "MailBox not deployed"
 fi
 
-# ---- Storage / Seafile (sub/storage) -------------------------------------------
-storage_dir="$STORAGE_DEPLOY_DIR"
-if [[ -f "$storage_dir/docker-compose.yml" ]] || container_exists "$SEAFILE_CONTAINER"; then
-	copy_path storage-env storage required "$storage_dir/.env"
-	copy_path storage-compose storage required "$storage_dir/docker-compose.yml"
-	storage_shared="$(mount_source "$SEAFILE_CONTAINER" /shared)"
-	storage_shared="${storage_shared:-$storage_dir/data}"
-	COPY_NOTE="Seafile /shared: seafile/conf (seahub_settings.py, ccnet/seafile conf), seafile-data, seahub-data" \
-		copy_path storage-shared storage required "$storage_shared"
-	dump_to storage-mysql storage "$SEAFILE_DB_CONTAINER" dumps/seafile-mysql-all.sql 'Dump completed' -- \
-		'set -- "$MYSQL_ROOT_PASSWORD"; d=mariadb-dump; command -v "$d" >/dev/null 2>&1 || d=mysqldump; MYSQL_PWD="$1" exec "$d" -uroot --all-databases --single-transaction --routines --triggers --events'
-else
-	record storage storage missing "$storage_dir" - "Seafile not deployed"
-fi
-
-# ---- Note / AFFiNE (sub/note) --------------------------------------------------
-note_dir="$AFFINE_DEPLOY_DIR"
-if [[ -f "$note_dir/compose.yml" ]] || container_exists "$AFFINE_CONTAINER"; then
-	copy_path note-env note optional "$note_dir/.env"
-	copy_path note-compose note required "$note_dir/compose.yml"
-	# Sync worker (Farm.Sync) sidecar: its config holds the Farm DB password and the read-only AFFiNE login.
-	copy_path note-sync-env note optional "$note_dir/sync.env"
-	copy_path note-sync-compose note optional "$note_dir/compose.sync.yml"
-	note_config="$(mount_source "$AFFINE_CONTAINER" /root/.affine/config)"
-	copy_path note-config note required "${note_config:-$note_dir/config}"
-	note_blobs="$(mount_source "$AFFINE_CONTAINER" /root/.affine/storage)"
-	COPY_NOTE="AFFiNE uploaded blobs" copy_path note-blobs note required "${note_blobs:-$note_dir/data/storage}"
-	dump_to note-postgres note "$AFFINE_DB_CONTAINER" dumps/affine-postgres.sql 'PostgreSQL database dump complete' -- \
-		'set -- "${POSTGRES_PASSWORD:-}"; PGPASSWORD="$1" exec pg_dump -U "${POSTGRES_USER:-affine}" -d "${POSTGRES_DB:-affine}" --clean --if-exists'
-else
-	record note note missing "$note_dir" - "AFFiNE not deployed"
-fi
-
 # ---- PARA (Car knowledge and Quick Actions) ----------------------------------
 dump_para_postgres para-car-postgres PARA_CAR_DATABASE dumps/para-car-postgres.sql
 dump_para_postgres para-actions-postgres PARA_ACTIONS_DATABASE dumps/para-actions-postgres.sql
@@ -402,11 +359,11 @@ restore_cmd() { # <zip path> <original path>
 	printf '| Created (UTC) | `%s` |\n' "$iso_time"
 	printf '| main git SHA | `%s` |\n' "$BACKUP_GIT_SHA"
 	printf '| Items included / missing / failed | %s / %s / %s |\n\n' "$included" "$missing" "$failed"
-	printf 'This archive holds configuration, credentials, certificates and service data. It contains NO logs and NO mail content.\n'
+	printf 'This archive holds configuration, credentials, certificates and service data. It contains NO logs, NO mail content and NO service-specific Seafile or AFFiNE backups. Shared Caddy configuration and certificates are still included.\n'
 	printf 'It contains private keys and passwords: keep it root-only and encrypt it before it leaves the VPS.\n\n'
 	printf '## Layout\n\n'
 	printf -- '- `files/<absolute path>`: copies of VPS paths, e.g. `files/etc/caddy/Caddyfile` came from `/etc/caddy/Caddyfile`.\n'
-	printf -- '- `dumps/`: logical database dumps (Seafile MariaDB, Farm, AFFiNE and PARA Postgres).\n'
+	printf -- '- `dumps/`: logical database dumps (Farm and PARA Postgres).\n'
 	printf -- '- `meta/containers.tsv`: container names, images and states at backup time.\n'
 	printf -- '- `MANIFEST.tsv`: the table below in machine-readable form.\n\n'
 	printf '## Unpack\n\n```bash\nsudo -i\nmkdir -p /root/restore && cd /root/restore\nunzip -X /var/backups/eldervibe/eldervibe-backup-%s.zip   # -X restores uid/gid; for .tar.gz use: tar --numeric-owner -xzpf <file>\n```\n\n' "$timestamp"
@@ -431,7 +388,7 @@ restore_cmd() { # <zip path> <original path>
 	else
 		printf 'None.\n'
 	fi
-	printf '\nAlways excluded: `*.log`, `logs/`, `/var/log/**`, journal, Maddy message store (`imapsql.db*`, `messages/`), mail queue (`remote_queue/`), `mtasts_cache/`, ACME webroot, raw MariaDB/Postgres data dirs (restored from the dumps), older per-service `backups/` folders, caches, docker images.\n\n'
+	printf '\nAlways excluded: Seafile and AFFiNE service configuration, credentials, data and database dumps (including the AFFiNE sync sidecar), `*.log`, `logs/`, `/var/log/**`, journal, Maddy message store (`imapsql.db*`, `messages/`), mail queue (`remote_queue/`), `mtasts_cache/`, ACME webroot, raw MariaDB/Postgres data dirs, older per-service `backups/` folders, caches, docker images.\n\n'
 
 	printf '## Restore order per service\n\n'
 	printf 'Always: stop the service, copy the items back, fix owner/mode, restore the database dump, start the service.\n\n'
@@ -466,21 +423,6 @@ restore_cmd() { # <zip path> <original path>
 	printf '# Mailboxes were NOT backed up (mail content excluded). Recreate an empty IMAP mailbox for each address in secrets/accounts.json:\n'
 	printf 'docker compose exec maddy maddy imap-acct create <address>\n'
 	printf '# Then re-run deploy-mailbox.yml so configure-caddy-web.sh re-grants Caddy read access to the certificates.\n```\n\n'
-	printf '### Storage / Seafile\n\n```bash\ncd %s\ndocker compose down\n' "$storage_dir"
-	printf 'cp -a /root/restore/files%s/.env /root/restore/files%s/docker-compose.yml ./\n' "$storage_dir" "$storage_dir"
-	printf 'rsync -a /root/restore/files%s/ %s/\n' "${storage_shared:-$storage_dir/data}" "${storage_shared:-$storage_dir/data}"
-	printf 'docker compose up -d db && sleep 20\n'
-	printf 'docker exec -i %s sh -c '\''set -- "$MYSQL_ROOT_PASSWORD"; MYSQL_PWD="$1" exec mariadb -uroot'\'' < /root/restore/dumps/seafile-mysql-all.sql\n' "$SEAFILE_DB_CONTAINER"
-	printf 'docker compose up -d\n```\n\n'
-	printf '### Note / AFFiNE\n\n```bash\ncd %s\ndocker compose -f compose.yml down\n' "$note_dir"
-	printf 'for p in .env compose.yml sync.env compose.sync.yml; do [ -e "/root/restore/files%s/$p" ] && cp -a "/root/restore/files%s/$p" ./; done\n' "$note_dir" "$note_dir"
-	printf 'rsync -a /root/restore/files%s/ %s/\n' "${note_config:-$note_dir/config}" "${note_config:-$note_dir/config}"
-	printf 'rsync -a /root/restore/files%s/ %s/\n' "${note_blobs:-$note_dir/data/storage}" "${note_blobs:-$note_dir/data/storage}"
-	printf 'docker compose -f compose.yml up -d postgres && sleep 15\n'
-	printf 'docker exec -i %s sh -c '\''set -- "${POSTGRES_PASSWORD:-}"; PGPASSWORD="$1" exec psql -U "${POSTGRES_USER:-affine}" -d "${POSTGRES_DB:-affine}"'\'' < /root/restore/dumps/affine-postgres.sql\n' "$AFFINE_DB_CONTAINER"
-	printf 'docker compose -f compose.yml up -d\n'
-	printf '# The affine_sync read-only role is not in the dump: recreate it with Farm.Sync/reader/provision-source-role.sql and the password from sync.env.\n'
-	printf '[ -e compose.sync.yml ] && docker compose -f compose.yml -f compose.sync.yml up -d affine-sync\n```\n\n'
 	printf '### PARA (Car knowledge and Quick Actions)\n\n'
 	printf 'Stop the PARA services before restoring. Provision the destination databases and original owner roles first.\n'
 	printf 'For each dump below, set `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD` and, if needed, `PGSSLMODE` from the matching GitHub secret on the VPS. Do not paste credentials into shell commands or logs.\n'

@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   backup:
-    name: Back up every service on the VPS into one archive
+    name: Back up services except Seafile and AFFiNE into one archive
     runs-on: ubuntu-latest
     environment: hostkey-server
     timeout-minutes: 180
@@ -27,7 +27,7 @@ jobs:
       - name: Validate backup script
         run: |
           bash -n scripts/backup-all.sh
-          python3 -m unittest discover -s scripts -p 'test_backup_postgres.py'
+          python3 -m unittest discover -s scripts -p 'test_backup*.py'
 
       - name: Configure SSH
         env:
@@ -54,8 +54,6 @@ jobs:
           VPS_PORT: ${{ secrets.VPS_PORT }}
           VPS_USER: ${{ secrets.VPS_USER }}
           MAILBOX_DEPLOY_DIR: ${{ vars.MAILBOX_DEPLOY_DIR }}
-          STORAGE_DEPLOY_DIR: ${{ vars.STORAGE_DEPLOY_DIR }}
-          AFFINE_DEPLOY_DIR: ${{ vars.AFFINE_DEPLOY_DIR }}
           FENCES_DEPLOY_DIR: ${{ vars.FENCES_DEPLOY_DIR }}
           FARM_PG_PORT: ${{ vars.FARM_PG_PORT }}
           BACKUP_GIT_SHA: ${{ github.sha }}
@@ -76,7 +74,7 @@ jobs:
             [[ "$FARM_PG_PORT" =~ ^[1-9][0-9]{0,4}$ && "$FARM_PG_PORT" -le 65535 ]] || { echo "::error::FARM_PG_PORT must be an integer between 1 and 65535."; exit 1; }
             remote_env+=" FARM_PG_PORT=$FARM_PG_PORT"
           fi
-          for name in MAILBOX_DEPLOY_DIR STORAGE_DEPLOY_DIR AFFINE_DEPLOY_DIR FENCES_DEPLOY_DIR; do
+          for name in MAILBOX_DEPLOY_DIR FENCES_DEPLOY_DIR; do
             value="${!name:-}"
             [[ -z "$value" ]] && continue
             if [[ "$name" == FENCES_DEPLOY_DIR && ! "$value" =~ ^/[A-Za-z0-9_-][A-Za-z0-9._-]*(/[A-Za-z0-9_-][A-Za-z0-9._-]*)*$ ]]; then
@@ -156,6 +154,8 @@ jobs:
           | Items failed | ${FAILED:-—} |
 
           **Restore:** see \`RESTORE.md\` inside the archive (per-item original path, path in archive, owner/mode and restore commands).
+
+          Seafile and AFFiNE (affine-note), including their databases and sync sidecar, are excluded. Shared Caddy configuration and certificates remain included.
 
           The archive stays on the VPS (root-only, mode 600, newest 7 kept) and is not uploaded as an artifact.
           It contains private keys and passwords; encrypt it before copying it off the VPS:
